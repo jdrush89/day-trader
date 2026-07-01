@@ -101,7 +101,14 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
                 onClick={() => onBuy(stock.symbol, 1)}
                 disabled={stock.price > gameState.cash}
               >
-                Buy {stock.symbol} @ ${stock.price.toFixed(2)}
+                Buy 1 {stock.symbol} @ ${stock.price.toFixed(2)}
+              </button>
+              <button
+                className="buy-btn buy-10"
+                onClick={() => onBuy(stock.symbol, 10)}
+                disabled={stock.price * 10 > gameState.cash}
+              >
+                10
               </button>
               <button
                 className="short-btn"
