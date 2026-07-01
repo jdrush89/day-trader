@@ -331,6 +331,62 @@ body {
   flex-wrap: wrap;
 }
 
+.stock-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.stock-search-bar:focus-within {
+  border-color: var(--accent);
+}
+
+.stock-search-icon {
+  font-size: 0.75rem;
+  opacity: 0.5;
+}
+
+.stock-search-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.stock-search-input::placeholder {
+  color: var(--text-dim);
+  text-transform: none;
+}
+
+.stock-search-clear {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 2px 4px;
+  font-family: inherit;
+}
+
+.stock-search-clear:hover {
+  color: var(--text);
+}
+
+.stock-search-empty {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
 .stock-tab {
   padding: 3px 8px;
   font-size: 0.7rem;
