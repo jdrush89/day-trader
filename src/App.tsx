@@ -23,6 +23,17 @@ function App() {
     return () => clearInterval(interval);
   }, [gameState.marketOpen, gameState.gameOver, speed, paused]);
 
+  // Escape key toggles pause menu
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPaused((p) => !p);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   const handleChangeChannel = useCallback((monitorId: number, channel: MonitorChannel) => {
     setGameState((prev) => ({
       ...prev,
@@ -84,9 +95,6 @@ function App() {
             </span>
           </div>
           <div className="speed-controls">
-            <button className={`pause-btn ${paused ? "active" : ""}`} onClick={() => setPaused((p) => !p)}>
-              {paused ? "▶" : "⏸"}
-            </button>
             <button className={speed === 1 ? "active" : ""} onClick={() => setSpeed(1)}>1x</button>
             <button className={speed === 2 ? "active" : ""} onClick={() => setSpeed(2)}>2x</button>
             <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>
@@ -94,6 +102,21 @@ function App() {
           <button className="shop-btn" onClick={() => setShopOpen(true)}>🛒 Shop</button>
         </div>
       </header>
+
+      {paused && (
+        <div className="pause-overlay">
+          <div className="pause-menu">
+            <h2>⏸ Paused</h2>
+            <button className="pause-menu-btn resume" onClick={() => setPaused(false)}>
+              Resume
+            </button>
+            <button className="pause-menu-btn restart" onClick={() => { setPaused(false); handleRestart(); }}>
+              Start Over
+            </button>
+            <p className="pause-hint">Press ESC to resume</p>
+          </div>
+        </div>
+      )}
 
       {gameState.gameOver && (
         <div className="game-over-overlay">

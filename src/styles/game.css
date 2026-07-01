@@ -94,12 +94,6 @@ body {
   font-size: 0.75rem;
 }
 
-.pause-btn.active {
-  background: var(--gold);
-  color: #000;
-  border-color: var(--gold);
-}
-
 .speed-controls button.active {
   background: var(--accent);
   color: #000;
@@ -855,6 +849,7 @@ body {
 }
 
 /* Overlays */
+.pause-overlay,
 .game-over-overlay,
 .end-of-day-overlay,
 .upgrade-shop-overlay {
@@ -865,6 +860,62 @@ body {
   justify-content: center;
   background: rgba(0, 0, 0, 0.8);
   z-index: 100;
+}
+
+/* Pause Menu */
+.pause-menu {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 40px 48px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.pause-menu h2 {
+  font-size: 1.3rem;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.pause-menu-btn {
+  width: 180px;
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.pause-menu-btn.resume {
+  background: var(--accent);
+  color: #000;
+}
+
+.pause-menu-btn.resume:hover {
+  background: #79bbff;
+}
+
+.pause-menu-btn.restart {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.pause-menu-btn.restart:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.pause-hint {
+  margin-top: 8px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
 }
 
 .game-over,
