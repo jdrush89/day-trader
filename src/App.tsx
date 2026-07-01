@@ -10,17 +10,18 @@ function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [shopOpen, setShopOpen] = useState(false);
   const [speed, setSpeed] = useState<number>(1);
+  const [paused, setPaused] = useState(false);
 
   // Game loop
   useEffect(() => {
-    if (gameState.gameOver || !gameState.marketOpen) return;
+    if (gameState.gameOver || !gameState.marketOpen || paused) return;
 
     const interval = setInterval(() => {
       setGameState((prev) => tick(prev));
     }, 1000 / speed);
 
     return () => clearInterval(interval);
-  }, [gameState.marketOpen, gameState.gameOver, speed]);
+  }, [gameState.marketOpen, gameState.gameOver, speed, paused]);
 
   const handleChangeChannel = useCallback((monitorId: number, channel: MonitorChannel) => {
     setGameState((prev) => ({
@@ -79,10 +80,13 @@ function App() {
               style={{ width: `${gameState.timeOfDay}%` }}
             />
             <span className="time-label">
-              {gameState.marketOpen ? `Market Open — ${gameState.timeOfDay}%` : "Market Closed"}
+              {paused ? "⏸ PAUSED" : gameState.marketOpen ? `Market Open — ${gameState.timeOfDay}%` : "Market Closed"}
             </span>
           </div>
           <div className="speed-controls">
+            <button className={`pause-btn ${paused ? "active" : ""}`} onClick={() => setPaused((p) => !p)}>
+              {paused ? "▶" : "⏸"}
+            </button>
             <button className={speed === 1 ? "active" : ""} onClick={() => setSpeed(1)}>1x</button>
             <button className={speed === 2 ? "active" : ""} onClick={() => setSpeed(2)}>2x</button>
             <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>

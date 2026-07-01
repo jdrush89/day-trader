@@ -94,6 +94,12 @@ body {
   font-size: 0.75rem;
 }
 
+.pause-btn.active {
+  background: var(--gold);
+  color: #000;
+  border-color: var(--gold);
+}
+
 .speed-controls button.active {
   background: var(--accent);
   color: #000;
