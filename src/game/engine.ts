@@ -83,22 +83,22 @@ const BUSINESS_TEMPLATES: BusinessTemplate[] = [
 ];
 
 const GLOBAL_TEMPLATES = [
-  { headline: "BREAKING: Fed signals interest rate hike next quarter — markets brace for tightening", sentiment: "negative" as const, affectedTags: ["finance", "banking"], oppositeEffectTags: ["large-cap"] },
-  { headline: "BREAKING: Trade deal reached between US and China — tariffs to be rolled back", sentiment: "positive" as const, affectedTags: ["tech", "consumer", "retail"] },
-  { headline: "ALERT: Oil prices surge 8% on Middle East conflict escalation — defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["energy"], oppositeEffectTags: ["consumer", "retail"] },
-  { headline: "DEVELOPING: GDP growth exceeds forecasts at 3.2% — strongest quarter in two years", sentiment: "positive" as const, affectedTags: ["large-cap", "mid-cap"] },
-  { headline: "BREAKING: New 25% tariffs announced on tech imports — semiconductor stocks in freefall", sentiment: "negative" as const, affectedTags: ["tech", "enterprise"] },
-  { headline: "ALERT: Central bank announces emergency liquidity injection — $500B in stimulus", sentiment: "positive" as const, affectedTags: ["finance", "banking", "speculative"] },
-  { headline: "DEVELOPING: Unemployment hits 50-year low at 3.1% — wage growth accelerating", sentiment: "positive" as const, affectedTags: ["consumer", "retail", "food"] },
-  { headline: "BREAKING: Global supply chain crisis deepens — shipping delays hit 6-month highs", sentiment: "negative" as const, affectedTags: ["consumer", "retail"], oppositeEffectTags: ["tech", "cloud"] },
-  { headline: "ALERT: War unfolds in Eastern Europe — NATO activates rapid response force, defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["large-cap"], oppositeEffectTags: ["energy"] },
-  { headline: "BREAKING: Inflation falls to 2.1% — Fed pivot expected, markets rally", sentiment: "positive" as const, affectedTags: ["finance", "banking", "large-cap"] },
-  { headline: "DEVELOPING: Major bank collapse triggers contagion fears — regulators step in", sentiment: "negative" as const, affectedTags: ["finance", "banking"], oppositeEffectTags: ["pharma", "healthcare"] },
-  { headline: "ALERT: Historic climate accord signed — renewable energy subsidies tripled", sentiment: "positive" as const, affectedTags: ["energy", "renewable", "green"], oppositeEffectTags: ["large-cap"] },
-  { headline: "BREAKING: FDA fast-tracks approval for new drug class — pharma stocks surge", sentiment: "positive" as const, affectedTags: ["pharma", "biotech", "healthcare"] },
-  { headline: "ALERT: Social media regulation bill passes Senate — tech companies scramble", sentiment: "negative" as const, affectedTags: ["tech", "social-media"], oppositeEffectTags: ["finance"] },
-  { headline: "BREAKING: Retail spending surges over holiday weekend — consumer confidence soars", sentiment: "positive" as const, affectedTags: ["consumer", "retail", "food", "mid-cap"] },
-  { headline: "DEVELOPING: Small-cap rally as investors rotate out of mega-caps", sentiment: "positive" as const, affectedTags: ["small-cap", "speculative"], oppositeEffectTags: ["large-cap"] },
+  { headline: "BREAKING: Fed signals interest rate hike next quarter — markets brace for tightening", sentiment: "negative" as const, affectedTags: ["finance"] },
+  { headline: "BREAKING: Trade deal reached between US and China — tariffs to be rolled back", sentiment: "positive" as const, affectedTags: ["tech"] },
+  { headline: "ALERT: Oil prices surge 8% on Middle East conflict escalation — defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["energy"] },
+  { headline: "DEVELOPING: GDP growth exceeds forecasts at 3.2% — strongest quarter in two years", sentiment: "positive" as const, affectedTags: ["large-cap"] },
+  { headline: "BREAKING: New 25% tariffs announced on tech imports — semiconductor stocks in freefall", sentiment: "negative" as const, affectedTags: ["tech"] },
+  { headline: "ALERT: Central bank announces emergency liquidity injection — $500B in stimulus", sentiment: "positive" as const, affectedTags: ["finance", "speculative"] },
+  { headline: "DEVELOPING: Unemployment hits 50-year low at 3.1% — wage growth accelerating", sentiment: "positive" as const, affectedTags: ["consumer"] },
+  { headline: "BREAKING: Global supply chain crisis deepens — shipping delays hit 6-month highs", sentiment: "negative" as const, affectedTags: ["retail"] },
+  { headline: "ALERT: War unfolds in Eastern Europe — NATO activates rapid response force, defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["large-cap"] },
+  { headline: "BREAKING: Inflation falls to 2.1% — Fed pivot expected, markets rally", sentiment: "positive" as const, affectedTags: ["banking"] },
+  { headline: "DEVELOPING: Major bank collapse triggers contagion fears — regulators step in", sentiment: "negative" as const, affectedTags: ["banking"] },
+  { headline: "ALERT: Historic climate accord signed — renewable energy subsidies tripled", sentiment: "positive" as const, affectedTags: ["renewable"] },
+  { headline: "BREAKING: FDA fast-tracks approval for new drug class — pharma stocks surge", sentiment: "positive" as const, affectedTags: ["pharma"] },
+  { headline: "ALERT: Social media regulation bill passes Senate — tech companies scramble", sentiment: "negative" as const, affectedTags: ["social-media"] },
+  { headline: "BREAKING: Retail spending surges over holiday weekend — consumer confidence soars", sentiment: "positive" as const, affectedTags: ["retail", "consumer"] },
+  { headline: "DEVELOPING: Small-cap rally as investors rotate out of mega-caps", sentiment: "positive" as const, affectedTags: ["small-cap"] },
 ];
 
 const SOCIAL_TEMPLATES = [
@@ -142,15 +142,13 @@ function generateImpact(
   category: NewsItem["category"],
   sentiment: "positive" | "negative",
   targetStock: Stock,
-  allStocks: Stock[],
-  affectedTags?: string[],
-  oppositeEffectTags?: string[]
+  _allStocks: Stock[],
+  affectedTags?: string[]
 ): NewsImpact {
   const direction = sentiment === "positive" ? "up" : "down";
-  const oppositeDir = sentiment === "positive" ? "down" : "up";
 
   if (category === "business") {
-    // Direct impact on the target stock
+    // Direct impact on one specific stock
     const strength = Math.random() > 0.4 ? "strong" : "moderate";
     const probability = 0.7 + Math.random() * 0.2; // 70-90%
     const description = `${Math.round(probability * 100)}% chance of ${strength} price ${direction === "up" ? "surge" : "drop"} in ${targetStock.symbol}`;
@@ -164,55 +162,32 @@ function generateImpact(
   }
 
   if (category === "global") {
+    // Impact targets tags, not individual stocks
     const probability = 0.6 + Math.random() * 0.25; // 60-85%
     const tags = affectedTags ?? [];
-    const oppTags = oppositeEffectTags ?? [];
+    const strength = (Math.random() > 0.5 ? "moderate" : "weak") as "weak" | "moderate" | "strong";
 
-    // Find stocks matching the affected tags
-    const matchedStocks = tags.length > 0
-      ? allStocks.filter((s) => s.tags.some((t) => tags.includes(t)))
-      : allStocks;
-    // Find stocks matching the opposite-effect tags (but not already in main set)
-    const oppositeStocks = oppTags.length > 0
-      ? allStocks.filter((s) => s.tags.some((t) => oppTags.includes(t)) && !matchedStocks.includes(s))
-      : [];
+    const effects: NewsImpact["effects"] = tags.map((t) => ({
+      tag: t,
+      direction: direction as "up" | "down",
+      strength,
+    }));
 
-    const effects = [
-      ...matchedStocks.map((s) => ({
-        symbol: s.symbol,
-        direction: direction as "up" | "down",
-        strength: (Math.random() > 0.5 ? "moderate" : "weak") as "weak" | "moderate" | "strong",
-      })),
-      ...oppositeStocks.map((s) => ({
-        symbol: s.symbol,
-        direction: oppositeDir as "up" | "down",
-        strength: "weak" as "weak" | "moderate" | "strong",
-      })),
-    ];
-
-    // If no stocks matched at all, fall back to targeting the randomly-chosen stock
+    // Fallback: if no tags, target the random stock directly
     if (effects.length === 0) {
-      effects.push({
-        symbol: targetStock.symbol,
-        direction,
-        strength: "moderate" as "weak" | "moderate" | "strong",
-      });
+      effects.push({ symbol: targetStock.symbol, direction, strength: "moderate" as const });
     }
 
-    const upEffects = effects.filter((e) => e.direction === "up");
-    const downEffects = effects.filter((e) => e.direction === "down");
-    let description = `${Math.round(probability * 100)}% chance: `;
-    if (upEffects.length > 0) description += `${upEffects.map(e => e.symbol).join(", ")} go up`;
-    if (upEffects.length > 0 && downEffects.length > 0) description += "; ";
-    if (downEffects.length > 0) description += `${downEffects.map(e => e.symbol).join(", ")} go down`;
-    if (tags.length > 0) description += ` [${tags.join(", ")}]`;
+    const tagList = tags.join(", ");
+    const description = `${Math.round(probability * 100)}% chance: [${tagList}] stocks go ${direction}`;
+    const dur = 10 + Math.floor(Math.random() * 10);
 
     return {
       description,
       effects,
       probability,
-      duration: 10 + Math.floor(Math.random() * 10),
-      ticksRemaining: 10 + Math.floor(Math.random() * 10),
+      duration: dur,
+      ticksRemaining: dur,
     };
   }
 
@@ -253,7 +228,7 @@ function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem
 
   if (category === "global") {
     const template = GLOBAL_TEMPLATES[Math.floor(Math.random() * GLOBAL_TEMPLATES.length)];
-    const impact = generateImpact(category, template.sentiment, stock, stocks, template.affectedTags, template.oppositeEffectTags);
+    const impact = generateImpact(category, template.sentiment, stock, stocks, template.affectedTags);
     return {
       id: `news-${++newsIdCounter}`,
       headline: template.headline,
@@ -294,7 +269,13 @@ function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
     if (!item.impact || item.impact.ticksRemaining <= 0) continue;
 
     for (const effect of item.impact.effects) {
-      if (effect.symbol !== stock.symbol) continue;
+      // Match by symbol or by tag
+      const matches = effect.symbol
+        ? effect.symbol === stock.symbol
+        : effect.tag
+        ? stock.tags.includes(effect.tag)
+        : false;
+      if (!matches) continue;
 
       // Only fire with the given probability
       if (Math.random() > item.impact.probability) continue;

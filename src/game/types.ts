@@ -17,7 +17,7 @@ export interface EarningsData {
 
 export interface NewsImpact {
   description: string; // human-readable for debug view
-  effects: { symbol: string; direction: "up" | "down"; strength: "weak" | "moderate" | "strong" }[];
+  effects: { symbol?: string; tag?: string; direction: "up" | "down"; strength: "weak" | "moderate" | "strong" }[];
   probability: number; // 0-1, how likely it is to actually fire each tick
   duration: number; // how many ticks the effect lasts
   ticksRemaining: number;
