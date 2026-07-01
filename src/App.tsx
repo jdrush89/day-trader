@@ -5,8 +5,10 @@ import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchase
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { UpgradeShop } from "./components/UpgradeShop";
+import titleScreen from "./assets/title-screen.png";
 
 function App() {
+  const [showTitle, setShowTitle] = useState(true);
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [shopOpen, setShopOpen] = useState(false);
   const [speed, setSpeed] = useState<number>(1);
@@ -27,6 +29,10 @@ function App() {
   // Escape key toggles pause menu, 'n' toggles debug mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (showTitle) {
+        setShowTitle(false);
+        return;
+      }
       if (e.key === "Escape") {
         setPaused((p) => !p);
       } else if (e.key === "n" || e.key === "N") {
@@ -35,7 +41,7 @@ function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [showTitle]);
 
   const handleChangeChannel = useCallback((monitorId: number, channel: MonitorChannel) => {
     setGameState((prev) => ({
@@ -81,7 +87,22 @@ function App() {
 
   const handleRestart = useCallback(() => {
     setGameState(createInitialState());
+    setShowTitle(true);
   }, []);
+
+  if (showTitle) {
+    return (
+      <div className="title-screen">
+        <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
+        <div className="title-screen-overlay">
+          <button className="title-start-btn" onClick={() => setShowTitle(false)}>
+            START TRADING
+          </button>
+          <p className="title-hint">Press any key to start</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="game-container">

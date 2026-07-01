@@ -11,6 +11,69 @@
   --gold: #ffd700;
 }
 
+/* Title Screen */
+.title-screen {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
+.title-screen-bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+}
+
+.title-screen-overlay {
+  position: absolute;
+  bottom: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.title-start-btn {
+  font-family: "Courier New", monospace;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 0.8rem 2.5rem;
+  background: var(--green);
+  color: #000;
+  border: 3px solid #fff;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  animation: title-pulse 1.5s ease-in-out infinite;
+}
+
+.title-start-btn:hover {
+  background: #fff;
+  color: #000;
+}
+
+.title-hint {
+  font-family: "Courier New", monospace;
+  font-size: 0.85rem;
+  color: #aaa;
+  animation: title-blink 1s step-end infinite;
+}
+
+@keyframes title-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes title-blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+
 * {
   margin: 0;
   padding: 0;
