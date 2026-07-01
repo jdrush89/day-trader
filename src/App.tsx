@@ -26,13 +26,29 @@ function App() {
     return () => clearInterval(interval);
   }, [gameState.marketOpen, gameState.gameOver, speed, paused]);
 
-  // Escape key toggles pause menu, 'n' toggles debug mode
+  // Escape key toggles pause menu, 'n' toggles debug mode, number keys switch channels
+  const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showTitle) {
         setShowTitle(false);
         return;
       }
+
+      // Number keys 1-5 switch channel on the first monitor (override even focused inputs)
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= CHANNEL_KEYS.length) {
+        e.preventDefault();
+        setGameState((prev) => ({
+          ...prev,
+          monitors: prev.monitors.map((m) =>
+            m.id === 0 ? { ...m, channel: CHANNEL_KEYS[num - 1] } : m
+          ),
+        }));
+        return;
+      }
+
       if (e.key === "Escape") {
         setPaused((p) => !p);
       } else if (e.key === "n" || e.key === "N") {

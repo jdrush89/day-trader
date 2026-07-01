@@ -64,7 +64,13 @@ export function Monitor({ monitor, gameState, debugMode, onChangeChannel, onSele
                     className="stock-search-input"
                     placeholder="Search ticker..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={(e) => setSearchQuery(e.target.value.replace(/[0-9]/g, ""))}
+                    onKeyDown={(e) => {
+                      // Let number keys bubble up to the global handler for channel switching
+                      if (/^[1-9]$/.test(e.key)) {
+                        e.currentTarget.blur();
+                      }
+                    }}
                   />
                   {searchQuery && (
                     <button className="stock-search-clear" onClick={() => setSearchQuery("")}>✕</button>
