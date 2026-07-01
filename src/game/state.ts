@@ -67,6 +67,7 @@ export function createInitialState(): GameState {
     loan: 1000,
     interestRate: 0.1,
     portfolio: [],
+    shorts: [],
     monitors: [{ id: 0, channel: "stock_ticker", selectedStock: "MEGA" }],
     stocks: INITIAL_STOCKS,
     news: [],

@@ -22,6 +22,12 @@ export interface Position {
   avgCost: number;
 }
 
+export interface ShortPosition {
+  symbol: string;
+  shares: number;
+  entryPrice: number;
+}
+
 export interface Upgrade {
   id: string;
   name: string;
@@ -56,6 +62,7 @@ export interface GameState {
   loan: number;
   interestRate: number;
   portfolio: Position[];
+  shorts: ShortPosition[];
   monitors: Monitor[];
   stocks: Stock[];
   news: NewsItem[];

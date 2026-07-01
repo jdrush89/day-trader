@@ -365,6 +365,36 @@ body {
   gap: 4px;
 }
 
+.trade-row {
+  display: flex;
+  gap: 4px;
+}
+
+.trade-row .buy-btn {
+  flex: 1;
+}
+
+.short-btn {
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.short-btn:hover:not(:disabled) {
+  background: var(--red);
+  color: #000;
+}
+
+.short-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .buy-btn {
   padding: 6px 8px;
   font-size: 0.7rem;

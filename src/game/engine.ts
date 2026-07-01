@@ -104,7 +104,17 @@ export function tick(state: GameState): GameState {
       return sum + (stock ? stock.price * pos.shares : 0);
     }, 0);
 
-    const gameOver = newCash + portfolioValue < 0;
+    // Short positions: liability is current market value
+    const shortLiability = state.shorts.reduce((sum, pos) => {
+      const stock = newStocks.find((s) => s.symbol === pos.symbol);
+      return sum + (stock ? stock.price * pos.shares : 0);
+    }, 0);
+    const shortCollateral = state.shorts.reduce(
+      (sum, pos) => sum + pos.entryPrice * pos.shares,
+      0
+    );
+
+    const gameOver = newCash + portfolioValue - shortLiability < 0;
 
     return {
       ...state,
@@ -115,7 +125,7 @@ export function tick(state: GameState): GameState {
       timeOfDay: 0,
       marketOpen: false,
       gameOver,
-      totalProfit: newCash + portfolioValue - state.loan,
+      totalProfit: newCash + portfolioValue + shortCollateral - shortLiability - state.loan,
     };
   }
 
@@ -168,6 +178,53 @@ export function sellStock(state: GameState, symbol: string, shares: number): Gam
         );
 
   return { ...state, cash: state.cash + revenue, portfolio: newPortfolio };
+}
+
+export function shortStock(state: GameState, symbol: string, shares: number): GameState {
+  const stock = state.stocks.find((s) => s.symbol === symbol);
+  if (!stock) return state;
+
+  // Require margin: must have enough cash to cover potential loss (100% collateral)
+  const collateral = stock.price * shares;
+  if (collateral > state.cash) return state;
+
+  const existing = state.shorts.find((p) => p.symbol === symbol);
+  let newShorts;
+
+  if (existing) {
+    const totalShares = existing.shares + shares;
+    const totalEntry = existing.entryPrice * existing.shares + stock.price * shares;
+    newShorts = state.shorts.map((p) =>
+      p.symbol === symbol
+        ? { ...p, shares: totalShares, entryPrice: totalEntry / totalShares }
+        : p
+    );
+  } else {
+    newShorts = [...state.shorts, { symbol, shares, entryPrice: stock.price }];
+  }
+
+  // Lock collateral from cash
+  return { ...state, cash: state.cash - collateral, shorts: newShorts };
+}
+
+export function coverShort(state: GameState, symbol: string, shares: number): GameState {
+  const stock = state.stocks.find((s) => s.symbol === symbol);
+  const position = state.shorts.find((p) => p.symbol === symbol);
+  if (!stock || !position || position.shares < shares) return state;
+
+  // Return collateral + profit (or - loss)
+  // You get back your collateral, minus what it costs to buy back
+  const netCash = state.cash + (position.entryPrice - stock.price) * shares + position.entryPrice * shares;
+
+  const remainingShares = position.shares - shares;
+  const newShorts =
+    remainingShares === 0
+      ? state.shorts.filter((p) => p.symbol !== symbol)
+      : state.shorts.map((p) =>
+          p.symbol === symbol ? { ...p, shares: remainingShares } : p
+        );
+
+  return { ...state, cash: netCash, shorts: newShorts };
 }
 
 export function openMarket(state: GameState): GameState {

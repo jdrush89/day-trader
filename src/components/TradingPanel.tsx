@@ -4,9 +4,11 @@ interface TradingPanelProps {
   gameState: GameState;
   onBuy: (symbol: string, shares: number) => void;
   onSell: (symbol: string, shares: number) => void;
+  onShort: (symbol: string, shares: number) => void;
+  onCover: (symbol: string, shares: number) => void;
 }
 
-export function TradingPanel({ gameState, onBuy, onSell }: TradingPanelProps) {
+export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: TradingPanelProps) {
   const portfolioValue = gameState.portfolio.reduce((sum, pos) => {
     const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
     return sum + (stock ? stock.price * pos.shares : 0);
@@ -63,18 +65,52 @@ export function TradingPanel({ gameState, onBuy, onSell }: TradingPanelProps) {
         })}
       </div>
 
+      <div className="positions">
+        <h3>Short Positions</h3>
+        {gameState.shorts.length === 0 && <div className="empty">No shorts</div>}
+        {gameState.shorts.map((pos) => {
+          const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
+          const currentCost = stock ? stock.price * pos.shares : 0;
+          const entryValue = pos.entryPrice * pos.shares;
+          const pnl = entryValue - currentCost; // profit when price drops
+          return (
+            <div key={pos.symbol} className="position-row">
+              <span className="pos-symbol">{pos.symbol}</span>
+              <span className="pos-shares">{pos.shares} short</span>
+              <span className={`pos-pnl ${pnl >= 0 ? "up" : "down"}`}>
+                {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+              </span>
+              <button className="sell-btn" onClick={() => onCover(pos.symbol, 1)}>
+                Cover 1
+              </button>
+              <button className="sell-btn" onClick={() => onCover(pos.symbol, pos.shares)}>
+                Cover All
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="quick-buy">
-        <h3>Quick Buy</h3>
+        <h3>Quick Buy / Short</h3>
         <div className="buy-grid">
           {gameState.stocks.map((stock) => (
-            <button
-              key={stock.symbol}
-              className="buy-btn"
-              onClick={() => onBuy(stock.symbol, 1)}
-              disabled={stock.price > gameState.cash}
-            >
-              {stock.symbol} @ ${stock.price.toFixed(2)}
-            </button>
+            <div key={stock.symbol} className="trade-row">
+              <button
+                className="buy-btn"
+                onClick={() => onBuy(stock.symbol, 1)}
+                disabled={stock.price > gameState.cash}
+              >
+                Buy {stock.symbol} @ ${stock.price.toFixed(2)}
+              </button>
+              <button
+                className="short-btn"
+                onClick={() => onShort(stock.symbol, 1)}
+                disabled={stock.price > gameState.cash}
+              >
+                Short
+              </button>
+            </div>
           ))}
         </div>
       </div>

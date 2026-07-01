@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, openMarket, purchaseUpgrade } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade } from "./game/engine";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { UpgradeShop } from "./components/UpgradeShop";
@@ -46,6 +46,14 @@ function App() {
 
   const handleSell = useCallback((symbol: string, shares: number) => {
     setGameState((prev) => sellStock(prev, symbol, shares));
+  }, []);
+
+  const handleShort = useCallback((symbol: string, shares: number) => {
+    setGameState((prev) => shortStock(prev, symbol, shares));
+  }, []);
+
+  const handleCover = useCallback((symbol: string, shares: number) => {
+    setGameState((prev) => coverShort(prev, symbol, shares));
   }, []);
 
   const handlePurchase = useCallback((upgradeId: string) => {
@@ -122,6 +130,8 @@ function App() {
             gameState={gameState}
             onBuy={handleBuy}
             onSell={handleSell}
+            onShort={handleShort}
+            onCover={handleCover}
           />
         </aside>
       </div>
