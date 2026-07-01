@@ -363,7 +363,11 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
 }
 
 export function openMarket(state: GameState): GameState {
-  return { ...state, marketOpen: true };
+  return {
+    ...state,
+    marketOpen: true,
+    stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price })),
+  };
 }
 
 export function purchaseUpgrade(state: GameState, upgradeId: string): GameState {

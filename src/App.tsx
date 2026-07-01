@@ -102,16 +102,60 @@ function App() {
         </div>
       )}
 
-      {!gameState.marketOpen && !gameState.gameOver && (
-        <div className="end-of-day-overlay">
-          <div className="end-of-day">
-            <h2>📋 End of Day {gameState.day - 1}</h2>
-            <p>Interest paid: ${(gameState.loan * gameState.interestRate).toFixed(2)}</p>
-            <p>Cash remaining: ${gameState.cash.toFixed(2)}</p>
-            <button onClick={handleNewDay}>Start Day {gameState.day}</button>
+      {!gameState.marketOpen && !gameState.gameOver && (() => {
+        const ranked = [...gameState.stocks]
+          .map((s) => ({
+            ...s,
+            change: s.price - s.openPrice,
+            changePct: ((s.price - s.openPrice) / s.openPrice) * 100,
+          }))
+          .sort((a, b) => b.changePct - a.changePct);
+        const winners = ranked.filter((s) => s.changePct > 0);
+        const losers = ranked.filter((s) => s.changePct < 0).reverse();
+
+        return (
+          <div className="end-of-day-overlay">
+            <div className="end-of-day">
+              <h2>📋 End of Day {gameState.day - 1}</h2>
+              <div className="eod-stats">
+                <p>Interest paid: <strong>${(gameState.loan * gameState.interestRate).toFixed(2)}</strong></p>
+                <p>Cash remaining: <strong>${gameState.cash.toFixed(2)}</strong></p>
+              </div>
+
+              <div className="eod-movers">
+                <div className="eod-column">
+                  <h3 className="eod-winners-title">📈 Winners</h3>
+                  {winners.length === 0 && <span className="eod-none">None</span>}
+                  {winners.map((s) => (
+                    <div key={s.symbol} className="eod-mover-row">
+                      <span className="eod-symbol">{s.symbol}</span>
+                      <span className="eod-price">${s.price.toFixed(2)}</span>
+                      <span className="eod-change up">
+                        +${s.change.toFixed(2)} (+{s.changePct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <div className="eod-column">
+                  <h3 className="eod-losers-title">📉 Losers</h3>
+                  {losers.length === 0 && <span className="eod-none">None</span>}
+                  {losers.map((s) => (
+                    <div key={s.symbol} className="eod-mover-row">
+                      <span className="eod-symbol">{s.symbol}</span>
+                      <span className="eod-price">${s.price.toFixed(2)}</span>
+                      <span className="eod-change down">
+                        -${Math.abs(s.change).toFixed(2)} ({s.changePct.toFixed(1)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={handleNewDay}>Start Day {gameState.day}</button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="main-layout">
         <div className="monitors-area">

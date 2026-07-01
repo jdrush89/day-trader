@@ -749,8 +749,87 @@ body {
   text-align: center;
 }
 
+.end-of-day {
+  min-width: 420px;
+}
+
 .game-over h2 { color: var(--red); margin-bottom: 12px; }
-.end-of-day h2 { color: var(--accent); margin-bottom: 12px; }
+.end-of-day h2 { color: var(--accent); margin-bottom: 16px; }
+
+.eod-stats {
+  margin-bottom: 20px;
+}
+
+.eod-stats p {
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.eod-stats strong {
+  color: var(--text);
+}
+
+.eod-movers {
+  display: flex;
+  gap: 20px;
+  text-align: left;
+  margin-bottom: 8px;
+}
+
+.eod-column {
+  flex: 1;
+}
+
+.eod-winners-title {
+  font-size: 0.8rem;
+  color: var(--green);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eod-losers-title {
+  font-size: 0.8rem;
+  color: var(--red);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eod-mover-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.75rem;
+  gap: 8px;
+}
+
+.eod-symbol {
+  font-weight: bold;
+  min-width: 45px;
+}
+
+.eod-price {
+  color: var(--text-dim);
+}
+
+.eod-change {
+  font-weight: bold;
+  font-size: 0.7rem;
+  min-width: 110px;
+  text-align: right;
+}
+
+.eod-change.up { color: var(--green); }
+.eod-change.down { color: var(--red); }
+
+.eod-none {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
 
 .game-over p,
 .end-of-day p {

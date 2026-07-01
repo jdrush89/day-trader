@@ -2,6 +2,7 @@ export interface Stock {
   symbol: string;
   name: string;
   price: number;
+  openPrice: number;
   history: number[];
   sector: string;
 }
