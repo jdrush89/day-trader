@@ -1,8 +1,98 @@
+import { useState, useEffect } from "react";
 import { NewsItem } from "../game/types";
 
 interface NewsFeedProps {
   news: NewsItem[];
   category: "business" | "global" | "social";
+}
+
+interface Commercial {
+  symbol: string;
+  company: string;
+  tagline: string;
+  description: string;
+  emoji: string;
+  color: string;
+}
+
+const COMMERCIALS: Commercial[] = [
+  {
+    symbol: "MEGA",
+    company: "MegaCorp Industries",
+    tagline: "Building Tomorrow. Today.™",
+    description: "From cloud infrastructure to quantum computing, MegaCorp is the backbone of modern enterprise. 500,000 employees. 140 countries. One vision. Whether it's autonomous logistics or AI-driven analytics — if it runs, it runs on MegaCorp.",
+    emoji: "🏢",
+    color: "#58a6ff",
+  },
+  {
+    symbol: "BREW",
+    company: "BrewDog Coffee Co",
+    tagline: "Fuel Your Grind.™",
+    description: "Life's too short for bad coffee. BrewDog sources single-origin beans from 23 countries, roasts them in small batches, and delivers them to 8,000 cafés worldwide. Now introducing BrewDog Energy — because sleep is for closers.",
+    emoji: "☕",
+    color: "#c69749",
+  },
+  {
+    symbol: "NOVA",
+    company: "Nova Energy",
+    tagline: "Power Without Compromise.™",
+    description: "Nova Energy operates the world's largest network of next-gen solar farms and offshore wind installations. Powering 40 million homes and counting. Our fusion research division is on track to deliver limitless clean energy by 2035. Probably.",
+    emoji: "⚡",
+    color: "#00ff88",
+  },
+  {
+    symbol: "PILL",
+    company: "PillStack Pharma",
+    tagline: "A Pill For Every Ill.™",
+    description: "PillStack Pharma has 47 drugs in its pipeline and FDA approval rates that make competitors weep. From gene therapy to anti-aging supplements, we're not just extending lives — we're upgrading them. Side effects may include optimism.",
+    emoji: "💊",
+    color: "#ff6b9d",
+  },
+  {
+    symbol: "BANK",
+    company: "First National Holdings",
+    tagline: "Your Money. Our Expertise. Our Yachts.™",
+    description: "For over 150 years, First National has been the name in institutional finance. Wealth management, commercial lending, algorithmic trading — we do it all. With $2.3 trillion in assets under management, your portfolio is in good hands. Ours.",
+    emoji: "🏦",
+    color: "#ffd700",
+  },
+  {
+    symbol: "MEME",
+    company: "MemeTech Solutions",
+    tagline: "Disrupting Disruption.™",
+    description: "What do NFT-powered smart toasters, blockchain pet insurance, and AI-generated horoscopes have in common? MemeTech built them all. Our CEO is 24 and sleeps in the office. We don't have a business model, but we DO have 12 million TikTok followers.",
+    emoji: "🚀",
+    color: "#ff4500",
+  },
+];
+
+function CommercialView() {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * COMMERCIALS.length));
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % COMMERCIALS.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const ad = COMMERCIALS[index];
+
+  return (
+    <div className="commercial">
+      <div className="commercial-badge">AD</div>
+      <div className="commercial-emoji">{ad.emoji}</div>
+      <div className="commercial-company" style={{ color: ad.color }}>{ad.company}</div>
+      <div className="commercial-tagline">{ad.tagline}</div>
+      <div className="commercial-body">{ad.description}</div>
+      <div className="commercial-ticker">${ad.symbol}</div>
+      <div className="commercial-dots">
+        {COMMERCIALS.map((_, i) => (
+          <span key={i} className={`commercial-dot ${i === index ? "active" : ""}`} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function BusinessNewsView({ news }: { news: NewsItem[] }) {
@@ -15,9 +105,7 @@ function BusinessNewsView({ news }: { news: NewsItem[] }) {
           <span className="biz-logo">📊 MARKET WATCH</span>
           <span className="biz-live">● LIVE</span>
         </div>
-        <div className="biz-waiting">
-          <div className="biz-standby">STANDING BY FOR EARNINGS REPORT...</div>
-        </div>
+        <CommercialView />
       </div>
     );
   }
@@ -85,7 +173,7 @@ function GlobalNewsView({ news }: { news: NewsItem[] }) {
         </div>
       ) : (
         <div className="global-main">
-          <div className="global-standby">NO ACTIVE ALERTS</div>
+          <CommercialView />
         </div>
       )}
       <div className="global-ticker-bar">
