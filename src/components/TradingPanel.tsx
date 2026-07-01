@@ -39,8 +39,9 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
         </div>
       </div>
 
-      <div className="positions">
-        <h3>Positions</h3>
+      <div className="positions-scroll">
+        <div className="positions">
+          <h3>Positions</h3>
         {gameState.portfolio.length === 0 && <div className="empty">No positions</div>}
         {gameState.portfolio.map((pos) => {
           const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
@@ -89,6 +90,7 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
             </div>
           );
         })}
+      </div>
       </div>
 
       <div className="quick-buy">

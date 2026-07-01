@@ -608,6 +608,10 @@ body {
 /* Trading Panel */
 .trading-panel {
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
 }
 
 .account-summary {
@@ -635,8 +639,20 @@ body {
   color: var(--text-dim);
 }
 
+.positions-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
 .positions {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
+}
+
+.quick-buy {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
 }
 
 .position-row {
