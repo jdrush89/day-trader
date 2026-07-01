@@ -282,6 +282,24 @@ body {
   color: var(--text-dim);
 }
 
+.stock-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.stock-tag {
+  font-size: 0.6rem;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(88, 166, 255, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(88, 166, 255, 0.25);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .stock-price-row {
   display: flex;
   align-items: baseline;

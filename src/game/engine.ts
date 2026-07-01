@@ -83,18 +83,22 @@ const BUSINESS_TEMPLATES: BusinessTemplate[] = [
 ];
 
 const GLOBAL_TEMPLATES = [
-  { headline: "BREAKING: Fed signals interest rate hike next quarter — markets brace for tightening", sentiment: "negative" as const },
-  { headline: "BREAKING: Trade deal reached between US and China — tariffs to be rolled back", sentiment: "positive" as const },
-  { headline: "ALERT: Oil prices surge 8% on Middle East conflict escalation — defense spending to skyrocket", sentiment: "negative" as const },
-  { headline: "DEVELOPING: GDP growth exceeds forecasts at 3.2% — strongest quarter in two years", sentiment: "positive" as const },
-  { headline: "BREAKING: New 25% tariffs announced on tech imports — semiconductor stocks in freefall", sentiment: "negative" as const },
-  { headline: "ALERT: Central bank announces emergency liquidity injection — $500B in stimulus", sentiment: "positive" as const },
-  { headline: "DEVELOPING: Unemployment hits 50-year low at 3.1% — wage growth accelerating", sentiment: "positive" as const },
-  { headline: "BREAKING: Global supply chain crisis deepens — shipping delays hit 6-month highs", sentiment: "negative" as const },
-  { headline: "ALERT: War unfolds in Eastern Europe — NATO activates rapid response force, defense spending to skyrocket", sentiment: "negative" as const },
-  { headline: "BREAKING: Inflation falls to 2.1% — Fed pivot expected, markets rally", sentiment: "positive" as const },
-  { headline: "DEVELOPING: Major bank collapse triggers contagion fears — regulators step in", sentiment: "negative" as const },
-  { headline: "ALERT: Historic climate accord signed — renewable energy subsidies tripled", sentiment: "positive" as const },
+  { headline: "BREAKING: Fed signals interest rate hike next quarter — markets brace for tightening", sentiment: "negative" as const, affectedTags: ["finance", "banking"], oppositeEffectTags: ["large-cap"] },
+  { headline: "BREAKING: Trade deal reached between US and China — tariffs to be rolled back", sentiment: "positive" as const, affectedTags: ["tech", "consumer", "retail"] },
+  { headline: "ALERT: Oil prices surge 8% on Middle East conflict escalation — defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["energy"], oppositeEffectTags: ["consumer", "retail"] },
+  { headline: "DEVELOPING: GDP growth exceeds forecasts at 3.2% — strongest quarter in two years", sentiment: "positive" as const, affectedTags: ["large-cap", "mid-cap"] },
+  { headline: "BREAKING: New 25% tariffs announced on tech imports — semiconductor stocks in freefall", sentiment: "negative" as const, affectedTags: ["tech", "enterprise"] },
+  { headline: "ALERT: Central bank announces emergency liquidity injection — $500B in stimulus", sentiment: "positive" as const, affectedTags: ["finance", "banking", "speculative"] },
+  { headline: "DEVELOPING: Unemployment hits 50-year low at 3.1% — wage growth accelerating", sentiment: "positive" as const, affectedTags: ["consumer", "retail", "food"] },
+  { headline: "BREAKING: Global supply chain crisis deepens — shipping delays hit 6-month highs", sentiment: "negative" as const, affectedTags: ["consumer", "retail"], oppositeEffectTags: ["tech", "cloud"] },
+  { headline: "ALERT: War unfolds in Eastern Europe — NATO activates rapid response force, defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["large-cap"], oppositeEffectTags: ["energy"] },
+  { headline: "BREAKING: Inflation falls to 2.1% — Fed pivot expected, markets rally", sentiment: "positive" as const, affectedTags: ["finance", "banking", "large-cap"] },
+  { headline: "DEVELOPING: Major bank collapse triggers contagion fears — regulators step in", sentiment: "negative" as const, affectedTags: ["finance", "banking"], oppositeEffectTags: ["pharma", "healthcare"] },
+  { headline: "ALERT: Historic climate accord signed — renewable energy subsidies tripled", sentiment: "positive" as const, affectedTags: ["energy", "renewable", "green"], oppositeEffectTags: ["large-cap"] },
+  { headline: "BREAKING: FDA fast-tracks approval for new drug class — pharma stocks surge", sentiment: "positive" as const, affectedTags: ["pharma", "biotech", "healthcare"] },
+  { headline: "ALERT: Social media regulation bill passes Senate — tech companies scramble", sentiment: "negative" as const, affectedTags: ["tech", "social-media"], oppositeEffectTags: ["finance"] },
+  { headline: "BREAKING: Retail spending surges over holiday weekend — consumer confidence soars", sentiment: "positive" as const, affectedTags: ["consumer", "retail", "food", "mid-cap"] },
+  { headline: "DEVELOPING: Small-cap rally as investors rotate out of mega-caps", sentiment: "positive" as const, affectedTags: ["small-cap", "speculative"], oppositeEffectTags: ["large-cap"] },
 ];
 
 const SOCIAL_TEMPLATES = [
@@ -138,7 +142,9 @@ function generateImpact(
   category: NewsItem["category"],
   sentiment: "positive" | "negative",
   targetStock: Stock,
-  allStocks: Stock[]
+  allStocks: Stock[],
+  affectedTags?: string[],
+  oppositeEffectTags?: string[]
 ): NewsImpact {
   const direction = sentiment === "positive" ? "up" : "down";
   const oppositeDir = sentiment === "positive" ? "down" : "up";
@@ -158,27 +164,48 @@ function generateImpact(
   }
 
   if (category === "global") {
-    // Affects multiple or all stocks
     const probability = 0.6 + Math.random() * 0.25; // 60-85%
-    const affectedCount = 3 + Math.floor(Math.random() * (allStocks.length - 2));
-    const shuffled = [...allStocks].sort(() => Math.random() - 0.5).slice(0, affectedCount);
+    const tags = affectedTags ?? [];
+    const oppTags = oppositeEffectTags ?? [];
 
-    // Some go with sentiment, some against (sector rotation)
-    const effects = shuffled.map((s, i) => {
-      const goesWithSentiment = i < Math.ceil(shuffled.length * 0.7);
-      return {
+    // Find stocks matching the affected tags
+    const matchedStocks = tags.length > 0
+      ? allStocks.filter((s) => s.tags.some((t) => tags.includes(t)))
+      : allStocks;
+    // Find stocks matching the opposite-effect tags (but not already in main set)
+    const oppositeStocks = oppTags.length > 0
+      ? allStocks.filter((s) => s.tags.some((t) => oppTags.includes(t)) && !matchedStocks.includes(s))
+      : [];
+
+    const effects = [
+      ...matchedStocks.map((s) => ({
         symbol: s.symbol,
-        direction: (goesWithSentiment ? direction : oppositeDir) as "up" | "down",
+        direction: direction as "up" | "down",
         strength: (Math.random() > 0.5 ? "moderate" : "weak") as "weak" | "moderate" | "strong",
-      };
-    });
+      })),
+      ...oppositeStocks.map((s) => ({
+        symbol: s.symbol,
+        direction: oppositeDir as "up" | "down",
+        strength: "weak" as "weak" | "moderate" | "strong",
+      })),
+    ];
 
-    const upCount = effects.filter((e) => e.direction === "up").length;
-    const downCount = effects.filter((e) => e.direction === "down").length;
+    // If no stocks matched at all, fall back to targeting the randomly-chosen stock
+    if (effects.length === 0) {
+      effects.push({
+        symbol: targetStock.symbol,
+        direction,
+        strength: "moderate" as "weak" | "moderate" | "strong",
+      });
+    }
+
+    const upEffects = effects.filter((e) => e.direction === "up");
+    const downEffects = effects.filter((e) => e.direction === "down");
     let description = `${Math.round(probability * 100)}% chance: `;
-    if (upCount > 0) description += `${effects.filter(e => e.direction === "up").map(e => e.symbol).join(", ")} go up`;
-    if (upCount > 0 && downCount > 0) description += "; ";
-    if (downCount > 0) description += `${effects.filter(e => e.direction === "down").map(e => e.symbol).join(", ")} go down`;
+    if (upEffects.length > 0) description += `${upEffects.map(e => e.symbol).join(", ")} go up`;
+    if (upEffects.length > 0 && downEffects.length > 0) description += "; ";
+    if (downEffects.length > 0) description += `${downEffects.map(e => e.symbol).join(", ")} go down`;
+    if (tags.length > 0) description += ` [${tags.join(", ")}]`;
 
     return {
       description,
@@ -226,7 +253,7 @@ function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem
 
   if (category === "global") {
     const template = GLOBAL_TEMPLATES[Math.floor(Math.random() * GLOBAL_TEMPLATES.length)];
-    const impact = generateImpact(category, template.sentiment, stock, stocks);
+    const impact = generateImpact(category, template.sentiment, stock, stocks, template.affectedTags, template.oppositeEffectTags);
     return {
       id: `news-${++newsIdCounter}`,
       headline: template.headline,
@@ -234,6 +261,7 @@ function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem
       category,
       timestamp: Date.now(),
       sentiment: template.sentiment,
+      affectedTags: template.affectedTags,
       impact,
     };
   }

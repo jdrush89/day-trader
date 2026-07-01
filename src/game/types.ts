@@ -4,7 +4,7 @@ export interface Stock {
   price: number;
   openPrice: number;
   history: number[];
-  sector: string;
+  tags: string[];
 }
 
 export interface EarningsData {
@@ -30,6 +30,7 @@ export interface NewsItem {
   category: "business" | "global" | "social";
   timestamp: number;
   affectedStocks?: string[];
+  affectedTags?: string[];
   sentiment: "positive" | "negative" | "neutral";
   earnings?: EarningsData;
   author?: string;

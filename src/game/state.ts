@@ -1,12 +1,12 @@
 import { GameState, Stock, Upgrade } from "./types";
 
 const INITIAL_STOCKS: Stock[] = [
-  { symbol: "MEGA", name: "MegaCorp Industries", price: 150, openPrice: 150, history: [150], sector: "tech" },
-  { symbol: "BREW", name: "BrewDog Coffee Co", price: 42, openPrice: 42, history: [42], sector: "consumer" },
-  { symbol: "NOVA", name: "Nova Energy", price: 88, openPrice: 88, history: [88], sector: "energy" },
-  { symbol: "PILL", name: "PillStack Pharma", price: 210, openPrice: 210, history: [210], sector: "healthcare" },
-  { symbol: "BANK", name: "First National Holdings", price: 65, openPrice: 65, history: [65], sector: "finance" },
-  { symbol: "MEME", name: "MemeTech Solutions", price: 12, openPrice: 12, history: [12], sector: "tech" },
+  { symbol: "MEGA", name: "MegaCorp Industries", price: 150, openPrice: 150, history: [150], tags: ["large-cap", "tech", "cloud", "enterprise"] },
+  { symbol: "BREW", name: "BrewDog Coffee Co", price: 42, openPrice: 42, history: [42], tags: ["mid-cap", "consumer", "retail", "food"] },
+  { symbol: "NOVA", name: "Nova Energy", price: 88, openPrice: 88, history: [88], tags: ["mid-cap", "energy", "renewable", "green"] },
+  { symbol: "PILL", name: "PillStack Pharma", price: 210, openPrice: 210, history: [210], tags: ["large-cap", "healthcare", "pharma", "biotech"] },
+  { symbol: "BANK", name: "First National Holdings", price: 65, openPrice: 65, history: [65], tags: ["large-cap", "finance", "banking"] },
+  { symbol: "MEME", name: "MemeTech Solutions", price: 12, openPrice: 12, history: [12], tags: ["small-cap", "tech", "speculative", "social-media"] },
 ];
 
 const INITIAL_UPGRADES: Upgrade[] = [

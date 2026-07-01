@@ -35,6 +35,11 @@ export function StockChart({ stock }: StockChartProps) {
         <span className="stock-symbol">{stock.symbol}</span>
         <span className="stock-name">{stock.name}</span>
       </div>
+      <div className="stock-tags">
+        {stock.tags.map((tag) => (
+          <span key={tag} className="stock-tag">{tag}</span>
+        ))}
+      </div>
       <div className="stock-price-row">
         <span className="stock-price">${lastPrice.toFixed(2)}</span>
         <span className={`stock-change ${isUp ? "up" : "down"}`}>
