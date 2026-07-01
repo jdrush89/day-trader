@@ -117,13 +117,48 @@ function App() {
         const winners = ranked.filter((s) => s.changePct > 0);
         const losers = ranked.filter((s) => s.changePct < 0).reverse();
 
+        const portfolioValue = gameState.portfolio.reduce((sum, pos) => {
+          const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
+          return sum + (stock ? stock.price * pos.shares : 0);
+        }, 0);
+        const shortLiability = gameState.shorts.reduce((sum, pos) => {
+          const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
+          return sum + (stock ? stock.price * pos.shares : 0);
+        }, 0);
+        const shortCollateral = gameState.shorts.reduce(
+          (sum, pos) => sum + pos.entryPrice * pos.shares, 0
+        );
+        const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability;
+        const dailyPnL = currentNetWorth - gameState.dayStartNetWorth;
+        const interest = gameState.loan * gameState.interestRate;
+
         return (
           <div className="end-of-day-overlay">
             <div className="end-of-day">
               <h2>📋 End of Day {gameState.day - 1}</h2>
+              <div className="eod-pnl-hero">
+                <span className="eod-pnl-label">Today's P&L</span>
+                <span className={`eod-pnl-value ${dailyPnL >= 0 ? "up" : "down"}`}>
+                  {dailyPnL >= 0 ? "+$" : "-$"}{Math.abs(dailyPnL).toFixed(2)}
+                </span>
+              </div>
               <div className="eod-stats">
-                <p>Interest paid: <strong>${(gameState.loan * gameState.interestRate).toFixed(2)}</strong></p>
-                <p>Cash remaining: <strong>${gameState.cash.toFixed(2)}</strong></p>
+                <div className="eod-stat-row">
+                  <span>Interest paid</span>
+                  <span className="danger">-${interest.toFixed(2)}</span>
+                </div>
+                <div className="eod-stat-row">
+                  <span>Net worth</span>
+                  <span>${currentNetWorth.toFixed(2)}</span>
+                </div>
+                <div className="eod-stat-row">
+                  <span>Cash</span>
+                  <span>${gameState.cash.toFixed(2)}</span>
+                </div>
+                <div className="eod-stat-row">
+                  <span>Portfolio value</span>
+                  <span>${portfolioValue.toFixed(2)}</span>
+                </div>
               </div>
 
               <div className="eod-movers">

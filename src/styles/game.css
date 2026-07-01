@@ -154,8 +154,19 @@ body {
   flex: 1;
   background: var(--bg-monitor);
   border-radius: 4px;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.monitor-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .monitor-controls {
@@ -264,7 +275,9 @@ body {
 .biz-news-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .biz-header {
@@ -350,7 +363,9 @@ body {
 .global-news-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .global-header {
@@ -429,7 +444,9 @@ body {
 .social-feed-view {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .social-header {
@@ -439,6 +456,7 @@ body {
   padding-bottom: 8px;
   border-bottom: 2px solid #ff4500;
   margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .social-logo { font-weight: bold; font-size: 0.85rem; color: #ff4500; }
@@ -464,6 +482,7 @@ body {
 .social-post-list {
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -868,15 +887,47 @@ body {
   margin-bottom: 20px;
 }
 
-.eod-stats p {
-  margin-bottom: 4px;
-  font-size: 0.85rem;
+.eod-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  padding: 3px 0;
   color: var(--text-dim);
 }
 
-.eod-stats strong {
+.eod-stat-row span:last-child {
   color: var(--text);
+  font-weight: bold;
 }
+
+.eod-stat-row .danger {
+  color: var(--red);
+}
+
+.eod-pnl-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.eod-pnl-label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 4px;
+}
+
+.eod-pnl-value {
+  font-size: 1.6rem;
+  font-weight: bold;
+}
+
+.eod-pnl-value.up { color: var(--green); }
+.eod-pnl-value.down { color: var(--red); }
 
 .eod-movers {
   display: flex;

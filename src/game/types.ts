@@ -85,4 +85,5 @@ export interface GameState {
   marketOpen: boolean;
   gameOver: boolean;
   totalProfit: number;
+  dayStartNetWorth: number;
 }

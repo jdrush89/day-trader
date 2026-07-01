@@ -76,5 +76,6 @@ export function createInitialState(): GameState {
     marketOpen: true,
     gameOver: false,
     totalProfit: 0,
+    dayStartNetWorth: 1000,
   };
 }

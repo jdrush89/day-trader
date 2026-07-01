@@ -363,10 +363,24 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
 }
 
 export function openMarket(state: GameState): GameState {
+  const portfolioValue = state.portfolio.reduce((sum, pos) => {
+    const stock = state.stocks.find((s) => s.symbol === pos.symbol);
+    return sum + (stock ? stock.price * pos.shares : 0);
+  }, 0);
+  const shortLiability = state.shorts.reduce((sum, pos) => {
+    const stock = state.stocks.find((s) => s.symbol === pos.symbol);
+    return sum + (stock ? stock.price * pos.shares : 0);
+  }, 0);
+  const shortCollateral = state.shorts.reduce(
+    (sum, pos) => sum + pos.entryPrice * pos.shares, 0
+  );
+  const netWorth = state.cash + portfolioValue + shortCollateral - shortLiability;
+
   return {
     ...state,
     marketOpen: true,
     stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price })),
+    dayStartNetWorth: netWorth,
   };
 }
 
