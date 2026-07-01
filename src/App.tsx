@@ -119,6 +119,18 @@ function App() {
     setShowTitle(true);
   }, []);
 
+  // Convert timeOfDay (0-100) to market time (9:30 AM - 4:00 PM)
+  const formatMarketTime = (pct: number): string => {
+    const startMinutes = 570; // 9:30 AM
+    const endMinutes = 960;   // 4:00 PM
+    const totalMinutes = startMinutes + (pct / 100) * (endMinutes - startMinutes);
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = Math.floor(totalMinutes % 60);
+    const ampm = hours >= 12 ? "PM" : "AM";
+    const displayHour = hours > 12 ? hours - 12 : hours;
+    return `${displayHour}:${mins.toString().padStart(2, "0")} ${ampm}`;
+  };
+
   if (showTitle) {
     return (
       <div className="title-screen">
@@ -144,7 +156,7 @@ function App() {
               style={{ width: `${gameState.timeOfDay}%` }}
             />
             <span className="time-label">
-              {paused ? "⏸ PAUSED" : gameState.marketOpen ? `Market Open — ${gameState.timeOfDay}%` : "Market Closed"}
+              {paused ? "⏸ PAUSED" : gameState.marketOpen ? `Day ${gameState.day} — ${formatMarketTime(gameState.timeOfDay)}` : "Market Closed"}
             </span>
           </div>
           <div className="speed-controls">
