@@ -253,30 +253,334 @@ body {
 }
 
 /* News Feed */
-.news-feed-header {
-  font-size: 0.85rem;
-  font-weight: bold;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
-}
 
-.news-feed-items {
+/* === Business News Channel === */
+.biz-news-view {
   display: flex;
   flex-direction: column;
+  height: 100%;
+}
+
+.biz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent);
+  margin-bottom: 12px;
+}
+
+.biz-logo { font-weight: bold; font-size: 0.85rem; color: var(--accent); }
+.biz-live { color: var(--red); font-size: 0.7rem; animation: pulse 1.5s infinite; }
+
+.biz-waiting, .biz-standby {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 40px 0;
+}
+
+.biz-banner {
+  font-size: 0.95rem;
+  font-weight: bold;
+  padding: 8px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}
+
+.biz-banner.sentiment-positive { background: rgba(0, 255, 136, 0.1); color: var(--green); }
+.biz-banner.sentiment-negative { background: rgba(255, 68, 68, 0.1); color: var(--red); }
+
+.biz-body {
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--text);
+  margin-bottom: 14px;
+}
+
+.biz-earnings {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.earnings-title {
+  font-size: 0.7rem;
+  font-weight: bold;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  letter-spacing: 0.1em;
+}
+
+.earnings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
 
-.news-item {
-  padding: 6px 8px;
-  border-left: 3px solid var(--border);
-  font-size: 0.75rem;
-  line-height: 1.4;
+.earnings-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.news-item.sentiment-positive { border-left-color: var(--green); }
-.news-item.sentiment-negative { border-left-color: var(--red); }
-.news-item.sentiment-neutral { border-left-color: var(--text-dim); }
+.earnings-stat.full-width { grid-column: 1 / -1; }
+.earnings-label { font-size: 0.65rem; color: var(--text-dim); }
+.earnings-value { font-size: 0.8rem; font-weight: bold; }
+
+.biz-ticker-tag {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 2px 8px;
+  background: var(--accent);
+  color: #000;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+/* === Global News Channel === */
+.global-news-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.global-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--red);
+  margin-bottom: 12px;
+}
+
+.global-logo { font-weight: bold; font-size: 0.85rem; color: var(--red); }
+.global-live { color: var(--red); font-size: 0.7rem; animation: pulse 1.5s infinite; }
+
+.global-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 10px;
+}
+
+.global-breaking {
+  font-size: 0.7rem;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  padding: 4px 16px;
+  margin-bottom: 16px;
+  border-radius: 3px;
+}
+
+.global-breaking.sentiment-negative { background: var(--red); color: #000; }
+.global-breaking.sentiment-positive { background: var(--green); color: #000; }
+
+.global-headline {
+  font-size: 1rem;
+  font-weight: bold;
+  line-height: 1.5;
+  max-width: 90%;
+}
+
+.global-standby {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+}
+
+.global-ticker-bar {
+  border-top: 1px solid var(--border);
+  padding: 6px 0;
+  overflow: hidden;
+  white-space: nowrap;
+  margin-top: auto;
+}
+
+.global-ticker-content {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  animation: scroll-ticker 30s linear infinite;
+}
+
+@keyframes scroll-ticker {
+  0%   { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* === Social / Reddit Channel === */
+.social-feed-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.social-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #ff4500;
+  margin-bottom: 8px;
+}
+
+.social-logo { font-weight: bold; font-size: 0.85rem; color: #ff4500; }
+
+.social-tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.social-tab {
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  border-radius: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.social-tab.active {
+  background: rgba(255, 69, 0, 0.15);
+  color: #ff4500;
+}
+
+.social-post-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.social-post-row {
+  display: flex;
+  gap: 8px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.3s, border-color 0.3s;
+}
+
+.social-post-row.viral {
+  background: rgba(255, 69, 0, 0.04);
+  border-left: 2px solid #ff4500;
+}
+
+.social-post-row.mega-viral {
+  background: rgba(255, 215, 0, 0.06);
+  border-left: 2px solid var(--gold);
+}
+
+.social-rank {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  min-width: 18px;
+  padding-top: 2px;
+}
+
+.social-vote-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  gap: 1px;
+}
+
+.vote-arrow {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.vote-arrow.dim { opacity: 0.3; }
+
+.vote-count {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.vote-count.vote-hot {
+  color: #ff4500;
+}
+
+.social-post-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.social-post-title {
+  font-size: 0.8rem;
+  font-weight: bold;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+
+.social-post-body {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-bottom: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.social-post-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  align-items: center;
+}
+
+.social-author { color: #ff4500; }
+.social-flair {
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 0.55rem;
+}
+
+.social-flair.sentiment-positive { background: rgba(0, 255, 136, 0.12); color: var(--green); }
+.social-flair.sentiment-negative { background: rgba(255, 68, 68, 0.12); color: var(--red); }
+
+.social-comments { cursor: pointer; }
+.social-share { cursor: pointer; }
+
+.social-awards {
+  margin-left: auto;
+  font-size: 0.7rem;
+}
+
+.viral-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.55rem;
+  border-radius: 8px;
+  background: rgba(255, 69, 0, 0.15);
+  color: #ff4500;
+  font-weight: normal;
+}
+
+.social-empty {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 40px 0;
+  font-style: italic;
+}
 
 .news-empty {
   color: var(--text-dim);

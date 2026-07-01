@@ -6,6 +6,14 @@ export interface Stock {
   sector: string;
 }
 
+export interface EarningsData {
+  revenue: string;
+  profit: string;
+  growth: string;
+  spending: string;
+  guidance: string;
+}
+
 export interface NewsItem {
   id: string;
   headline: string;
@@ -14,6 +22,11 @@ export interface NewsItem {
   timestamp: number;
   affectedStocks?: string[];
   sentiment: "positive" | "negative" | "neutral";
+  earnings?: EarningsData;
+  author?: string;
+  upvotes?: number;
+  commentCount?: number;
+  momentum?: number; // how fast upvotes are growing (hidden from player)
 }
 
 export interface Position {
