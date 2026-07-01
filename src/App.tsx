@@ -11,6 +11,7 @@ function App() {
   const [shopOpen, setShopOpen] = useState(false);
   const [speed, setSpeed] = useState<number>(1);
   const [paused, setPaused] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
 
   // Game loop
   useEffect(() => {
@@ -23,11 +24,13 @@ function App() {
     return () => clearInterval(interval);
   }, [gameState.marketOpen, gameState.gameOver, speed, paused]);
 
-  // Escape key toggles pause menu
+  // Escape key toggles pause menu, 'n' toggles debug mode
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setPaused((p) => !p);
+      } else if (e.key === "n" || e.key === "N") {
+        setDebugMode((d) => !d);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -226,6 +229,7 @@ function App() {
               key={monitor.id}
               monitor={monitor}
               gameState={gameState}
+              debugMode={debugMode}
               onChangeChannel={handleChangeChannel}
               onSelectStock={handleSelectStock}
             />

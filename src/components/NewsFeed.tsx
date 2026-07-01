@@ -4,6 +4,7 @@ import { NewsItem } from "../game/types";
 interface NewsFeedProps {
   news: NewsItem[];
   category: "business" | "global" | "social";
+  debugMode?: boolean;
 }
 
 interface Commercial {
@@ -95,7 +96,21 @@ function CommercialView() {
   );
 }
 
-function BusinessNewsView({ news }: { news: NewsItem[] }) {
+function DebugImpact({ item }: { item: NewsItem }) {
+  if (!item.impact) return null;
+  const active = item.impact.ticksRemaining > 0;
+  return (
+    <div className={`debug-impact ${active ? "active" : "expired"}`}>
+      <span className="debug-label">🔍 DEBUG</span>
+      <span className="debug-desc">{item.impact.description}</span>
+      <span className="debug-ticks">
+        {active ? `⏱ ${item.impact.ticksRemaining} ticks remaining` : "✓ Expired"}
+      </span>
+    </div>
+  );
+}
+
+function BusinessNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
   const latest = news.find((n) => n.category === "business");
 
   if (!latest) {
@@ -150,11 +165,12 @@ function BusinessNewsView({ news }: { news: NewsItem[] }) {
       {latest.affectedStocks && (
         <div className="biz-ticker-tag">${latest.affectedStocks[0]}</div>
       )}
+      {debugMode && <DebugImpact item={latest} />}
     </div>
   );
 }
 
-function GlobalNewsView({ news }: { news: NewsItem[] }) {
+function GlobalNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
   const headlines = news.filter((n) => n.category === "global");
   const latest = headlines[0];
 
@@ -170,6 +186,7 @@ function GlobalNewsView({ news }: { news: NewsItem[] }) {
             BREAKING NEWS
           </div>
           <div className="global-headline">{latest.headline}</div>
+          {debugMode && <DebugImpact item={latest} />}
         </div>
       ) : (
         <div className="global-main">
@@ -193,7 +210,7 @@ function formatUpvotes(n: number): string {
   return `${n}`;
 }
 
-function SocialFeedView({ news }: { news: NewsItem[] }) {
+function SocialFeedView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
   // Sort by upvotes descending — this is the front page ranking
   const posts = news
     .filter((n) => n.category === "social")
@@ -251,6 +268,7 @@ function SocialFeedView({ news }: { news: NewsItem[] }) {
                     {(post.upvotes ?? 0) > 100 && "🥈"}
                   </span>
                 </div>
+                {debugMode && <DebugImpact item={post} />}
               </div>
             </div>
           );
@@ -260,8 +278,8 @@ function SocialFeedView({ news }: { news: NewsItem[] }) {
   );
 }
 
-export function NewsFeed({ news, category }: NewsFeedProps) {
-  if (category === "business") return <BusinessNewsView news={news} />;
-  if (category === "global") return <GlobalNewsView news={news} />;
-  return <SocialFeedView news={news} />;
+export function NewsFeed({ news, category, debugMode }: NewsFeedProps) {
+  if (category === "business") return <BusinessNewsView news={news} debugMode={debugMode} />;
+  if (category === "global") return <GlobalNewsView news={news} debugMode={debugMode} />;
+  return <SocialFeedView news={news} debugMode={debugMode} />;
 }

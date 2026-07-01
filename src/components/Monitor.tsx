@@ -5,6 +5,7 @@ import { NewsFeed } from "./NewsFeed";
 interface MonitorProps {
   monitor: MonitorType;
   gameState: GameState;
+  debugMode: boolean;
   onChangeChannel: (monitorId: number, channel: MonitorChannel) => void;
   onSelectStock: (monitorId: number, symbol: string) => void;
 }
@@ -16,7 +17,7 @@ const CHANNEL_LABELS: Record<MonitorChannel, string> = {
   stock_ticker: "📈 Stocks",
 };
 
-export function Monitor({ monitor, gameState, onChangeChannel, onSelectStock }: MonitorProps) {
+export function Monitor({ monitor, gameState, debugMode, onChangeChannel, onSelectStock }: MonitorProps) {
   const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media"];
 
   return (
@@ -45,13 +46,13 @@ export function Monitor({ monitor, gameState, onChangeChannel, onSelectStock }: 
               </div>
             )}
             {monitor.channel === "business_news" && (
-              <NewsFeed news={gameState.news} category="business" />
+              <NewsFeed news={gameState.news} category="business" debugMode={debugMode} />
             )}
             {monitor.channel === "global_news" && (
-              <NewsFeed news={gameState.news} category="global" />
+              <NewsFeed news={gameState.news} category="global" debugMode={debugMode} />
             )}
             {monitor.channel === "social_media" && (
-              <NewsFeed news={gameState.news} category="social" />
+              <NewsFeed news={gameState.news} category="social" debugMode={debugMode} />
             )}
           </div>
         </div>

@@ -15,6 +15,14 @@ export interface EarningsData {
   guidance: string;
 }
 
+export interface NewsImpact {
+  description: string; // human-readable for debug view
+  effects: { symbol: string; direction: "up" | "down"; strength: "weak" | "moderate" | "strong" }[];
+  probability: number; // 0-1, how likely it is to actually fire each tick
+  duration: number; // how many ticks the effect lasts
+  ticksRemaining: number;
+}
+
 export interface NewsItem {
   id: string;
   headline: string;
@@ -27,7 +35,8 @@ export interface NewsItem {
   author?: string;
   upvotes?: number;
   commentCount?: number;
-  momentum?: number; // how fast upvotes are growing (hidden from player)
+  momentum?: number;
+  impact?: NewsImpact;
 }
 
 export interface Position {

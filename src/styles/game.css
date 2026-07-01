@@ -693,6 +693,41 @@ body {
   background: var(--text);
 }
 
+/* Debug Impact */
+.debug-impact {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed #ff0;
+  border-radius: 4px;
+  background: rgba(255, 255, 0, 0.05);
+  font-size: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.debug-impact.expired {
+  opacity: 0.4;
+  border-color: var(--text-dim);
+}
+
+.debug-label {
+  font-weight: bold;
+  color: #ff0;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+}
+
+.debug-desc {
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.debug-ticks {
+  color: var(--text-dim);
+  font-size: 0.6rem;
+}
+
 .ticker-tag {
   display: inline-block;
   margin-left: 6px;

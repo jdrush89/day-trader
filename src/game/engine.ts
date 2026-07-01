@@ -1,4 +1,4 @@
-import { GameState, NewsItem, Stock, EarningsData } from "./types";
+import { GameState, NewsItem, Stock, EarningsData, NewsImpact } from "./types";
 
 interface BusinessTemplate {
   headline: string;
@@ -108,11 +108,83 @@ const SOCIAL_TEMPLATES = [
 
 let newsIdCounter = 0;
 
+function generateImpact(
+  category: NewsItem["category"],
+  sentiment: "positive" | "negative",
+  targetStock: Stock,
+  allStocks: Stock[]
+): NewsImpact {
+  const direction = sentiment === "positive" ? "up" : "down";
+  const oppositeDir = sentiment === "positive" ? "down" : "up";
+
+  if (category === "business") {
+    // Direct impact on the target stock
+    const strength = Math.random() > 0.4 ? "strong" : "moderate";
+    const probability = 0.7 + Math.random() * 0.2; // 70-90%
+    const description = `${Math.round(probability * 100)}% chance of ${strength} price ${direction === "up" ? "surge" : "drop"} in ${targetStock.symbol}`;
+    return {
+      description,
+      effects: [{ symbol: targetStock.symbol, direction, strength }],
+      probability,
+      duration: 8 + Math.floor(Math.random() * 7),
+      ticksRemaining: 8 + Math.floor(Math.random() * 7),
+    };
+  }
+
+  if (category === "global") {
+    // Affects multiple or all stocks
+    const probability = 0.6 + Math.random() * 0.25; // 60-85%
+    const affectedCount = 3 + Math.floor(Math.random() * (allStocks.length - 2));
+    const shuffled = [...allStocks].sort(() => Math.random() - 0.5).slice(0, affectedCount);
+
+    // Some go with sentiment, some against (sector rotation)
+    const effects = shuffled.map((s, i) => {
+      const goesWithSentiment = i < Math.ceil(shuffled.length * 0.7);
+      return {
+        symbol: s.symbol,
+        direction: (goesWithSentiment ? direction : oppositeDir) as "up" | "down",
+        strength: (Math.random() > 0.5 ? "moderate" : "weak") as "weak" | "moderate" | "strong",
+      };
+    });
+
+    const upCount = effects.filter((e) => e.direction === "up").length;
+    const downCount = effects.filter((e) => e.direction === "down").length;
+    let description = `${Math.round(probability * 100)}% chance: `;
+    if (upCount > 0) description += `${effects.filter(e => e.direction === "up").map(e => e.symbol).join(", ")} go up`;
+    if (upCount > 0 && downCount > 0) description += "; ";
+    if (downCount > 0) description += `${effects.filter(e => e.direction === "down").map(e => e.symbol).join(", ")} go down`;
+
+    return {
+      description,
+      effects,
+      probability,
+      duration: 10 + Math.floor(Math.random() * 10),
+      ticksRemaining: 10 + Math.floor(Math.random() * 10),
+    };
+  }
+
+  // Social: impact depends on virality; starts weak, strengthens if upvotes grow
+  const strength = "moderate";
+  const probability = 0.5 + Math.random() * 0.3; // 50-80%
+  const willSellOff = sentiment === "positive" && Math.random() > 0.6;
+  let description = `${Math.round(probability * 100)}% chance of ${strength} price ${direction === "up" ? "surge" : "drop"} in ${targetStock.symbol}`;
+  if (willSellOff) description += " followed by quick sell-off";
+
+  return {
+    description,
+    effects: [{ symbol: targetStock.symbol, direction, strength }],
+    probability,
+    duration: 12 + Math.floor(Math.random() * 8),
+    ticksRemaining: 12 + Math.floor(Math.random() * 8),
+  };
+}
+
 function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem {
   const stock = stocks[Math.floor(Math.random() * stocks.length)];
 
   if (category === "business") {
     const template = BUSINESS_TEMPLATES[Math.floor(Math.random() * BUSINESS_TEMPLATES.length)];
+    const impact = generateImpact(category, template.sentiment, stock, stocks);
     return {
       id: `news-${++newsIdCounter}`,
       headline: template.headline.replace("{stock}", stock.symbol),
@@ -122,11 +194,13 @@ function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem
       affectedStocks: [stock.symbol],
       sentiment: template.sentiment,
       earnings: template.earningsGen(stock),
+      impact,
     };
   }
 
   if (category === "global") {
     const template = GLOBAL_TEMPLATES[Math.floor(Math.random() * GLOBAL_TEMPLATES.length)];
+    const impact = generateImpact(category, template.sentiment, stock, stocks);
     return {
       id: `news-${++newsIdCounter}`,
       headline: template.headline,
@@ -134,13 +208,14 @@ function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem
       category,
       timestamp: Date.now(),
       sentiment: template.sentiment,
+      impact,
     };
   }
 
   // social
   const template = SOCIAL_TEMPLATES[Math.floor(Math.random() * SOCIAL_TEMPLATES.length)];
-  // Each post starts with a random momentum that determines how viral it goes
-  const initialMomentum = Math.random() * 3 + 0.5; // 0.5 to 3.5
+  const initialMomentum = Math.random() * 3 + 0.5;
+  const impact = generateImpact(category, template.sentiment, stock, stocks);
   return {
     id: `news-${++newsIdCounter}`,
     headline: template.headline.replace(/\{stock\}/g, stock.symbol),
@@ -153,30 +228,36 @@ function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem
     upvotes: Math.floor(Math.random() * 20 + 1),
     commentCount: Math.floor(Math.random() * 5),
     momentum: initialMomentum,
+    impact,
   };
 }
 
 function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
-  const relevantNews = news.filter(
-    (n) => n.affectedStocks?.includes(stock.symbol) || n.category === "global"
-  );
+  let momentum = (Math.random() - 0.5) * 1.5; // Base random walk (slightly reduced)
 
-  let momentum = (Math.random() - 0.5) * 2; // Base random walk
+  // Apply impacts from active news
+  for (const item of news) {
+    if (!item.impact || item.impact.ticksRemaining <= 0) continue;
 
-  for (const item of relevantNews) {
-    if (item.category === "social" && item.upvotes != null) {
-      // Social impact scales with upvotes: low upvotes = noise, high upvotes = real pressure
-      const virality = Math.min(item.upvotes / 1000, 5); // cap at 5x
-      const impact = 0.3 + virality * 0.8;
-      momentum += item.sentiment === "positive" ? impact : -impact;
-    } else {
-      const impact = item.category === "global" ? 0.5 : 1.5;
-      momentum += item.sentiment === "positive" ? impact : -impact;
+    for (const effect of item.impact.effects) {
+      if (effect.symbol !== stock.symbol) continue;
+
+      // Only fire with the given probability
+      if (Math.random() > item.impact.probability) continue;
+
+      let magnitude = effect.strength === "strong" ? 2.0 : effect.strength === "moderate" ? 1.2 : 0.5;
+
+      // Social posts scale with upvotes
+      if (item.category === "social" && item.upvotes != null) {
+        const virality = Math.min(item.upvotes / 500, 4);
+        magnitude *= 0.4 + virality * 0.4;
+      }
+
+      momentum += effect.direction === "up" ? magnitude : -magnitude;
     }
   }
 
-  // Price changes as percentage
-  const changePercent = momentum * 0.02;
+  const changePercent = momentum * 0.015;
   const newPrice = Math.max(0.01, stock.price * (1 + changePercent));
   const history = [...stock.history, newPrice].slice(-50);
 
@@ -198,7 +279,14 @@ export function tick(state: GameState): GameState {
 
   // Simulate social post upvote growth each tick
   newNews = newNews.map((item) => {
-    if (item.category !== "social" || item.upvotes == null || item.momentum == null) return item;
+    // Decrement impact ticks
+    const updatedImpact = item.impact && item.impact.ticksRemaining > 0
+      ? { ...item.impact, ticksRemaining: item.impact.ticksRemaining - 1 }
+      : item.impact;
+
+    if (item.category !== "social" || item.upvotes == null || item.momentum == null) {
+      return updatedImpact !== item.impact ? { ...item, impact: updatedImpact } : item;
+    }
 
     // Momentum decays over time but viral posts sustain longer
     const age = (Date.now() - item.timestamp) / 1000;
@@ -221,14 +309,12 @@ export function tick(state: GameState): GameState {
       upvotes: newUpvotes,
       commentCount: newComments,
       momentum: newMomentum,
+      impact: updatedImpact,
     };
   });
 
-  // Update stock prices
-  const recentNews = newNews.filter(
-    (n) => Date.now() - n.timestamp < 10000
-  );
-  const newStocks = state.stocks.map((s) => updateStockPrice(s, recentNews));
+  // Update stock prices using impact system
+  const newStocks = state.stocks.map((s) => updateStockPrice(s, newNews));
 
   // End of day
   if (newTimeOfDay >= 100) {
