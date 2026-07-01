@@ -1,4 +1,4 @@
-import { GameState, NewsItem, Stock, EarningsData, NewsImpact } from "./types";
+import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip } from "./types";
 
 interface BusinessTemplate {
   headline: string;
@@ -105,6 +105,32 @@ const SOCIAL_TEMPLATES = [
   { headline: "Technical analysis shows {stock} breakout IMMINENT 📈", body: "Cup and handle forming on the daily, golden cross on the weekly, RSI bouncing off support. Every indicator I follow is screaming BUY. If this doesn't break out by Friday I'll eat my keyboard on stream.", author: "ChartWizard", sentiment: "positive" as const },
   { headline: "{stock} is a complete SCAM — here's why", body: "I used to work at {name} and let me tell you, the product doesn't work, the revenue is fake, and management is cooking the books. They're going to get delisted within 6 months. Don't say I didn't warn you.", author: "Whistleblower_X", sentiment: "negative" as const },
 ];
+
+const INSIDER_TIP_TEMPLATES = [
+  { text: "Overheard at the country club: {name}'s board is about to announce a massive buyback program. This thing is going to rip.", direction: "up" as const },
+  { text: "My buddy on the {name} board says they're about to land a contract worth billions. Hasn't hit the press yet. You didn't hear this from me.", direction: "up" as const },
+  { text: "A friend at the FDA told me {name}'s drug trial results are outstanding. Approval is basically guaranteed. This will double.", direction: "up" as const },
+  { text: "Word from a {name} VP: next quarter's numbers are going to blow the doors off. They've been sandbagging guidance for months.", direction: "up" as const },
+  { text: "Got a tip from my accountant friend at {name}: they're cooking the books. This is going to implode when the audit drops.", direction: "down" as const },
+  { text: "Someone at {name} just told me the CEO is about to be indicted. SEC investigation has been going on for months. Get out now — or short it.", direction: "down" as const },
+  { text: "Insider at {name} says their flagship product failed safety testing. Recall incoming. This stock is going to crater.", direction: "down" as const },
+  { text: "My golf partner sits on {name}'s compensation committee. He says three C-suite execs just dumped all their shares. Something big is coming.", direction: "down" as const },
+];
+
+let insiderIdCounter = 0;
+
+function generateInsiderTip(stocks: Stock[], day: number): InsiderTip {
+  const stock = stocks[Math.floor(Math.random() * stocks.length)];
+  const template = INSIDER_TIP_TEMPLATES[Math.floor(Math.random() * INSIDER_TIP_TEMPLATES.length)];
+  return {
+    id: `insider-${++insiderIdCounter}`,
+    symbol: stock.symbol,
+    companyName: stock.name,
+    tipText: template.text.replace(/\{name\}/g, stock.name),
+    direction: template.direction,
+    day,
+  };
+}
 
 let newsIdCounter = 0;
 
@@ -271,6 +297,38 @@ export function tick(state: GameState): GameState {
 
   // Generate news occasionally
   let newNews = [...state.news];
+  let insiderTip = state.insiderTip;
+
+  // Generate insider tip once per day (early)
+  if (newTimeOfDay <= 2 && !insiderTip) {
+    insiderTip = generateInsiderTip(state.stocks, state.day);
+  }
+
+  // Inject insider tip as a hidden high-impact news event
+  // This drives the stock move but doesn't appear in normal news channels
+  if (insiderTip && newTimeOfDay === 3) {
+    const insiderStock = state.stocks.find((s) => s.symbol === insiderTip!.symbol);
+    if (insiderStock) {
+      const impact: NewsImpact = {
+        description: `INSIDER: 90% chance of strong price ${insiderTip.direction === "up" ? "surge" : "crash"} in ${insiderTip.symbol}`,
+        effects: [{ symbol: insiderTip.symbol, direction: insiderTip.direction, strength: "strong" }],
+        probability: 0.9,
+        duration: 40 + Math.floor(Math.random() * 20),
+        ticksRemaining: 40 + Math.floor(Math.random() * 20),
+      };
+      // Add as a hidden news item that drives prices but isn't shown in feeds
+      newNews.push({
+        id: `insider-impact-${insiderTip.id}`,
+        headline: "",
+        body: "",
+        category: "business",
+        timestamp: Date.now(),
+        affectedStocks: [insiderTip.symbol],
+        sentiment: insiderTip.direction === "up" ? "positive" : "negative",
+        impact,
+      });
+    }
+  }
 
   // Seed first stories early in the day
   if (newTimeOfDay <= 3) {
@@ -352,16 +410,87 @@ export function tick(state: GameState): GameState {
 
     const gameOver = newCash + portfolioValue - shortLiability < 0;
 
+    // SEC fine check: only if player viewed the insider channel and made money on that stock AFTER viewing
+    let secFine = null;
+    let finalCash = newCash;
+    if (state.insiderViewed && insiderTip) {
+      const tipSymbol = insiderTip.symbol;
+      const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
+
+      if (tipStock) {
+        // Calculate profit made on the insider stock AFTER viewing the tip
+        let profitAfterViewing = 0;
+
+        // Long positions: profit = (current price - avg cost) * shares, but only for shares beyond snapshot
+        const currentPos = state.portfolio.find((p) => p.symbol === tipSymbol);
+        const snapPos = state.insiderSnapshotHoldings.find((p) => p.symbol === tipSymbol);
+        const currentShares = currentPos?.shares ?? 0;
+        const snapShares = snapPos?.shares ?? 0;
+        const snapAvgCost = snapPos?.avgCost ?? 0;
+
+        if (currentShares > snapShares) {
+          // New shares bought after viewing — profit on those
+          const newShares = currentShares - snapShares;
+          const avgCostNewShares = currentPos
+            ? (currentPos.avgCost * currentPos.shares - snapAvgCost * snapShares) / newShares
+            : tipStock.price;
+          profitAfterViewing += (tipStock.price - avgCostNewShares) * newShares;
+        }
+
+        // Short positions: profit if shorted after viewing and price went in favorable direction
+        const currentShort = state.shorts.find((p) => p.symbol === tipSymbol);
+        const snapShort = state.insiderSnapshotShorts.find((p) => p.symbol === tipSymbol);
+        const currentShortShares = currentShort?.shares ?? 0;
+        const snapShortShares = snapShort?.shares ?? 0;
+
+        if (currentShortShares > snapShortShares) {
+          const newShortShares = currentShortShares - snapShortShares;
+          const shortEntry = currentShort!.entryPrice;
+          profitAfterViewing += (shortEntry - tipStock.price) * newShortShares;
+        }
+
+        // Also count shares already sold for profit (no longer in portfolio)
+        // We approximate: if they had more shares at snapshot than now, they sold some
+        if (snapShares > currentShares && currentShares >= 0) {
+          // They may have sold shares they bought after viewing — hard to track exactly
+          // Conservative: just use the profit we can measure from current holdings
+        }
+
+        if (profitAfterViewing > 0) {
+          // Chance of getting caught scales with profit: $100 = 10%, $500 = 40%, $1000+ = 70%+
+          const catchChance = Math.min(0.85, profitAfterViewing / 1500);
+          if (Math.random() < catchChance) {
+            // Fine is 2-3x the profit
+            const fineMultiplier = 2 + Math.random();
+            const fineAmount = Math.round(profitAfterViewing * fineMultiplier * 100) / 100;
+            secFine = {
+              amount: fineAmount,
+              symbol: tipSymbol,
+              profit: Math.round(profitAfterViewing * 100) / 100,
+              day: state.day,
+            };
+            finalCash -= fineAmount;
+          }
+        }
+      }
+    }
+
     return {
       ...state,
       day: state.day + 1,
-      cash: newCash,
+      cash: finalCash,
       stocks: newStocks,
       news: newNews,
       timeOfDay: 0,
       marketOpen: false,
       gameOver,
-      totalProfit: newCash + portfolioValue + shortCollateral - shortLiability - state.loan,
+      totalProfit: finalCash + portfolioValue + shortCollateral - shortLiability - state.loan,
+      insiderTip: null,
+      insiderViewed: false,
+      insiderViewedTick: 0,
+      insiderSnapshotHoldings: [],
+      insiderSnapshotShorts: [],
+      secFines: secFine ? [...state.secFines, secFine] : state.secFines,
     };
   }
 
@@ -370,6 +499,7 @@ export function tick(state: GameState): GameState {
     stocks: newStocks,
     news: newNews,
     timeOfDay: newTimeOfDay,
+    insiderTip,
   };
 }
 
@@ -482,6 +612,11 @@ export function openMarket(state: GameState): GameState {
     marketOpen: true,
     stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price })),
     dayStartNetWorth: netWorth,
+    insiderTip: null,
+    insiderViewed: false,
+    insiderViewedTick: 0,
+    insiderSnapshotHoldings: [],
+    insiderSnapshotShorts: [],
   };
 }
 

@@ -1230,3 +1230,172 @@ body {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* Insider Feed */
+.insider-feed-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(180deg, #0a0a0a 0%, #1a0a0a 100%);
+}
+
+.insider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  background: rgba(255, 50, 50, 0.1);
+  border-bottom: 1px solid rgba(255, 50, 50, 0.3);
+}
+
+.insider-logo {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #ff6b6b;
+  letter-spacing: 1px;
+}
+
+.insider-warning {
+  font-size: 0.7rem;
+  color: #ff4444;
+  animation: title-blink 2s step-end infinite;
+}
+
+.insider-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  color: var(--text-dim);
+}
+
+.insider-empty-icon {
+  font-size: 3rem;
+  opacity: 0.3;
+}
+
+.insider-empty-text {
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.insider-empty-sub {
+  font-size: 0.8rem;
+  text-align: center;
+  max-width: 250px;
+}
+
+.insider-tip-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  gap: 1rem;
+}
+
+.insider-message-bubble {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 100, 100, 0.3);
+  border-radius: 12px;
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.insider-message-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.insider-avatar {
+  font-size: 1.5rem;
+}
+
+.insider-sender {
+  font-weight: bold;
+  color: var(--text);
+}
+
+.insider-encrypted {
+  margin-left: auto;
+  font-size: 0.7rem;
+  color: var(--green);
+  opacity: 0.7;
+}
+
+.insider-message-body {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text);
+  font-style: italic;
+}
+
+.insider-stock-tag {
+  margin-top: 0.3rem;
+}
+
+.insider-direction {
+  display: inline-block;
+  padding: 0.3rem 0.8rem;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 1.1rem;
+}
+
+.insider-direction.up {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.insider-direction.down {
+  background: rgba(255, 68, 68, 0.15);
+  color: var(--red);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+}
+
+.insider-sec-warning {
+  background: rgba(255, 200, 0, 0.1);
+  border: 1px solid rgba(255, 200, 0, 0.4);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+  font-size: 0.8rem;
+  color: #ffcc00;
+  line-height: 1.4;
+}
+
+/* SEC Fine Alert in End of Day */
+.sec-fine-alert {
+  background: rgba(255, 0, 0, 0.1);
+  border: 2px solid #ff4444;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+  animation: sec-flash 0.5s ease-in-out 3;
+}
+
+.sec-fine-header {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: #ff4444;
+  text-align: center;
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+}
+
+.sec-fine-body {
+  font-size: 0.85rem;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.6;
+}
+
+@keyframes sec-flash {
+  0%, 100% { border-color: #ff4444; }
+  50% { border-color: #ff0000; background: rgba(255, 0, 0, 0.2); }
+}

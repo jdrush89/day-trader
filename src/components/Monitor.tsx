@@ -1,6 +1,6 @@
 import { Monitor as MonitorType, MonitorChannel, GameState } from "../game/types";
 import { StockChart } from "./StockChart";
-import { NewsFeed } from "./NewsFeed";
+import { NewsFeed, InsiderFeed } from "./NewsFeed";
 
 interface MonitorProps {
   monitor: MonitorType;
@@ -8,6 +8,7 @@ interface MonitorProps {
   debugMode: boolean;
   onChangeChannel: (monitorId: number, channel: MonitorChannel) => void;
   onSelectStock: (monitorId: number, symbol: string) => void;
+  onViewInsider: () => void;
 }
 
 const CHANNEL_LABELS: Record<MonitorChannel, string> = {
@@ -15,10 +16,11 @@ const CHANNEL_LABELS: Record<MonitorChannel, string> = {
   global_news: "🌍 Global",
   social_media: "💬 Social",
   stock_ticker: "📈 Stocks",
+  insider: "🤫 Insider",
 };
 
-export function Monitor({ monitor, gameState, debugMode, onChangeChannel, onSelectStock }: MonitorProps) {
-  const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media"];
+export function Monitor({ monitor, gameState, debugMode, onChangeChannel, onSelectStock, onViewInsider }: MonitorProps) {
+  const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
   return (
     <div className="monitor">
@@ -53,6 +55,14 @@ export function Monitor({ monitor, gameState, debugMode, onChangeChannel, onSele
             )}
             {monitor.channel === "social_media" && (
               <NewsFeed news={gameState.news} category="social" debugMode={debugMode} />
+            )}
+            {monitor.channel === "insider" && (
+              <InsiderFeed
+                tip={gameState.insiderTip}
+                viewed={gameState.insiderViewed}
+                onView={onViewInsider}
+                debugMode={debugMode}
+              />
             )}
           </div>
         </div>

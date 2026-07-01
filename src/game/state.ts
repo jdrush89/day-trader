@@ -77,5 +77,11 @@ export function createInitialState(): GameState {
     gameOver: false,
     totalProfit: 0,
     dayStartNetWorth: 1000,
+    insiderTip: null,
+    insiderViewed: false,
+    insiderViewedTick: 0,
+    insiderSnapshotHoldings: [],
+    insiderSnapshotShorts: [],
+    secFines: [],
   };
 }

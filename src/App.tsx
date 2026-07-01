@@ -85,6 +85,19 @@ function App() {
     setGameState((prev) => openMarket(prev));
   }, []);
 
+  const handleViewInsider = useCallback(() => {
+    setGameState((prev) => {
+      if (prev.insiderViewed) return prev;
+      return {
+        ...prev,
+        insiderViewed: true,
+        insiderViewedTick: prev.timeOfDay,
+        insiderSnapshotHoldings: prev.portfolio.map((p) => ({ ...p })),
+        insiderSnapshotShorts: prev.shorts.map((p) => ({ ...p })),
+      };
+    });
+  }, []);
+
   const handleRestart = useCallback(() => {
     setGameState(createInitialState());
     setShowTitle(true);
@@ -237,6 +250,17 @@ function App() {
                 </div>
               </div>
 
+              {gameState.secFines.filter((f) => f.day === gameState.day - 1).map((fine, i) => (
+                <div key={i} className="sec-fine-alert">
+                  <div className="sec-fine-header">🚨 SEC ENFORCEMENT ACTION 🚨</div>
+                  <div className="sec-fine-body">
+                    You have been fined for insider trading on <strong>${fine.symbol}</strong>.
+                    <br />Illegal profit detected: <span className="up">${fine.profit.toFixed(2)}</span>
+                    <br />Fine imposed: <span className="danger">-${fine.amount.toFixed(2)}</span>
+                  </div>
+                </div>
+              ))}
+
               <button onClick={handleNewDay}>Start Day {gameState.day}</button>
             </div>
           </div>
@@ -253,6 +277,7 @@ function App() {
               debugMode={debugMode}
               onChangeChannel={handleChangeChannel}
               onSelectStock={handleSelectStock}
+              onViewInsider={handleViewInsider}
             />
           ))}
         </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NewsItem } from "../game/types";
+import { NewsItem, InsiderTip } from "../game/types";
 
 interface NewsFeedProps {
   news: NewsItem[];
@@ -322,4 +322,67 @@ export function NewsFeed({ news, category, debugMode }: NewsFeedProps) {
   if (category === "business") return <BusinessNewsView news={news} debugMode={debugMode} />;
   if (category === "global") return <GlobalNewsView news={news} debugMode={debugMode} />;
   return <SocialFeedView news={news} debugMode={debugMode} />;
+}
+
+interface InsiderFeedProps {
+  tip: InsiderTip | null;
+  viewed: boolean;
+  onView: () => void;
+  debugMode?: boolean;
+}
+
+export function InsiderFeed({ tip, viewed, onView, debugMode }: InsiderFeedProps) {
+  // Trigger onView when the component mounts (player is looking at this channel)
+  useEffect(() => {
+    if (tip && !viewed) {
+      onView();
+    }
+  }, [tip, viewed, onView]);
+
+  return (
+    <div className="insider-feed-view">
+      <div className="insider-header">
+        <span className="insider-logo">🤫 INSIDER TIPS</span>
+        <span className="insider-warning">⚠️ CONFIDENTIAL</span>
+      </div>
+      {!tip ? (
+        <div className="insider-empty">
+          <div className="insider-empty-icon">📱</div>
+          <div className="insider-empty-text">No tips today...</div>
+          <div className="insider-empty-sub">Check back tomorrow. Your contacts are working on something.</div>
+        </div>
+      ) : (
+        <div className="insider-tip-container">
+          <div className="insider-message-bubble">
+            <div className="insider-message-header">
+              <span className="insider-avatar">🕵️</span>
+              <span className="insider-sender">Anonymous Contact</span>
+              <span className="insider-encrypted">🔒 encrypted</span>
+            </div>
+            <div className="insider-message-body">{tip.tipText}</div>
+            <div className="insider-stock-tag">
+              <span className={`insider-direction ${tip.direction}`}>
+                {tip.direction === "up" ? "📈" : "📉"} ${tip.symbol}
+              </span>
+            </div>
+          </div>
+          {viewed && (
+            <div className="insider-sec-warning">
+              ⚠️ You've viewed this tip. Trading on this information may attract SEC attention.
+              The more profit you make on ${tip.symbol} today, the higher the chance of a fine.
+            </div>
+          )}
+          {debugMode && (
+            <div className="debug-impact active">
+              <span className="debug-label">🔍 DEBUG</span>
+              <span className="debug-desc">
+                90% chance of strong price {tip.direction === "up" ? "surge" : "crash"} in {tip.symbol}.
+                SEC fine risk scales with profit: $100→10%, $500→40%, $1000+→70%+. Fine = 2-3x profit.
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

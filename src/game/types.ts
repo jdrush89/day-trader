@@ -71,12 +71,29 @@ export type MonitorChannel =
   | "business_news"
   | "global_news"
   | "social_media"
-  | "stock_ticker";
+  | "stock_ticker"
+  | "insider";
 
 export interface Monitor {
   id: number;
   channel: MonitorChannel;
   selectedStock?: string;
+}
+
+export interface InsiderTip {
+  id: string;
+  symbol: string;
+  companyName: string;
+  tipText: string;
+  direction: "up" | "down";
+  day: number;
+}
+
+export interface SECFine {
+  amount: number;
+  symbol: string;
+  profit: number;
+  day: number;
 }
 
 export interface GameState {
@@ -95,4 +112,11 @@ export interface GameState {
   gameOver: boolean;
   totalProfit: number;
   dayStartNetWorth: number;
+  insiderTip: InsiderTip | null;
+  insiderViewed: boolean; // player looked at insider channel today
+  insiderViewedTick: number; // tick when they first viewed it
+  // snapshot of holdings at the moment they viewed insider, to calc profit AFTER viewing
+  insiderSnapshotHoldings: { symbol: string; shares: number; avgCost: number }[];
+  insiderSnapshotShorts: { symbol: string; shares: number; entryPrice: number }[];
+  secFines: SECFine[];
 }
