@@ -1,0 +1,508 @@
+:root {
+  --bg-dark: #0a0e17;
+  --bg-panel: #131a2b;
+  --bg-monitor: #0d1117;
+  --border: #1e2d4a;
+  --text: #c9d1d9;
+  --text-dim: #6e7a8a;
+  --accent: #58a6ff;
+  --green: #00ff88;
+  --red: #ff4444;
+  --gold: #ffd700;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  background: var(--bg-dark);
+  color: var(--text);
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Header */
+.game-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.game-header h1 {
+  font-size: 1.1rem;
+  color: var(--gold);
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.time-bar {
+  position: relative;
+  width: 200px;
+  height: 20px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.time-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--green));
+  transition: width 0.3s;
+}
+
+.time-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text);
+}
+
+.speed-controls button,
+.shop-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  color: var(--text);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+.speed-controls button.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+
+.shop-btn:hover {
+  background: var(--border);
+}
+
+/* Main Layout */
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.monitors-area {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  padding: 12px;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.sidebar {
+  width: 280px;
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+}
+
+/* Monitor */
+.monitor {
+  flex: 1;
+  min-width: 350px;
+  max-width: 600px;
+}
+
+.monitor-bezel {
+  background: #1a1a2e;
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 3px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.monitor-screen {
+  flex: 1;
+  background: var(--bg-monitor);
+  border-radius: 4px;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.monitor-controls {
+  display: flex;
+  gap: 4px;
+  padding: 6px 4px;
+  justify-content: center;
+}
+
+.channel-btn {
+  padding: 3px 8px;
+  font-size: 0.65rem;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  color: var(--text-dim);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.channel-btn.active {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+}
+
+.channel-btn:hover:not(.active) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* Stock Chart */
+.stock-chart {
+  padding: 8px 0;
+}
+
+.stock-chart-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.stock-symbol {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.stock-name {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.stock-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.stock-price {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.stock-change {
+  font-size: 0.85rem;
+}
+
+.stock-change.up { color: var(--green); }
+.stock-change.down { color: var(--red); }
+
+.chart-svg {
+  width: 100%;
+  height: 120px;
+}
+
+.stock-selector {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.stock-tab {
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  color: var(--text-dim);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.stock-tab.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* News Feed */
+.news-feed-header {
+  font-size: 0.85rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.news-feed-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.news-item {
+  padding: 6px 8px;
+  border-left: 3px solid var(--border);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.news-item.sentiment-positive { border-left-color: var(--green); }
+.news-item.sentiment-negative { border-left-color: var(--red); }
+.news-item.sentiment-neutral { border-left-color: var(--text-dim); }
+
+.news-empty {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.ticker-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 4px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  font-size: 0.65rem;
+  color: var(--accent);
+}
+
+/* Trading Panel */
+.trading-panel {
+  padding: 12px;
+}
+
+.account-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.stat-label { color: var(--text-dim); }
+.stat-value { font-weight: bold; }
+.stat-value.danger { color: var(--red); }
+
+.positions h3, .quick-buy h3 {
+  font-size: 0.8rem;
+  margin-bottom: 8px;
+  color: var(--text-dim);
+}
+
+.positions {
+  margin-bottom: 16px;
+}
+
+.position-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 0.7rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pos-symbol { font-weight: bold; width: 45px; }
+.pos-shares { color: var(--text-dim); flex: 1; }
+.pos-pnl.up { color: var(--green); }
+.pos-pnl.down { color: var(--red); }
+
+.sell-btn {
+  padding: 2px 6px;
+  font-size: 0.6rem;
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.sell-btn:hover {
+  background: var(--red);
+  color: #000;
+}
+
+.buy-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.buy-btn {
+  padding: 6px 8px;
+  font-size: 0.7rem;
+  background: transparent;
+  border: 1px solid var(--green);
+  color: var(--green);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+.buy-btn:hover:not(:disabled) {
+  background: var(--green);
+  color: #000;
+}
+
+.buy-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.empty {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+/* Overlays */
+.game-over-overlay,
+.end-of-day-overlay,
+.upgrade-shop-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.8);
+  z-index: 100;
+}
+
+.game-over,
+.end-of-day {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+}
+
+.game-over h2 { color: var(--red); margin-bottom: 12px; }
+.end-of-day h2 { color: var(--accent); margin-bottom: 12px; }
+
+.game-over p,
+.end-of-day p {
+  margin-bottom: 8px;
+  font-size: 0.85rem;
+}
+
+.game-over button,
+.end-of-day button {
+  margin-top: 16px;
+  padding: 8px 24px;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Upgrade Shop */
+.upgrade-shop {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.shop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.shop-header h2 { font-size: 1rem; }
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.shop-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.upgrade-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.upgrade-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.upgrade-name { font-size: 0.8rem; font-weight: bold; }
+.upgrade-desc { font-size: 0.7rem; color: var(--text-dim); }
+
+.upgrade-buy-btn {
+  padding: 6px 12px;
+  background: var(--gold);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  font-weight: bold;
+  font-size: 0.75rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.upgrade-buy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
