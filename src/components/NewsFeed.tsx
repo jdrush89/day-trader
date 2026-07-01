@@ -111,9 +111,31 @@ function DebugImpact({ item }: { item: NewsItem }) {
 }
 
 function BusinessNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
-  const latest = news.find((n) => n.category === "business");
+  const stories = news.filter((n) => n.category === "business");
+  const [showCommercial, setShowCommercial] = useState(false);
+  const [storyIndex, setStoryIndex] = useState(0);
 
-  if (!latest) {
+  // Alternate: show story for 8s, then commercial for 5s
+  useEffect(() => {
+    if (stories.length === 0) return;
+
+    const duration = showCommercial ? 5000 : 8000;
+    const timer = setTimeout(() => {
+      if (showCommercial) {
+        // After commercial, advance to next story
+        setStoryIndex((prev) => (prev + 1) % stories.length);
+      }
+      setShowCommercial((s) => !s);
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [showCommercial, stories.length]);
+
+  // Show first story quickly — only start with commercial if no stories yet
+  const story = stories[storyIndex % Math.max(stories.length, 1)];
+  const shouldShowCommercial = stories.length === 0 || showCommercial;
+
+  if (shouldShowCommercial) {
     return (
       <div className="biz-news-view">
         <div className="biz-header">
@@ -131,48 +153,66 @@ function BusinessNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: b
         <span className="biz-logo">📊 MARKET WATCH</span>
         <span className="biz-live">● LIVE</span>
       </div>
-      <div className={`biz-banner sentiment-${latest.sentiment}`}>
-        {latest.headline}
+      <div className={`biz-banner sentiment-${story.sentiment}`}>
+        {story.headline}
       </div>
-      <div className="biz-body">{latest.body}</div>
-      {latest.earnings && (
+      <div className="biz-body">{story.body}</div>
+      {story.earnings && (
         <div className="biz-earnings">
           <div className="earnings-title">QUARTERLY RESULTS</div>
           <div className="earnings-grid">
             <div className="earnings-stat">
               <span className="earnings-label">Revenue</span>
-              <span className="earnings-value">{latest.earnings.revenue}</span>
+              <span className="earnings-value">{story.earnings.revenue}</span>
             </div>
             <div className="earnings-stat">
               <span className="earnings-label">Net Profit</span>
-              <span className="earnings-value">{latest.earnings.profit}</span>
+              <span className="earnings-value">{story.earnings.profit}</span>
             </div>
             <div className="earnings-stat">
               <span className="earnings-label">Growth</span>
-              <span className="earnings-value">{latest.earnings.growth}</span>
+              <span className="earnings-value">{story.earnings.growth}</span>
             </div>
             <div className="earnings-stat">
               <span className="earnings-label">Spending</span>
-              <span className="earnings-value">{latest.earnings.spending}</span>
+              <span className="earnings-value">{story.earnings.spending}</span>
             </div>
             <div className="earnings-stat full-width">
               <span className="earnings-label">Guidance</span>
-              <span className="earnings-value">{latest.earnings.guidance}</span>
+              <span className="earnings-value">{story.earnings.guidance}</span>
             </div>
           </div>
         </div>
       )}
-      {latest.affectedStocks && (
-        <div className="biz-ticker-tag">${latest.affectedStocks[0]}</div>
+      {story.affectedStocks && (
+        <div className="biz-ticker-tag">${story.affectedStocks[0]}</div>
       )}
-      {debugMode && <DebugImpact item={latest} />}
+      {debugMode && <DebugImpact item={story} />}
     </div>
   );
 }
 
 function GlobalNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
   const headlines = news.filter((n) => n.category === "global");
-  const latest = headlines[0];
+  const [showCommercial, setShowCommercial] = useState(false);
+  const [storyIndex, setStoryIndex] = useState(0);
+
+  useEffect(() => {
+    if (headlines.length === 0) return;
+
+    const duration = showCommercial ? 5000 : 10000;
+    const timer = setTimeout(() => {
+      if (showCommercial) {
+        setStoryIndex((prev) => (prev + 1) % headlines.length);
+      }
+      setShowCommercial((s) => !s);
+    }, duration);
+
+    return () => clearTimeout(timer);
+  }, [showCommercial, headlines.length]);
+
+  const latest = headlines[storyIndex % Math.max(headlines.length, 1)];
+  const shouldShowCommercial = headlines.length === 0 || showCommercial;
 
   return (
     <div className="global-news-view">
@@ -180,7 +220,7 @@ function GlobalNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boo
         <span className="global-logo">🌍 WORLD NEWS NETWORK</span>
         <span className="global-live">● LIVE</span>
       </div>
-      {latest ? (
+      {!shouldShowCommercial && latest ? (
         <div className="global-main">
           <div className={`global-breaking sentiment-${latest.sentiment}`}>
             BREAKING NEWS

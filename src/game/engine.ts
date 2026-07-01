@@ -271,10 +271,25 @@ export function tick(state: GameState): GameState {
 
   // Generate news occasionally
   let newNews = [...state.news];
-  if (Math.random() < 0.15) {
+
+  // Seed first stories early in the day
+  if (newTimeOfDay <= 3) {
+    if (!newNews.some((n) => n.category === "business")) {
+      newNews = [generateNews(state.stocks, "business"), ...newNews];
+    }
+    if (!newNews.some((n) => n.category === "global")) {
+      newNews = [generateNews(state.stocks, "global"), ...newNews];
+    }
+    if (!newNews.some((n) => n.category === "social")) {
+      newNews = [generateNews(state.stocks, "social"), ...newNews];
+    }
+  }
+
+  // Ongoing news generation
+  if (Math.random() < 0.18) {
     const categories: NewsItem["category"][] = ["business", "global", "social"];
     const category = categories[Math.floor(Math.random() * categories.length)];
-    newNews = [generateNews(state.stocks, category), ...newNews].slice(0, 20);
+    newNews = [generateNews(state.stocks, category), ...newNews].slice(0, 30);
   }
 
   // Simulate social post upvote growth each tick
