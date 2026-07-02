@@ -1699,6 +1699,54 @@ body {
   max-width: 250px;
 }
 
+.insider-tip-hidden {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 2rem;
+}
+
+.insider-envelope {
+  font-size: 3rem;
+}
+
+.insider-hidden-text {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--text);
+  text-align: center;
+}
+
+.insider-hidden-sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-align: center;
+  max-width: 280px;
+  line-height: 1.4;
+}
+
+.insider-reveal-btn {
+  margin-top: 8px;
+  padding: 10px 24px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  font-family: inherit;
+  background: rgba(255, 165, 0, 0.15);
+  color: #ffaa00;
+  border: 2px solid #ffaa00;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.insider-reveal-btn:hover {
+  background: #ffaa00;
+  color: #000;
+}
+
 .insider-tip-container {
   flex: 1;
   display: flex;

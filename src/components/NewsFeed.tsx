@@ -341,13 +341,6 @@ interface InsiderFeedProps {
 }
 
 export function InsiderFeed({ tip, viewed, onView, debugMode }: InsiderFeedProps) {
-  // Trigger onView when the component mounts (player is looking at this channel)
-  useEffect(() => {
-    if (tip && !viewed) {
-      onView();
-    }
-  }, [tip, viewed, onView]);
-
   return (
     <div className="insider-feed-view">
       <div className="insider-header">
@@ -359,6 +352,17 @@ export function InsiderFeed({ tip, viewed, onView, debugMode }: InsiderFeedProps
           <div className="insider-empty-icon">📱</div>
           <div className="insider-empty-text">No tips today...</div>
           <div className="insider-empty-sub">Check back tomorrow. Your contacts are working on something.</div>
+        </div>
+      ) : !viewed ? (
+        <div className="insider-tip-hidden">
+          <div className="insider-envelope">📨</div>
+          <div className="insider-hidden-text">You have a new tip from an anonymous contact.</div>
+          <div className="insider-hidden-sub">
+            Viewing this tip may constitute insider trading. Any profits from this stock after viewing may attract SEC attention.
+          </div>
+          <button className="insider-reveal-btn" onClick={onView}>
+            🔓 View Tip
+          </button>
         </div>
       ) : (
         <div className="insider-tip-container">
@@ -375,12 +379,10 @@ export function InsiderFeed({ tip, viewed, onView, debugMode }: InsiderFeedProps
               </span>
             </div>
           </div>
-          {viewed && (
-            <div className="insider-sec-warning">
-              ⚠️ You've viewed this tip. Trading on this information may attract SEC attention.
-              The more profit you make on ${tip.symbol} today, the higher the chance of a fine.
-            </div>
-          )}
+          <div className="insider-sec-warning">
+            ⚠️ You've viewed this tip. Trading on this information may attract SEC attention.
+            The more profit you make on ${tip.symbol} today, the higher the chance of a fine.
+          </div>
           {debugMode && (
             <div className="debug-impact active">
               <span className="debug-label">🔍 DEBUG</span>
