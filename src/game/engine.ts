@@ -1,5 +1,17 @@
 import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType } from "./types";
 
+// Milestone: every 3 days, player must reach this net worth or lose
+// Day 3: $1500, Day 6: $2500, Day 9: $4000, etc.
+export function getMilestone(day: number): { checkDay: number; required: number } | null {
+  // Next milestone check day (next multiple of 3)
+  const nextCheck = Math.ceil(day / 3) * 3;
+  const milestoneNum = nextCheck / 3;
+  return {
+    checkDay: nextCheck,
+    required: 1000 + 250 * milestoneNum * (milestoneNum + 1),
+  };
+}
+
 interface BusinessTemplate {
   headline: string;
   body: string;
@@ -407,8 +419,6 @@ export function tick(state: GameState): GameState {
 
   // End of day
   if (newTimeOfDay >= 100) {
-    const interest = postOrderState.loan * postOrderState.interestRate;
-    const newCash = postOrderState.cash - interest;
     const portfolioValue = postOrderState.portfolio.reduce((sum, pos) => {
       const stock = newStocks.find((s) => s.symbol === pos.symbol);
       return sum + (stock ? stock.price * pos.shares : 0);
@@ -424,11 +434,9 @@ export function tick(state: GameState): GameState {
       0
     );
 
-    const gameOver = newCash + portfolioValue - shortLiability < 0;
-
     // SEC fine check: only if player viewed the insider channel
     let secFine = null;
-    let finalCash = newCash;
+    let finalCash = postOrderState.cash;
     if (postOrderState.insiderViewed && insiderTip) {
       const tipSymbol = insiderTip.symbol;
       const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
@@ -474,6 +482,17 @@ export function tick(state: GameState): GameState {
       }
     }
 
+    const finalNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability;
+
+    // Milestone check every 3 days: milestone n requires 1000 + 250*n*(n+1)
+    const completedDay = state.day;
+    let gameOver = false;
+    if (completedDay % 3 === 0) {
+      const milestoneNum = completedDay / 3;
+      const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1);
+      gameOver = finalNetWorth < requiredNetWorth;
+    }
+
     return {
       ...postOrderState,
       day: state.day + 1,
@@ -483,7 +502,7 @@ export function tick(state: GameState): GameState {
       timeOfDay: 0,
       marketOpen: false,
       gameOver,
-      totalProfit: finalCash + portfolioValue + shortCollateral - shortLiability - postOrderState.loan,
+      totalProfit: finalNetWorth - 1000,
       insiderTip: null,
       insiderViewed: false,
       insiderViewedTick: 0,
@@ -669,9 +688,6 @@ export function purchaseUpgrade(state: GameState, upgradeId: string): GameState 
         ...newState.monitors,
         { id: newState.monitors.length, channel: "business_news" },
       ];
-      break;
-    case "lower_interest":
-      newState.interestRate = Math.max(0.01, newState.interestRate - upgrade.effect.reduction);
       break;
   }
 

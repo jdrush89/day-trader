@@ -75,7 +75,6 @@ export type UpgradeEffect =
   | { type: "extra_monitor" }
   | { type: "faster_news" }
   | { type: "better_charts"; detail: string }
-  | { type: "lower_interest"; reduction: number }
   | { type: "insider_tips" };
 
 export type MonitorChannel =
@@ -125,8 +124,6 @@ export interface PendingOrder {
 export interface GameState {
   day: number;
   cash: number;
-  loan: number;
-  interestRate: number;
   portfolio: Position[];
   shorts: ShortPosition[];
   monitors: Monitor[];
@@ -141,10 +138,8 @@ export interface GameState {
   insiderTip: InsiderTip | null;
   insiderViewed: boolean;
   insiderViewedTick: number;
-  // snapshot of holdings at the moment they viewed insider, to calc profit AFTER viewing
   insiderSnapshotHoldings: { symbol: string; shares: number; avgCost: number }[];
   insiderSnapshotShorts: { symbol: string; shares: number; entryPrice: number }[];
-  // accumulated realized profit from selling/covering the insider stock after viewing
   insiderRealizedProfit: number;
   secFines: SECFine[];
   pendingOrders: PendingOrder[];

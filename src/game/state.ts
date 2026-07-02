@@ -107,12 +107,12 @@ const INITIAL_UPGRADES: Upgrade[] = [
     effect: { type: "better_charts", detail: "candlestick" },
   },
   {
-    id: "low_interest",
-    name: "Credit Score Boost",
-    description: "Reduce daily interest by 2%",
+    id: "fast_charts",
+    name: "Real-Time Data Feed",
+    description: "Charts update faster with more data points",
     cost: 1500,
     purchased: false,
-    effect: { type: "lower_interest", reduction: 0.02 },
+    effect: { type: "better_charts", detail: "realtime" },
   },
   {
     id: "insider",
@@ -141,8 +141,6 @@ export function createInitialState(): GameState {
   return {
     day: 1,
     cash: 1000,
-    loan: 1000,
-    interestRate: 0.1,
     portfolio: [],
     shorts: [],
     monitors: [{ id: 0, channel: "stock_ticker", selectedStock: "MEGA" }],

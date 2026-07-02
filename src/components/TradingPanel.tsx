@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { GameState } from "../game/types";
+import { getMilestone } from "../game/engine";
 
 interface TradingPanelProps {
   gameState: GameState;
@@ -17,6 +18,19 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
     return sum + (stock ? stock.price * pos.shares : 0);
   }, 0);
 
+  const shortLiability = gameState.shorts.reduce((sum, pos) => {
+    const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
+    return sum + (stock ? stock.price * pos.shares : 0);
+  }, 0);
+  const shortCollateral = gameState.shorts.reduce(
+    (sum, pos) => sum + pos.entryPrice * pos.shares, 0
+  );
+  const netWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability;
+
+  const milestone = getMilestone(gameState.day);
+  const daysUntilCheck = milestone ? milestone.checkDay - gameState.day : 0;
+  const onTrack = milestone ? netWorth >= milestone.required : true;
+
   const handleAction = shortMode ? onShort : onBuy;
   const actionLabel = shortMode ? "Short" : "Buy";
 
@@ -32,17 +46,23 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
           <span className="stat-value">${portfolioValue.toFixed(2)}</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Loan</span>
-          <span className="stat-value danger">${gameState.loan.toFixed(2)}</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">Interest</span>
-          <span className="stat-value danger">{(gameState.interestRate * 100).toFixed(0)}%/day</span>
+          <span className="stat-label">Net Worth</span>
+          <span className="stat-value">${netWorth.toFixed(2)}</span>
         </div>
         <div className="stat">
           <span className="stat-label">Day</span>
           <span className="stat-value">{gameState.day}</span>
         </div>
+        {milestone && (
+          <div className="stat milestone-stat">
+            <span className="stat-label">
+              Target (in {daysUntilCheck}d)
+            </span>
+            <span className={`stat-value ${onTrack ? "milestone-ok" : "danger"}`}>
+              ${milestone.required.toLocaleString()}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="positions-scroll">

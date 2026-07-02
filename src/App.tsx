@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder, getMilestone } from "./game/engine";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
@@ -235,12 +235,14 @@ function App() {
         );
         const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability;
         const dailyPnL = currentNetWorth - gameState.dayStartNetWorth;
-        const interest = gameState.loan * gameState.interestRate;
+        const completedDay = gameState.day - 1;
+        const wasMilestoneDay = completedDay % 3 === 0;
+        const milestone = wasMilestoneDay ? getMilestone(completedDay) : null;
 
         return (
           <div className="end-of-day-overlay">
             <div className="end-of-day">
-              <h2>📋 End of Day {gameState.day - 1}</h2>
+              <h2>📋 End of Day {completedDay}</h2>
               <div className="eod-pnl-hero">
                 <span className="eod-pnl-label">Today's P&L</span>
                 <span className={`eod-pnl-value ${dailyPnL >= 0 ? "up" : "down"}`}>
@@ -248,10 +250,6 @@ function App() {
                 </span>
               </div>
               <div className="eod-stats">
-                <div className="eod-stat-row">
-                  <span>Interest paid</span>
-                  <span className="danger">-${interest.toFixed(2)}</span>
-                </div>
                 <div className="eod-stat-row">
                   <span>Net worth</span>
                   <span>${currentNetWorth.toFixed(2)}</span>
@@ -265,6 +263,17 @@ function App() {
                   <span>${portfolioValue.toFixed(2)}</span>
                 </div>
               </div>
+
+              {milestone && (
+                <div className={`milestone-check ${currentNetWorth >= milestone.required ? "passed" : "failed"}`}>
+                  <div className="milestone-header">
+                    {currentNetWorth >= milestone.required ? "✅ Milestone Passed!" : "❌ Milestone Failed!"}
+                  </div>
+                  <div className="milestone-body">
+                    Required: ${milestone.required.toLocaleString()} — Your net worth: ${currentNetWorth.toFixed(2)}
+                  </div>
+                </div>
+              )}
 
               <div className="eod-movers">
                 <div className="eod-column">

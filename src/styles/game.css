@@ -1811,3 +1811,47 @@ body {
   0%, 100% { border-color: #ff4444; }
   50% { border-color: #ff0000; background: rgba(255, 0, 0, 0.2); }
 }
+
+/* Milestone check in End of Day */
+.milestone-check {
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.milestone-check.passed {
+  background: rgba(0, 255, 136, 0.1);
+  border: 2px solid var(--green);
+}
+
+.milestone-check.failed {
+  background: rgba(255, 0, 0, 0.1);
+  border: 2px solid var(--red);
+  animation: sec-flash 0.5s ease-in-out 3;
+}
+
+.milestone-header {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.milestone-check.passed .milestone-header { color: var(--green); }
+.milestone-check.failed .milestone-header { color: var(--red); }
+
+.milestone-body {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* Milestone stat in sidebar */
+.milestone-stat {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+  margin-top: 2px;
+}
+
+.stat-value.milestone-ok {
+  color: var(--green);
+}
