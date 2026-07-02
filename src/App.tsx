@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder, getMilestone } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder, getMilestone, draftStock } from "./game/engine";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
@@ -16,6 +16,7 @@ function App() {
   const [paused, setPaused] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [showDraft, setShowDraft] = useState(false);
 
   // Game loop
   useEffect(() => {
@@ -115,7 +116,16 @@ function App() {
   }, []);
 
   const handleNewDay = useCallback(() => {
-    setGameState((prev) => openMarket(prev));
+    if (gameState.stockDraftOptions.length > 0) {
+      setShowDraft(true);
+    } else {
+      setGameState((prev) => openMarket(prev));
+    }
+  }, [gameState.stockDraftOptions.length]);
+
+  const handleDraftStock = useCallback((symbol: string) => {
+    setGameState((prev) => openMarket(draftStock(prev, symbol)));
+    setShowDraft(false);
   }, []);
 
   const handleViewInsider = useCallback(() => {
@@ -211,7 +221,7 @@ function App() {
         </div>
       )}
 
-      {!gameState.marketOpen && !gameState.gameOver && (() => {
+      {!gameState.marketOpen && !gameState.gameOver && !showDraft && (() => {
         const ranked = [...gameState.stocks]
           .map((s) => ({
             ...s,
@@ -315,11 +325,38 @@ function App() {
                 </div>
               ))}
 
-              <button onClick={handleNewDay}>Start Day {gameState.day}</button>
+              <button onClick={handleNewDay}>Continue →</button>
             </div>
           </div>
         );
       })()}
+
+      {!gameState.marketOpen && !gameState.gameOver && showDraft && (
+        <div className="end-of-day-overlay">
+          <div className="stock-draft">
+            <h2>📊 New Stock Available</h2>
+            <p className="stock-draft-sub">Choose a company to add to the market for Day {gameState.day}</p>
+            <div className="stock-draft-options">
+              {gameState.stockDraftOptions.map((stock) => (
+                <button
+                  key={stock.symbol}
+                  className="stock-draft-card"
+                  onClick={() => handleDraftStock(stock.symbol)}
+                >
+                  <div className="draft-card-symbol">{stock.symbol}</div>
+                  <div className="draft-card-name">{stock.name}</div>
+                  <div className="draft-card-price">${stock.price.toFixed(2)}</div>
+                  <div className="draft-card-tags">
+                    {stock.tags.map((tag) => (
+                      <span key={tag} className="stock-tag">{tag}</span>
+                    ))}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="main-layout">
         <div className="monitors-area">

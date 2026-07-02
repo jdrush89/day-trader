@@ -1,4 +1,5 @@
-import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType } from "./types";
+import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType, DailyPrice } from "./types";
+import { STOCK_POOL, StockCandidate } from "./stock-pool";
 
 // Milestone: every 3 days, player must reach this net worth or lose
 // Day 3: $1500, Day 6: $2500, Day 9: $4000, etc.
@@ -504,7 +505,7 @@ export function tick(state: GameState): GameState {
       gameOver = finalNetWorth < requiredNetWorth;
     }
 
-    return {
+    const endOfDayState: GameState = {
       ...postOrderState,
       day: state.day + 1,
       cash: finalCash,
@@ -523,6 +524,9 @@ export function tick(state: GameState): GameState {
       pendingOrders: [], // clear all pending orders at end of day
       secFines: secFine ? [...postOrderState.secFines, secFine] : postOrderState.secFines,
     };
+
+    // Generate 3 stock draft options for the player to choose from
+    return gameOver ? endOfDayState : generateDraftOptions(endOfDayState);
   }
 
   return {
@@ -795,4 +799,95 @@ export function processOrders(state: GameState): GameState {
   }
 
   return { ...newState, pendingOrders: remainingOrders };
+}
+
+// --- Stock Draft System ---
+
+function draftSeededRandom(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return s / 2147483647;
+  };
+}
+
+function generateDraftHistory(
+  currentPrice: number,
+  tradingDays: number,
+  seed: number,
+  volatility: number,
+): DailyPrice[] {
+  const rng = draftSeededRandom(seed);
+  const prices: DailyPrice[] = [];
+  let price = currentPrice;
+  const rawPrices: number[] = [price];
+
+  for (let i = 1; i < tradingDays; i++) {
+    const change = (rng() - 0.48) * volatility * price;
+    price = Math.max(0.5, price - change);
+    rawPrices.unshift(price);
+  }
+
+  for (let i = 0; i < rawPrices.length; i++) {
+    prices.push({
+      day: i - rawPrices.length + 1,
+      close: Math.round(rawPrices[i] * 100) / 100,
+    });
+  }
+
+  return prices;
+}
+
+function candidateToStock(candidate: StockCandidate, seed: number): Stock {
+  const rng = draftSeededRandom(seed);
+  const price = Math.round((candidate.priceRange[0] + rng() * (candidate.priceRange[1] - candidate.priceRange[0])) * 100) / 100;
+  const dailyHistory = generateDraftHistory(price, candidate.historyDays, seed + 9973, candidate.volatility);
+
+  return {
+    symbol: candidate.symbol,
+    name: candidate.name,
+    price,
+    openPrice: price,
+    history: [price],
+    dailyHistory,
+    tags: candidate.tags,
+    ipoDay: candidate.historyDays,
+  };
+}
+
+export function generateDraftOptions(state: GameState): GameState {
+  const existingSymbols = new Set([
+    ...state.stocks.map((s) => s.symbol),
+    ...state.draftedSymbols,
+  ]);
+
+  const available = STOCK_POOL.filter((c) => !existingSymbols.has(c.symbol));
+
+  // Pick 3 random candidates (or fewer if pool is exhausted)
+  const count = Math.min(3, available.length);
+  const picked: StockCandidate[] = [];
+  const pool = [...available];
+
+  for (let i = 0; i < count; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picked.push(pool[idx]);
+    pool.splice(idx, 1);
+  }
+
+  const seed = state.day * 31337;
+  const options = picked.map((c, i) => candidateToStock(c, seed + i * 7919));
+
+  return { ...state, stockDraftOptions: options };
+}
+
+export function draftStock(state: GameState, symbol: string): GameState {
+  const chosen = state.stockDraftOptions.find((s) => s.symbol === symbol);
+  if (!chosen) return state;
+
+  return {
+    ...state,
+    stocks: [...state.stocks, chosen],
+    stockDraftOptions: [],
+    draftedSymbols: [...state.draftedSymbols, symbol],
+  };
 }

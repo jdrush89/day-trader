@@ -1632,6 +1632,83 @@ body {
   font-family: inherit;
 }
 
+/* Stock Draft */
+.stock-draft {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 650px;
+  width: 90vw;
+  text-align: center;
+}
+
+.stock-draft h2 {
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.stock-draft-sub {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  margin-bottom: 20px;
+}
+
+.stock-draft-options {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.stock-draft-card {
+  flex: 1;
+  background: rgba(88, 166, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.stock-draft-card:hover {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.draft-card-symbol {
+  font-size: 1.3rem;
+  font-weight: bold;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+
+.draft-card-name {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  line-height: 1.3;
+}
+
+.draft-card-price {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--green);
+  margin: 4px 0;
+}
+
+.draft-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+}
+
 /* Upgrade Shop */
 .upgrade-shop {
   background: var(--bg-panel);
