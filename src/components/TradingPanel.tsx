@@ -7,12 +7,9 @@ interface TradingPanelProps {
   onSell: (symbol: string, shares: number) => void;
   onShort: (symbol: string, shares: number) => void;
   onCover: (symbol: string, shares: number) => void;
-  onToggleOrders: () => void;
-  ordersOpen: boolean;
-  pendingOrderCount: number;
 }
 
-export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onToggleOrders, ordersOpen, pendingOrderCount }: TradingPanelProps) {
+export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: TradingPanelProps) {
   const [shortMode, setShortMode] = useState(false);
 
   const portfolioValue = gameState.portfolio.reduce((sum, pos) => {
@@ -150,13 +147,6 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTog
             );
           })}
         </div>
-      </div>
-
-      <div className="orders-toggle-bar">
-        <button className="orders-toggle-btn" onClick={onToggleOrders}>
-          📋 Orders {pendingOrderCount > 0 && <span className="orders-badge">{pendingOrderCount}</span>}
-          <span className="orders-arrow">{ordersOpen ? "▶" : "◀"}</span>
-        </button>
       </div>
     </div>
   );

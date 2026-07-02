@@ -335,6 +335,17 @@ function App() {
             onPlaceOrder={handlePlaceOrder}
             onCancelOrder={handleCancelOrder}
           />
+          <button
+            className={`orders-tab-strip ${ordersOpen ? "active" : ""}`}
+            onClick={() => setOrdersOpen((o) => !o)}
+            title="Custom Orders"
+          >
+            <span className="orders-tab-icon">📋</span>
+            <span className="orders-tab-label">O R D E R S</span>
+            {gameState.pendingOrders.length > 0 && (
+              <span className="orders-tab-badge">{gameState.pendingOrders.length}</span>
+            )}
+          </button>
           <div className="sidebar">
             <TradingPanel
               gameState={gameState}
@@ -342,9 +353,6 @@ function App() {
               onSell={handleSell}
               onShort={handleShort}
               onCover={handleCover}
-              onToggleOrders={() => setOrdersOpen((o) => !o)}
-              ordersOpen={ordersOpen}
-              pendingOrderCount={gameState.pendingOrders.length}
             />
           </div>
         </aside>
