@@ -7,6 +7,7 @@ interface MonitorProps {
   monitor: MonitorType;
   gameState: GameState;
   debugMode: boolean;
+  paused: boolean;
   onChangeChannel: (monitorId: number, channel: MonitorChannel) => void;
   onSelectStock: (monitorId: number, symbol: string) => void;
   onViewInsider: () => void;
@@ -20,7 +21,7 @@ const CHANNEL_LABELS: Record<MonitorChannel, string> = {
   insider: "🤫 Insider",
 };
 
-export function Monitor({ monitor, gameState, debugMode, onChangeChannel, onSelectStock, onViewInsider }: MonitorProps) {
+export function Monitor({ monitor, gameState, debugMode, paused, onChangeChannel, onSelectStock, onViewInsider }: MonitorProps) {
   const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -98,13 +99,13 @@ export function Monitor({ monitor, gameState, debugMode, onChangeChannel, onSele
               </div>
             )}
             {monitor.channel === "business_news" && (
-              <NewsFeed news={gameState.news} category="business" debugMode={debugMode} />
+              <NewsFeed news={gameState.news} category="business" debugMode={debugMode} paused={paused} />
             )}
             {monitor.channel === "global_news" && (
-              <NewsFeed news={gameState.news} category="global" debugMode={debugMode} />
+              <NewsFeed news={gameState.news} category="global" debugMode={debugMode} paused={paused} />
             )}
             {monitor.channel === "social_media" && (
-              <NewsFeed news={gameState.news} category="social" debugMode={debugMode} />
+              <NewsFeed news={gameState.news} category="social" debugMode={debugMode} paused={paused} />
             )}
             {monitor.channel === "insider" && (
               <InsiderFeed

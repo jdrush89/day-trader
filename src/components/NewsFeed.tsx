@@ -5,6 +5,7 @@ interface NewsFeedProps {
   news: NewsItem[];
   category: "business" | "global" | "social";
   debugMode?: boolean;
+  paused?: boolean;
 }
 
 interface Commercial {
@@ -67,15 +68,16 @@ const COMMERCIALS: Commercial[] = [
   },
 ];
 
-function CommercialView() {
+function CommercialView({ paused }: { paused?: boolean }) {
   const [index, setIndex] = useState(() => Math.floor(Math.random() * COMMERCIALS.length));
 
   useEffect(() => {
+    if (paused) return;
     const interval = setInterval(() => {
       setIndex((prev) => (prev + 1) % COMMERCIALS.length);
     }, 6000);
     return () => clearInterval(interval);
-  }, []);
+  }, [paused]);
 
   const ad = COMMERCIALS[index];
 
@@ -117,14 +119,14 @@ function DebugImpact({ item }: { item: NewsItem }) {
   );
 }
 
-function BusinessNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
+function BusinessNewsView({ news, debugMode, paused }: { news: NewsItem[]; debugMode?: boolean; paused?: boolean }) {
   const stories = news.filter((n) => n.category === "business");
   const [showCommercial, setShowCommercial] = useState(false);
   const [storyIndex, setStoryIndex] = useState(0);
 
   // Alternate: show story for 8s, then commercial for 5s
   useEffect(() => {
-    if (stories.length === 0) return;
+    if (stories.length === 0 || paused) return;
 
     const duration = showCommercial ? 5000 : 8000;
     const timer = setTimeout(() => {
@@ -136,7 +138,7 @@ function BusinessNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: b
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [showCommercial, stories.length]);
+  }, [showCommercial, stories.length, paused]);
 
   // Show first story quickly — only start with commercial if no stories yet
   const story = stories[storyIndex % Math.max(stories.length, 1)];
@@ -149,7 +151,7 @@ function BusinessNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: b
           <span className="biz-logo">📊 MARKET WATCH</span>
           <span className="biz-live">● LIVE</span>
         </div>
-        <CommercialView />
+        <CommercialView paused={paused} />
       </div>
     );
   }
@@ -199,13 +201,13 @@ function BusinessNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: b
   );
 }
 
-function GlobalNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
+function GlobalNewsView({ news, debugMode, paused }: { news: NewsItem[]; debugMode?: boolean; paused?: boolean }) {
   const headlines = news.filter((n) => n.category === "global");
   const [showCommercial, setShowCommercial] = useState(false);
   const [storyIndex, setStoryIndex] = useState(0);
 
   useEffect(() => {
-    if (headlines.length === 0) return;
+    if (headlines.length === 0 || paused) return;
 
     const duration = showCommercial ? 5000 : 10000;
     const timer = setTimeout(() => {
@@ -216,7 +218,7 @@ function GlobalNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boo
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [showCommercial, headlines.length]);
+  }, [showCommercial, headlines.length, paused]);
 
   const latest = headlines[storyIndex % Math.max(headlines.length, 1)];
   const shouldShowCommercial = headlines.length === 0 || showCommercial;
@@ -237,7 +239,7 @@ function GlobalNewsView({ news, debugMode }: { news: NewsItem[]; debugMode?: boo
         </div>
       ) : (
         <div className="global-main">
-          <CommercialView />
+          <CommercialView paused={paused} />
         </div>
       )}
       <div className="global-ticker-bar">
@@ -325,9 +327,9 @@ function SocialFeedView({ news, debugMode }: { news: NewsItem[]; debugMode?: boo
   );
 }
 
-export function NewsFeed({ news, category, debugMode }: NewsFeedProps) {
-  if (category === "business") return <BusinessNewsView news={news} debugMode={debugMode} />;
-  if (category === "global") return <GlobalNewsView news={news} debugMode={debugMode} />;
+export function NewsFeed({ news, category, debugMode, paused }: NewsFeedProps) {
+  if (category === "business") return <BusinessNewsView news={news} debugMode={debugMode} paused={paused} />;
+  if (category === "global") return <GlobalNewsView news={news} debugMode={debugMode} paused={paused} />;
   return <SocialFeedView news={news} debugMode={debugMode} />;
 }
 

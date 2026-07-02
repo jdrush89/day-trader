@@ -303,6 +303,7 @@ function App() {
               monitor={monitor}
               gameState={gameState}
               debugMode={debugMode}
+              paused={paused}
               onChangeChannel={handleChangeChannel}
               onSelectStock={handleSelectStock}
               onViewInsider={handleViewInsider}
