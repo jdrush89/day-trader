@@ -118,7 +118,9 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
           </div>
         </div>
         <div className="buy-grid">
-          {gameState.stocks.map((stock) => (
+          {gameState.stocks.map((stock) => {
+            const maxShares = Math.floor(gameState.cash / stock.price);
+            return (
             <div key={stock.symbol} className="trade-row">
               <button
                 className={`buy-btn ${shortMode ? "short-mode" : ""}`}
@@ -134,8 +136,16 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
               >
                 10
               </button>
+              <button
+                className={`buy-btn buy-max ${shortMode ? "short-mode" : ""}`}
+                onClick={() => handleAction(stock.symbol, maxShares)}
+                disabled={maxShares < 1}
+              >
+                Max
+              </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
