@@ -260,10 +260,19 @@ function formatUpvotes(n: number): string {
 }
 
 function SocialFeedView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
-  // Sort by upvotes descending — this is the front page ranking
+  // Hot ranking: upvotes weighted by recency — new posts with fast upvotes rise to top
+  const now = Date.now();
   const posts = news
     .filter((n) => n.category === "social")
-    .sort((a, b) => (b.upvotes ?? 0) - (a.upvotes ?? 0));
+    .sort((a, b) => {
+      const aUp = a.upvotes ?? 0;
+      const bUp = b.upvotes ?? 0;
+      const aAge = (now - a.timestamp) / 1000;
+      const bAge = (now - b.timestamp) / 1000;
+      const aScore = aUp / Math.pow(aAge / 60 + 2, 1.2);
+      const bScore = bUp / Math.pow(bAge / 60 + 2, 1.2);
+      return bScore - aScore;
+    });
 
   return (
     <div className="social-feed-view">

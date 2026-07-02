@@ -386,9 +386,11 @@ export function tick(state: GameState): GameState {
       return updatedImpact !== item.impact ? { ...item, impact: updatedImpact } : item;
     }
 
-    // Momentum decays over time but viral posts sustain longer
+    // Momentum decays over time — high-upvote posts sustain much longer
     const age = (Date.now() - item.timestamp) / 1000;
-    const decayFactor = Math.max(0, 1 - age / 120); // fade over ~2 minutes
+    const upvoteBoost = Math.min(item.upvotes / 200, 5); // up to 5x longer decay
+    const decayTime = 120 + upvoteBoost * 120; // 2-12 minutes based on upvotes
+    const decayFactor = Math.max(0, 1 - age / decayTime);
     const jitter = (Math.random() - 0.3) * item.momentum; // biased upward
     const newUpvotes = Math.max(
       item.upvotes,
@@ -402,12 +404,21 @@ export function tick(state: GameState): GameState {
       newMomentum = item.momentum * (1.5 + Math.random());
     }
 
+    // Extend impact duration for high-upvote posts
+    let socialImpact = updatedImpact;
+    if (socialImpact && newUpvotes > 100) {
+      const bonusTicks = Math.floor(Math.min(newUpvotes / 50, 40));
+      if (socialImpact.ticksRemaining > 0 && socialImpact.ticksRemaining < bonusTicks) {
+        socialImpact = { ...socialImpact, ticksRemaining: bonusTicks };
+      }
+    }
+
     return {
       ...item,
       upvotes: newUpvotes,
       commentCount: newComments,
       momentum: newMomentum,
-      impact: updatedImpact,
+      impact: socialImpact,
     };
   });
 
