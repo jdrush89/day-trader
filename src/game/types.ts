@@ -1,10 +1,19 @@
+export type HistoryRange = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "MAX";
+
+export interface DailyPrice {
+  day: number; // game day (negative for pre-game history)
+  close: number;
+}
+
 export interface Stock {
   symbol: string;
   name: string;
   price: number;
   openPrice: number;
-  history: number[];
+  history: number[]; // intraday ticks
+  dailyHistory: DailyPrice[]; // end-of-day closing prices
   tags: string[];
+  ipoDay: number; // how many trading days ago this stock IPO'd (for fake history)
 }
 
 export interface EarningsData {

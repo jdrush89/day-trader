@@ -632,7 +632,12 @@ export function openMarket(state: GameState): GameState {
   return {
     ...state,
     marketOpen: true,
-    stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price })),
+    stocks: state.stocks.map((s) => ({
+      ...s,
+      openPrice: s.price,
+      dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }],
+      history: [s.price], // reset intraday history for new day
+    })),
     dayStartNetWorth: netWorth,
     insiderTip: null,
     insiderViewed: false,
