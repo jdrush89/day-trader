@@ -538,6 +538,17 @@ export function tick(state: GameState): GameState {
   };
 }
 
+function pushRecent(recent: string[], symbol: string): string[] {
+  return [symbol, ...recent.filter((s) => s !== symbol)].slice(0, 10);
+}
+
+export function togglePinStock(state: GameState, symbol: string): GameState {
+  const pinned = state.pinnedStocks.includes(symbol)
+    ? state.pinnedStocks.filter((s) => s !== symbol)
+    : [...state.pinnedStocks, symbol];
+  return { ...state, pinnedStocks: pinned };
+}
+
 export function buyStock(state: GameState, symbol: string, shares: number): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock) return state;
@@ -560,7 +571,7 @@ export function buyStock(state: GameState, symbol: string, shares: number): Game
     newPortfolio = [...state.portfolio, { symbol, shares, avgCost: stock.price }];
   }
 
-  return { ...state, cash: state.cash - cost, portfolio: newPortfolio };
+  return { ...state, cash: state.cash - cost, portfolio: newPortfolio, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function sellStock(state: GameState, symbol: string, shares: number): GameState {
@@ -591,7 +602,7 @@ export function sellStock(state: GameState, symbol: string, shares: number): Gam
     }
   }
 
-  return { ...state, cash: state.cash + revenue, portfolio: newPortfolio, insiderRealizedProfit };
+  return { ...state, cash: state.cash + revenue, portfolio: newPortfolio, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function shortStock(state: GameState, symbol: string, shares: number): GameState {
@@ -618,7 +629,7 @@ export function shortStock(state: GameState, symbol: string, shares: number): Ga
   }
 
   // Lock collateral from cash
-  return { ...state, cash: state.cash - collateral, shorts: newShorts };
+  return { ...state, cash: state.cash - collateral, shorts: newShorts, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function coverShort(state: GameState, symbol: string, shares: number): GameState {
@@ -648,7 +659,7 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
     }
   }
 
-  return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit };
+  return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function openMarket(state: GameState): GameState {

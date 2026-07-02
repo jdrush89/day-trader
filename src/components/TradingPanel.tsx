@@ -8,9 +8,10 @@ interface TradingPanelProps {
   onSell: (symbol: string, shares: number) => void;
   onShort: (symbol: string, shares: number) => void;
   onCover: (symbol: string, shares: number) => void;
+  onTogglePin: (symbol: string) => void;
 }
 
-export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: TradingPanelProps) {
+export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTogglePin }: TradingPanelProps) {
   const [shortMode, setShortMode] = useState(false);
 
   const portfolioValue = gameState.portfolio.reduce((sum, pos) => {
@@ -138,34 +139,56 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
           </div>
         </div>
         <div className="buy-grid">
-          {gameState.stocks.map((stock) => {
-            const maxShares = Math.floor(gameState.cash / stock.price);
-            return (
-            <div key={stock.symbol} className="trade-row">
-              <button
-                className={`buy-btn ${shortMode ? "short-mode" : ""}`}
-                onClick={() => handleAction(stock.symbol, 1)}
-                disabled={stock.price > gameState.cash}
-              >
-                {actionLabel} 1 {stock.symbol} @ ${stock.price.toFixed(2)}
-              </button>
-              <button
-                className={`buy-btn buy-10 ${shortMode ? "short-mode" : ""}`}
-                onClick={() => handleAction(stock.symbol, 10)}
-                disabled={stock.price * 10 > gameState.cash}
-              >
-                10
-              </button>
-              <button
-                className={`buy-btn buy-max ${shortMode ? "short-mode" : ""}`}
-                onClick={() => handleAction(stock.symbol, maxShares)}
-                disabled={maxShares < 1}
-              >
-                Max
-              </button>
-            </div>
-            );
-          })}
+          {(() => {
+            // Build quick buy list: pinned first, then recent trades, up to 6
+            const pinned = gameState.pinnedStocks;
+            const recent = gameState.recentTrades.filter((s) => !pinned.includes(s));
+            const symbols = [...pinned, ...recent].slice(0, 6);
+            const quickStocks = symbols
+              .map((sym) => gameState.stocks.find((s) => s.symbol === sym))
+              .filter(Boolean) as typeof gameState.stocks;
+
+            if (quickStocks.length === 0) {
+              return <div className="empty">Trade a stock to add it here</div>;
+            }
+
+            return quickStocks.map((stock) => {
+              const maxShares = Math.floor(gameState.cash / stock.price);
+              const isPinned = pinned.includes(stock.symbol);
+              return (
+                <div key={stock.symbol} className="trade-row">
+                  <button
+                    className={`pin-btn ${isPinned ? "pinned" : ""}`}
+                    onClick={() => onTogglePin(stock.symbol)}
+                    title={isPinned ? "Unpin" : "Pin to quick buy"}
+                  >
+                    📌
+                  </button>
+                  <button
+                    className={`buy-btn ${shortMode ? "short-mode" : ""}`}
+                    onClick={() => handleAction(stock.symbol, 1)}
+                    disabled={stock.price > gameState.cash}
+                  >
+                    {actionLabel} 1 {stock.symbol} @ ${stock.price.toFixed(2)}
+                  </button>
+                  <button
+                    className={`buy-btn buy-10 ${shortMode ? "short-mode" : ""}`}
+                    onClick={() => handleAction(stock.symbol, 10)}
+                    disabled={stock.price * 10 > gameState.cash}
+                  >
+                    10
+                  </button>
+                  <button
+                    className={`buy-btn buy-max ${shortMode ? "short-mode" : ""}`}
+                    onClick={() => handleAction(stock.symbol, maxShares)}
+                    disabled={maxShares < 1}
+                  >
+                    Max
+                  </button>
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
     </div>

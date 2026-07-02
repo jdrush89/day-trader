@@ -162,5 +162,7 @@ export function createInitialState(): GameState {
     pendingOrders: [],
     stockDraftOptions: [],
     draftedSymbols: [],
+    recentTrades: [],
+    pinnedStocks: [],
   };
 }

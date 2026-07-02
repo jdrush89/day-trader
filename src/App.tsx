@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder, getMilestone, draftStock } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock } from "./game/engine";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
@@ -101,6 +101,10 @@ function App() {
 
   const handleCover = useCallback((symbol: string, shares: number) => {
     setGameState((prev) => coverShort(prev, symbol, shares));
+  }, []);
+
+  const handleTogglePin = useCallback((symbol: string) => {
+    setGameState((prev) => togglePinStock(prev, symbol));
   }, []);
 
   const handlePlaceOrder = useCallback((symbol: string, side: OrderSide, shares: number, orderType: OrderType, limitPrice?: number, stopPrice?: number) => {
@@ -403,6 +407,7 @@ function App() {
               onSell={handleSell}
               onShort={handleShort}
               onCover={handleCover}
+              onTogglePin={handleTogglePin}
             />
           </div>
         </aside>

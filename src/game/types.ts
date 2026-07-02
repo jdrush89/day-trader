@@ -145,4 +145,6 @@ export interface GameState {
   pendingOrders: PendingOrder[];
   stockDraftOptions: Stock[]; // 3 candidates to choose from at end of day
   draftedSymbols: string[]; // symbols already drafted (to avoid repeats)
+  recentTrades: string[]; // most recently traded symbols (newest first)
+  pinnedStocks: string[]; // symbols pinned to quick buy
 }

@@ -292,30 +292,38 @@ export function StockChart({ stock, totalTicks = 100, position, shortPosition, o
       </svg>
 
       {/* Tooltip rendered outside SVG for crisp text */}
-      {hover && hoverPrice !== null && (
-        <div className="chart-tooltip">
-          <span className="chart-tooltip-price">${hoverPrice.toFixed(2)}</span>
-          <span className={`chart-tooltip-change ${hoverChange >= 0 ? "up" : "down"}`}>
-            {hoverChange >= 0 ? "+" : ""}{hoverChange.toFixed(2)} ({hoverChange >= 0 ? "+" : ""}{hoverChangePct.toFixed(1)}%)
-          </span>
-        </div>
-      )}
+      <div className="chart-tooltip-area">
+        {hover && hoverPrice !== null ? (
+          <div className="chart-tooltip">
+            <span className="chart-tooltip-price">${hoverPrice.toFixed(2)}</span>
+            <span className={`chart-tooltip-change ${hoverChange >= 0 ? "up" : "down"}`}>
+              {hoverChange >= 0 ? "+" : ""}{hoverChange.toFixed(2)} ({hoverChange >= 0 ? "+" : ""}{hoverChangePct.toFixed(1)}%)
+            </span>
+          </div>
+        ) : (
+          <div className="chart-tooltip chart-tooltip-placeholder">&nbsp;</div>
+        )}
+      </div>
 
       {/* Trade buttons */}
       {onBuy && (
         <div className="chart-trade-buttons">
           <button className="chart-trade-btn buy" onClick={() => onBuy(stock.symbol, 1)}>Buy</button>
-          {position && position.shares > 0 && (
-            <button className="chart-trade-btn sell" onClick={() => onSell?.(stock.symbol, 1)}>
-              Sell ({position.shares})
-            </button>
-          )}
+          <button
+            className="chart-trade-btn sell"
+            onClick={() => onSell?.(stock.symbol, 1)}
+            disabled={!position || position.shares <= 0}
+          >
+            Sell{position && position.shares > 0 ? ` (${position.shares})` : ""}
+          </button>
           <button className="chart-trade-btn short" onClick={() => onShort?.(stock.symbol, 1)}>Short</button>
-          {shortPosition && shortPosition.shares > 0 && (
-            <button className="chart-trade-btn cover" onClick={() => onCover?.(stock.symbol, 1)}>
-              Cover ({shortPosition.shares})
-            </button>
-          )}
+          <button
+            className="chart-trade-btn cover"
+            onClick={() => onCover?.(stock.symbol, 1)}
+            disabled={!shortPosition || shortPosition.shares <= 0}
+          >
+            Cover{shortPosition && shortPosition.shares > 0 ? ` (${shortPosition.shares})` : ""}
+          </button>
         </div>
       )}
     </div>

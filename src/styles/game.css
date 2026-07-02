@@ -479,12 +479,20 @@ body {
   display: block;
 }
 
+.chart-tooltip-area {
+  min-height: 24px;
+}
+
 .chart-tooltip {
   display: flex;
   align-items: baseline;
   gap: 8px;
   padding: 4px 0;
   font-family: var(--font);
+}
+
+.chart-tooltip-placeholder {
+  visibility: hidden;
 }
 
 .chart-tooltip-price {
@@ -556,6 +564,16 @@ body {
 .chart-trade-btn.cover:hover {
   background: var(--accent);
   color: #000;
+}
+
+.chart-trade-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.chart-trade-btn:disabled:hover {
+  transform: none;
+  background: inherit;
+  color: inherit;
 }
 
 .stock-selector {
@@ -1385,6 +1403,28 @@ body {
 .trade-row {
   display: flex;
   gap: 4px;
+  align-items: stretch;
+}
+
+.pin-btn {
+  padding: 2px 4px;
+  font-size: 0.6rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.12s;
+  line-height: 1;
+}
+
+.pin-btn:hover {
+  opacity: 0.7;
+}
+
+.pin-btn.pinned {
+  opacity: 1;
+  border-color: var(--accent);
 }
 
 .trade-row .buy-btn {
