@@ -36,9 +36,16 @@ function App() {
         return;
       }
 
-      // Number keys 1-5 switch channel on the first monitor (override even focused inputs)
+      // Number keys 1-5 switch channel on the first monitor
+      // Skip if user is typing in an input/select (except the stock search bar which handles this itself)
       const num = parseInt(e.key);
       if (num >= 1 && num <= CHANNEL_KEYS.length) {
+        const active = document.activeElement;
+        const tag = active?.tagName.toLowerCase();
+        const isStockSearch = active?.classList.contains("stock-search-input");
+        if ((tag === "input" || tag === "select" || tag === "textarea") && !isStockSearch) {
+          return; // let the input handle the keystroke
+        }
         e.preventDefault();
         setGameState((prev) => ({
           ...prev,
