@@ -3,6 +3,7 @@ import { Stock, HistoryRange } from "../game/types";
 
 interface StockChartProps {
   stock: Stock;
+  totalTicks?: number; // total ticks in the trading day (for 1D view)
 }
 
 const RANGES: HistoryRange[] = ["1D", "5D", "1M", "6M", "1Y", "5Y", "MAX"];
@@ -118,31 +119,34 @@ const TOTAL_H = 140;
 const PLOT_W = TOTAL_W - MARGIN.left - MARGIN.right;
 const PLOT_H = TOTAL_H - MARGIN.top - MARGIN.bottom;
 
-export function StockChart({ stock }: StockChartProps) {
+export function StockChart({ stock, totalTicks = 100 }: StockChartProps) {
   const [range, setRange] = useState<HistoryRange>("1D");
   const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   const data = getChartData(stock, range);
+  const is1D = range === "1D";
+  // For 1D, X spans the full trading day; for others, X spans the data
+  const xSpan = is1D ? totalTicks : data.length - 1;
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>) => {
       const svg = svgRef.current;
       if (!svg || data.length < 2) return;
       const rect = svg.getBoundingClientRect();
-      // Use ratio of mouse position within the rendered element
       const ratioX = (e.clientX - rect.left) / rect.width;
       const plotRatio = (ratioX * TOTAL_W - MARGIN.left) / PLOT_W;
-      const idx = Math.round(plotRatio * (data.length - 1));
+      const rawIdx = plotRatio * xSpan;
+      const idx = Math.round(Math.min(rawIdx, data.length - 1));
       if (idx >= 0 && idx < data.length) {
-        const px = MARGIN.left + (idx / (data.length - 1)) * PLOT_W;
+        const px = MARGIN.left + (idx / xSpan) * PLOT_W;
         const price = data[idx];
         setHover({ idx, x: px, y: price });
       } else {
         setHover(null);
       }
     },
-    [data],
+    [data, xSpan],
   );
 
   const handleMouseLeave = useCallback(() => setHover(null), []);
@@ -156,7 +160,7 @@ export function StockChart({ stock }: StockChartProps) {
   const yMax = dataMax + padding;
   const yRange = yMax - yMin;
 
-  const toX = (i: number) => MARGIN.left + (i / (data.length - 1)) * PLOT_W;
+  const toX = (i: number) => MARGIN.left + (i / xSpan) * PLOT_W;
   const toY = (price: number) => MARGIN.top + PLOT_H - ((price - yMin) / yRange) * PLOT_H;
 
   const points = data.map((price, i) => `${toX(i)},${toY(price)}`).join(" ");

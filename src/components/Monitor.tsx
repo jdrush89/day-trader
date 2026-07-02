@@ -94,6 +94,7 @@ export function Monitor({ monitor, gameState, debugMode, paused, onChangeChannel
                 {monitor.selectedStock && filteredStocks.some((s) => s.symbol === monitor.selectedStock) && (
                   <StockChart
                     stock={gameState.stocks.find((s) => s.symbol === monitor.selectedStock)!}
+                    totalTicks={100}
                   />
                 )}
               </div>
