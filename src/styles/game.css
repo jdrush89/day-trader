@@ -516,13 +516,16 @@ body {
 }
 
 .chart-trade-btn {
-  padding: 4px 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 4px 4px;
   font-size: 0.7rem;
   font-weight: bold;
   font-family: inherit;
   border: 1px solid;
   border-radius: 3px;
   cursor: pointer;
+  text-align: center;
   transition: all 0.12s;
 }
 
