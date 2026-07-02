@@ -4,6 +4,7 @@ import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder } from "./game/engine";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
+import { OrdersPanel } from "./components/OrdersPanel";
 import { UpgradeShop } from "./components/UpgradeShop";
 import titleScreen from "./assets/title-screen.png";
 
@@ -14,6 +15,7 @@ function App() {
   const [speed, setSpeed] = useState<number>(1);
   const [paused, setPaused] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
+  const [ordersOpen, setOrdersOpen] = useState(false);
 
   // Game loop
   useEffect(() => {
@@ -325,16 +327,26 @@ function App() {
             />
           ))}
         </div>
-        <aside className="sidebar">
-          <TradingPanel
+        <aside className="sidebar-area">
+          <OrdersPanel
             gameState={gameState}
-            onBuy={handleBuy}
-            onSell={handleSell}
-            onShort={handleShort}
-            onCover={handleCover}
+            open={ordersOpen}
+            onClose={() => setOrdersOpen(false)}
             onPlaceOrder={handlePlaceOrder}
             onCancelOrder={handleCancelOrder}
           />
+          <div className="sidebar">
+            <TradingPanel
+              gameState={gameState}
+              onBuy={handleBuy}
+              onSell={handleSell}
+              onShort={handleShort}
+              onCover={handleCover}
+              onToggleOrders={() => setOrdersOpen((o) => !o)}
+              ordersOpen={ordersOpen}
+              pendingOrderCount={gameState.pendingOrders.length}
+            />
+          </div>
         </aside>
       </div>
 
