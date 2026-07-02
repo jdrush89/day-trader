@@ -333,6 +333,10 @@ function App() {
               onChangeChannel={handleChangeChannel}
               onSelectStock={handleSelectStock}
               onViewInsider={handleViewInsider}
+              onBuy={handleBuy}
+              onSell={handleSell}
+              onShort={handleShort}
+              onCover={handleCover}
             />
           ))}
         </div>

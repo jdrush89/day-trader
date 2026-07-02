@@ -1,9 +1,16 @@
 import { useState, useRef, useCallback } from "react";
-import { Stock, HistoryRange } from "../game/types";
+import { Stock, HistoryRange, Position, ShortPosition } from "../game/types";
 
 interface StockChartProps {
   stock: Stock;
   totalTicks?: number; // total ticks in the trading day (for 1D view)
+  cash?: number;
+  position?: Position;
+  shortPosition?: ShortPosition;
+  onBuy?: (symbol: string, shares: number) => void;
+  onSell?: (symbol: string, shares: number) => void;
+  onShort?: (symbol: string, shares: number) => void;
+  onCover?: (symbol: string, shares: number) => void;
 }
 
 const RANGES: HistoryRange[] = ["1D", "5D", "1M", "6M", "1Y", "5Y", "MAX"];
@@ -119,7 +126,7 @@ const TOTAL_H = 140;
 const PLOT_W = TOTAL_W - MARGIN.left - MARGIN.right;
 const PLOT_H = TOTAL_H - MARGIN.top - MARGIN.bottom;
 
-export function StockChart({ stock, totalTicks = 100 }: StockChartProps) {
+export function StockChart({ stock, totalTicks = 100, position, shortPosition, onBuy, onSell, onShort, onCover }: StockChartProps) {
   const [range, setRange] = useState<HistoryRange>("1D");
   const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -291,6 +298,24 @@ export function StockChart({ stock, totalTicks = 100 }: StockChartProps) {
           <span className={`chart-tooltip-change ${hoverChange >= 0 ? "up" : "down"}`}>
             {hoverChange >= 0 ? "+" : ""}{hoverChange.toFixed(2)} ({hoverChange >= 0 ? "+" : ""}{hoverChangePct.toFixed(1)}%)
           </span>
+        </div>
+      )}
+
+      {/* Trade buttons */}
+      {onBuy && (
+        <div className="chart-trade-buttons">
+          <button className="chart-trade-btn buy" onClick={() => onBuy(stock.symbol, 1)}>Buy</button>
+          {position && position.shares > 0 && (
+            <button className="chart-trade-btn sell" onClick={() => onSell?.(stock.symbol, 1)}>
+              Sell ({position.shares})
+            </button>
+          )}
+          <button className="chart-trade-btn short" onClick={() => onShort?.(stock.symbol, 1)}>Short</button>
+          {shortPosition && shortPosition.shares > 0 && (
+            <button className="chart-trade-btn cover" onClick={() => onCover?.(stock.symbol, 1)}>
+              Cover ({shortPosition.shares})
+            </button>
+          )}
         </div>
       )}
     </div>

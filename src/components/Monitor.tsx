@@ -11,6 +11,10 @@ interface MonitorProps {
   onChangeChannel: (monitorId: number, channel: MonitorChannel) => void;
   onSelectStock: (monitorId: number, symbol: string) => void;
   onViewInsider: () => void;
+  onBuy: (symbol: string, shares: number) => void;
+  onSell: (symbol: string, shares: number) => void;
+  onShort: (symbol: string, shares: number) => void;
+  onCover: (symbol: string, shares: number) => void;
 }
 
 const CHANNEL_LABELS: Record<MonitorChannel, string> = {
@@ -21,7 +25,7 @@ const CHANNEL_LABELS: Record<MonitorChannel, string> = {
   insider: "🤫 Insider",
 };
 
-export function Monitor({ monitor, gameState, debugMode, paused, onChangeChannel, onSelectStock, onViewInsider }: MonitorProps) {
+export function Monitor({ monitor, gameState, debugMode, paused, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover }: MonitorProps) {
   const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -95,6 +99,13 @@ export function Monitor({ monitor, gameState, debugMode, paused, onChangeChannel
                   <StockChart
                     stock={gameState.stocks.find((s) => s.symbol === monitor.selectedStock)!}
                     totalTicks={100}
+                    cash={gameState.cash}
+                    position={gameState.portfolio.find((p) => p.symbol === monitor.selectedStock)}
+                    shortPosition={gameState.shorts.find((s) => s.symbol === monitor.selectedStock)}
+                    onBuy={onBuy}
+                    onSell={onSell}
+                    onShort={onShort}
+                    onCover={onCover}
                   />
                 )}
               </div>
