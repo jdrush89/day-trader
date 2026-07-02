@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { GameState } from "../game/types";
 
 interface TradingPanelProps {
@@ -9,10 +10,15 @@ interface TradingPanelProps {
 }
 
 export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: TradingPanelProps) {
+  const [shortMode, setShortMode] = useState(false);
+
   const portfolioValue = gameState.portfolio.reduce((sum, pos) => {
     const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
     return sum + (stock ? stock.price * pos.shares : 0);
   }, 0);
+
+  const handleAction = shortMode ? onShort : onBuy;
+  const actionLabel = shortMode ? "Short" : "Buy";
 
   return (
     <div className="trading-panel">
@@ -73,7 +79,7 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
           const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
           const currentCost = stock ? stock.price * pos.shares : 0;
           const entryValue = pos.entryPrice * pos.shares;
-          const pnl = entryValue - currentCost; // profit when price drops
+          const pnl = entryValue - currentCost;
           return (
             <div key={pos.symbol} className="position-row">
               <span className="pos-symbol">{pos.symbol}</span>
@@ -94,30 +100,39 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover }: Tra
       </div>
 
       <div className="quick-buy">
-        <h3>Quick Buy / Short</h3>
+        <div className="quick-buy-header">
+          <h3>Quick {actionLabel}</h3>
+          <div className="trade-mode-toggle">
+            <button
+              className={`mode-btn ${!shortMode ? "active" : ""}`}
+              onClick={() => setShortMode(false)}
+            >
+              📈 Buy
+            </button>
+            <button
+              className={`mode-btn ${shortMode ? "active" : ""}`}
+              onClick={() => setShortMode(true)}
+            >
+              📉 Short
+            </button>
+          </div>
+        </div>
         <div className="buy-grid">
           {gameState.stocks.map((stock) => (
             <div key={stock.symbol} className="trade-row">
               <button
-                className="buy-btn"
-                onClick={() => onBuy(stock.symbol, 1)}
+                className={`buy-btn ${shortMode ? "short-mode" : ""}`}
+                onClick={() => handleAction(stock.symbol, 1)}
                 disabled={stock.price > gameState.cash}
               >
-                Buy 1 {stock.symbol} @ ${stock.price.toFixed(2)}
+                {actionLabel} 1 {stock.symbol} @ ${stock.price.toFixed(2)}
               </button>
               <button
-                className="buy-btn buy-10"
-                onClick={() => onBuy(stock.symbol, 10)}
+                className={`buy-btn buy-10 ${shortMode ? "short-mode" : ""}`}
+                onClick={() => handleAction(stock.symbol, 10)}
                 disabled={stock.price * 10 > gameState.cash}
               >
                 10
-              </button>
-              <button
-                className="short-btn"
-                onClick={() => onShort(stock.symbol, 1)}
-                disabled={stock.price > gameState.cash}
-              >
-                Short
               </button>
             </div>
           ))}

@@ -929,6 +929,54 @@ body {
   padding-top: 8px;
 }
 
+.quick-buy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.quick-buy-header h3 {
+  margin-bottom: 0;
+}
+
+.trade-mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-dark);
+  border-radius: 4px;
+  padding: 2px;
+  border: 1px solid var(--border);
+}
+
+.mode-btn {
+  padding: 3px 8px;
+  font-size: 0.65rem;
+  font-family: inherit;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-dim);
+  transition: all 0.15s;
+}
+
+.mode-btn.active {
+  background: var(--bg-panel);
+  color: var(--text);
+  font-weight: bold;
+}
+
+.buy-btn.short-mode {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.buy-btn.short-mode:hover:not(:disabled) {
+  background: var(--red);
+  color: #000;
+}
+
 .position-row {
   display: flex;
   align-items: center;
@@ -972,27 +1020,6 @@ body {
 
 .trade-row .buy-btn {
   flex: 1;
-}
-
-.short-btn {
-  padding: 6px 8px;
-  font-size: 0.7rem;
-  background: transparent;
-  border: 1px solid var(--red);
-  color: var(--red);
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.short-btn:hover:not(:disabled) {
-  background: var(--red);
-  color: #000;
-}
-
-.short-btn:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
 }
 
 .buy-btn {
