@@ -360,8 +360,30 @@ body {
 
 .chart-svg {
   width: 100%;
-  height: 120px;
+  height: 140px;
+  cursor: crosshair;
 }
+
+.chart-tooltip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 0;
+  font-family: var(--font);
+}
+
+.chart-tooltip-price {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.chart-tooltip-change {
+  font-size: 0.75rem;
+}
+
+.chart-tooltip-change.up { color: var(--green); }
+.chart-tooltip-change.down { color: var(--red); }
 
 .stock-selector {
   display: flex;
