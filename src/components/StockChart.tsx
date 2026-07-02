@@ -126,7 +126,7 @@ const TOTAL_H = 140;
 const PLOT_W = TOTAL_W - MARGIN.left - MARGIN.right;
 const PLOT_H = TOTAL_H - MARGIN.top - MARGIN.bottom;
 
-export function StockChart({ stock, totalTicks = 100, position, shortPosition, onBuy, onSell, onShort, onCover }: StockChartProps) {
+export function StockChart({ stock, totalTicks = 100, cash, position, shortPosition, onBuy, onSell, onShort, onCover }: StockChartProps) {
   const [range, setRange] = useState<HistoryRange>("1D");
   const [hover, setHover] = useState<{ idx: number; x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -308,7 +308,11 @@ export function StockChart({ stock, totalTicks = 100, position, shortPosition, o
       {/* Trade buttons */}
       {onBuy && (
         <div className="chart-trade-buttons">
-          <button className="chart-trade-btn buy" onClick={() => onBuy(stock.symbol, 1)}>Buy</button>
+          <button
+            className="chart-trade-btn buy"
+            onClick={() => onBuy(stock.symbol, 1)}
+            disabled={cash !== undefined && stock.price > cash}
+          >Buy</button>
           <button
             className="chart-trade-btn sell"
             onClick={() => onSell?.(stock.symbol, 1)}
@@ -316,7 +320,11 @@ export function StockChart({ stock, totalTicks = 100, position, shortPosition, o
           >
             Sell{position && position.shares > 0 ? ` (${position.shares})` : ""}
           </button>
-          <button className="chart-trade-btn short" onClick={() => onShort?.(stock.symbol, 1)}>Short</button>
+          <button
+            className="chart-trade-btn short"
+            onClick={() => onShort?.(stock.symbol, 1)}
+            disabled={cash !== undefined && stock.price > cash}
+          >Short</button>
           <button
             className="chart-trade-btn cover"
             onClick={() => onCover?.(stock.symbol, 1)}

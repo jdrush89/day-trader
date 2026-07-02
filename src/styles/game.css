@@ -480,14 +480,15 @@ body {
 }
 
 .chart-tooltip-area {
-  min-height: 24px;
+  height: 26px;
+  display: flex;
+  align-items: center;
 }
 
 .chart-tooltip {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 4px 0;
   font-family: var(--font);
 }
 
