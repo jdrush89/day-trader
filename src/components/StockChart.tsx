@@ -130,12 +130,10 @@ export function StockChart({ stock }: StockChartProps) {
       const svg = svgRef.current;
       if (!svg || data.length < 2) return;
       const rect = svg.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const scaleX = TOTAL_W / rect.width;
-      const svgX = mouseX * scaleX;
-      const plotX = svgX - MARGIN.left;
-      const ratio = plotX / PLOT_W;
-      const idx = Math.round(ratio * (data.length - 1));
+      // Use ratio of mouse position within the rendered element
+      const ratioX = (e.clientX - rect.left) / rect.width;
+      const plotRatio = (ratioX * TOTAL_W - MARGIN.left) / PLOT_W;
+      const idx = Math.round(plotRatio * (data.length - 1));
       if (idx >= 0 && idx < data.length) {
         const px = MARGIN.left + (idx / (data.length - 1)) * PLOT_W;
         const price = data[idx];
@@ -215,6 +213,7 @@ export function StockChart({ stock }: StockChartProps) {
       <svg
         ref={svgRef}
         viewBox={`0 0 ${TOTAL_W} ${TOTAL_H}`}
+        preserveAspectRatio="none"
         className="chart-svg"
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
