@@ -423,7 +423,7 @@ export function tick(state: GameState): GameState {
 
     const gameOver = newCash + portfolioValue - shortLiability < 0;
 
-    // SEC fine check: only if player viewed the insider channel and made money on that stock AFTER viewing
+    // SEC fine check: only if player viewed the insider channel
     let secFine = null;
     let finalCash = newCash;
     if (state.insiderViewed && insiderTip) {
@@ -431,55 +431,40 @@ export function tick(state: GameState): GameState {
       const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
 
       if (tipStock) {
-        // Calculate profit made on the insider stock AFTER viewing the tip
-        let profitAfterViewing = 0;
+        // Realized profit from sells/covers already tracked
+        let totalInsiderProfit = state.insiderRealizedProfit;
 
-        // Long positions: profit = (current price - avg cost) * shares, but only for shares beyond snapshot
+        // Unrealized gains on long shares bought AFTER viewing (still held)
         const currentPos = state.portfolio.find((p) => p.symbol === tipSymbol);
         const snapPos = state.insiderSnapshotHoldings.find((p) => p.symbol === tipSymbol);
         const currentShares = currentPos?.shares ?? 0;
         const snapShares = snapPos?.shares ?? 0;
-        const snapAvgCost = snapPos?.avgCost ?? 0;
-
         if (currentShares > snapShares) {
-          // New shares bought after viewing — profit on those
           const newShares = currentShares - snapShares;
-          const avgCostNewShares = currentPos
-            ? (currentPos.avgCost * currentPos.shares - snapAvgCost * snapShares) / newShares
-            : tipStock.price;
-          profitAfterViewing += (tipStock.price - avgCostNewShares) * newShares;
+          // Unrealized gain on shares bought after viewing
+          totalInsiderProfit += (tipStock.price - currentPos!.avgCost) * newShares;
         }
 
-        // Short positions: profit if shorted after viewing and price went in favorable direction
+        // Unrealized gains on short positions opened AFTER viewing (still open)
         const currentShort = state.shorts.find((p) => p.symbol === tipSymbol);
         const snapShort = state.insiderSnapshotShorts.find((p) => p.symbol === tipSymbol);
         const currentShortShares = currentShort?.shares ?? 0;
         const snapShortShares = snapShort?.shares ?? 0;
-
         if (currentShortShares > snapShortShares) {
           const newShortShares = currentShortShares - snapShortShares;
-          const shortEntry = currentShort!.entryPrice;
-          profitAfterViewing += (shortEntry - tipStock.price) * newShortShares;
+          totalInsiderProfit += (currentShort!.entryPrice - tipStock.price) * newShortShares;
         }
 
-        // Also count shares already sold for profit (no longer in portfolio)
-        // We approximate: if they had more shares at snapshot than now, they sold some
-        if (snapShares > currentShares && currentShares >= 0) {
-          // They may have sold shares they bought after viewing — hard to track exactly
-          // Conservative: just use the profit we can measure from current holdings
-        }
-
-        if (profitAfterViewing > 0) {
-          // Chance of getting caught scales with profit: $100 = 10%, $500 = 40%, $1000+ = 70%+
-          const catchChance = Math.min(0.85, profitAfterViewing / 1500);
+        if (totalInsiderProfit > 0) {
+          // Chance of getting caught: $100→15%, $500→50%, $1000→75%, $3000→95%
+          const catchChance = Math.min(0.95, totalInsiderProfit / 3500 + 0.1);
           if (Math.random() < catchChance) {
-            // Fine is 2-3x the profit
             const fineMultiplier = 2 + Math.random();
-            const fineAmount = Math.round(profitAfterViewing * fineMultiplier * 100) / 100;
+            const fineAmount = Math.round(totalInsiderProfit * fineMultiplier * 100) / 100;
             secFine = {
               amount: fineAmount,
               symbol: tipSymbol,
-              profit: Math.round(profitAfterViewing * 100) / 100,
+              profit: Math.round(totalInsiderProfit * 100) / 100,
               day: state.day,
             };
             finalCash -= fineAmount;
@@ -503,6 +488,7 @@ export function tick(state: GameState): GameState {
       insiderViewedTick: 0,
       insiderSnapshotHoldings: [],
       insiderSnapshotShorts: [],
+      insiderRealizedProfit: 0,
       secFines: secFine ? [...state.secFines, secFine] : state.secFines,
     };
   }
@@ -556,7 +542,20 @@ export function sellStock(state: GameState, symbol: string, shares: number): Gam
           p.symbol === symbol ? { ...p, shares: remainingShares } : p
         );
 
-  return { ...state, cash: state.cash + revenue, portfolio: newPortfolio };
+  // Track realized profit on insider stock (only shares bought after viewing)
+  let insiderRealizedProfit = state.insiderRealizedProfit;
+  if (state.insiderViewed && state.insiderTip && symbol === state.insiderTip.symbol) {
+    const snapPos = state.insiderSnapshotHoldings.find((p) => p.symbol === symbol);
+    const snapShares = snapPos?.shares ?? 0;
+    // Only count shares beyond the snapshot as insider-traded
+    const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
+    if (insiderShares > 0) {
+      const profit = (stock.price - position.avgCost) * insiderShares;
+      insiderRealizedProfit += profit;
+    }
+  }
+
+  return { ...state, cash: state.cash + revenue, portfolio: newPortfolio, insiderRealizedProfit };
 }
 
 export function shortStock(state: GameState, symbol: string, shares: number): GameState {
@@ -591,8 +590,6 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
   const position = state.shorts.find((p) => p.symbol === symbol);
   if (!stock || !position || position.shares < shares) return state;
 
-  // Return collateral + profit (or - loss)
-  // You get back your collateral, minus what it costs to buy back
   const netCash = state.cash + (position.entryPrice - stock.price) * shares + position.entryPrice * shares;
 
   const remainingShares = position.shares - shares;
@@ -603,7 +600,19 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
           p.symbol === symbol ? { ...p, shares: remainingShares } : p
         );
 
-  return { ...state, cash: netCash, shorts: newShorts };
+  // Track realized profit on insider stock (only shorts opened after viewing)
+  let insiderRealizedProfit = state.insiderRealizedProfit;
+  if (state.insiderViewed && state.insiderTip && symbol === state.insiderTip.symbol) {
+    const snapShort = state.insiderSnapshotShorts.find((p) => p.symbol === symbol);
+    const snapShares = snapShort?.shares ?? 0;
+    const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
+    if (insiderShares > 0) {
+      const profit = (position.entryPrice - stock.price) * insiderShares;
+      insiderRealizedProfit += profit;
+    }
+  }
+
+  return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit };
 }
 
 export function openMarket(state: GameState): GameState {
@@ -630,6 +639,7 @@ export function openMarket(state: GameState): GameState {
     insiderViewedTick: 0,
     insiderSnapshotHoldings: [],
     insiderSnapshotShorts: [],
+    insiderRealizedProfit: 0,
   };
 }
 

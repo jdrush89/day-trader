@@ -82,6 +82,7 @@ export function createInitialState(): GameState {
     insiderViewedTick: 0,
     insiderSnapshotHoldings: [],
     insiderSnapshotShorts: [],
+    insiderRealizedProfit: 0,
     secFines: [],
   };
 }

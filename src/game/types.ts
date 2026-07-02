@@ -115,10 +115,12 @@ export interface GameState {
   totalProfit: number;
   dayStartNetWorth: number;
   insiderTip: InsiderTip | null;
-  insiderViewed: boolean; // player looked at insider channel today
-  insiderViewedTick: number; // tick when they first viewed it
+  insiderViewed: boolean;
+  insiderViewedTick: number;
   // snapshot of holdings at the moment they viewed insider, to calc profit AFTER viewing
   insiderSnapshotHoldings: { symbol: string; shares: number; avgCost: number }[];
   insiderSnapshotShorts: { symbol: string; shares: number; entryPrice: number }[];
+  // accumulated realized profit from selling/covering the insider stock after viewing
+  insiderRealizedProfit: number;
   secFines: SECFine[];
 }

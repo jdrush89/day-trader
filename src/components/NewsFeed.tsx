@@ -384,7 +384,8 @@ export function InsiderFeed({ tip, viewed, onView, debugMode }: InsiderFeedProps
               <span className="debug-label">🔍 DEBUG</span>
               <span className="debug-desc">
                 90% chance of strong price {tip.direction === "up" ? "surge" : "crash"} in {tip.symbol}.
-                SEC fine risk scales with profit: $100→10%, $500→40%, $1000+→70%+. Fine = 2-3x profit.
+                SEC fine risk: $100→15%, $500→50%, $1000→75%, $3000→95%. Fine = 2-3x profit.
+                Includes unrealized gains on held shares bought after viewing.
               </span>
             </div>
           )}
