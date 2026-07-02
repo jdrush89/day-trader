@@ -98,13 +98,20 @@ function CommercialView() {
 
 function DebugImpact({ item }: { item: NewsItem }) {
   if (!item.impact) return null;
-  const active = item.impact.ticksRemaining > 0;
+  const { ticksRemaining, duration } = item.impact;
+  const inDelay = ticksRemaining > duration;
+  const active = ticksRemaining > 0 && !inDelay;
+  const expired = ticksRemaining <= 0;
   return (
-    <div className={`debug-impact ${active ? "active" : "expired"}`}>
+    <div className={`debug-impact ${expired ? "expired" : active ? "active" : "pending"}`}>
       <span className="debug-label">🔍 DEBUG</span>
       <span className="debug-desc">{item.impact.description}</span>
       <span className="debug-ticks">
-        {active ? `⏱ ${item.impact.ticksRemaining} ticks remaining` : "✓ Expired"}
+        {inDelay
+          ? `⏳ Delayed — activates in ${ticksRemaining - duration} ticks`
+          : active
+          ? `⏱ Active — ${ticksRemaining} ticks remaining`
+          : "✓ Expired"}
       </span>
     </div>
   );

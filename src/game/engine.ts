@@ -146,24 +146,25 @@ function generateImpact(
   affectedTags?: string[]
 ): NewsImpact {
   const direction = sentiment === "positive" ? "up" : "down";
+  const delay = 5; // 5 tick delay before effect kicks in
+  const duration = 20; // 20 ticks of active effect
 
   if (category === "business") {
-    // Direct impact on one specific stock
     const strength = Math.random() > 0.4 ? "strong" : "moderate";
-    const probability = 0.7 + Math.random() * 0.2; // 70-90%
+    const probability = 0.7 + Math.random() * 0.2;
     const description = `${Math.round(probability * 100)}% chance of ${strength} price ${direction === "up" ? "surge" : "drop"} in ${targetStock.symbol}`;
     return {
       description,
       effects: [{ symbol: targetStock.symbol, direction, strength }],
       probability,
-      duration: 8 + Math.floor(Math.random() * 7),
-      ticksRemaining: 8 + Math.floor(Math.random() * 7),
+      delay,
+      duration,
+      ticksRemaining: delay + duration,
     };
   }
 
   if (category === "global") {
-    // Impact targets tags, not individual stocks
-    const probability = 0.6 + Math.random() * 0.25; // 60-85%
+    const probability = 0.6 + Math.random() * 0.25;
     const tags = affectedTags ?? [];
     const strength = (Math.random() > 0.5 ? "moderate" : "weak") as "weak" | "moderate" | "strong";
 
@@ -173,27 +174,26 @@ function generateImpact(
       strength,
     }));
 
-    // Fallback: if no tags, target the random stock directly
     if (effects.length === 0) {
       effects.push({ symbol: targetStock.symbol, direction, strength: "moderate" as const });
     }
 
     const tagList = tags.join(", ");
     const description = `${Math.round(probability * 100)}% chance: [${tagList}] stocks go ${direction}`;
-    const dur = 10 + Math.floor(Math.random() * 10);
 
     return {
       description,
       effects,
       probability,
-      duration: dur,
-      ticksRemaining: dur,
+      delay,
+      duration,
+      ticksRemaining: delay + duration,
     };
   }
 
-  // Social: impact depends on virality; starts weak, strengthens if upvotes grow
+  // Social
   const strength = "moderate";
-  const probability = 0.5 + Math.random() * 0.3; // 50-80%
+  const probability = 0.5 + Math.random() * 0.3;
   const willSellOff = sentiment === "positive" && Math.random() > 0.6;
   let description = `${Math.round(probability * 100)}% chance of ${strength} price ${direction === "up" ? "surge" : "drop"} in ${targetStock.symbol}`;
   if (willSellOff) description += " followed by quick sell-off";
@@ -202,8 +202,9 @@ function generateImpact(
     description,
     effects: [{ symbol: targetStock.symbol, direction, strength }],
     probability,
-    duration: 12 + Math.floor(Math.random() * 8),
-    ticksRemaining: 12 + Math.floor(Math.random() * 8),
+    delay,
+    duration,
+    ticksRemaining: delay + duration,
   };
 }
 
@@ -267,6 +268,8 @@ function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
   // Apply impacts from active news
   for (const item of news) {
     if (!item.impact || item.impact.ticksRemaining <= 0) continue;
+    // Skip if still in delay period (effect hasn't kicked in yet)
+    if (item.impact.ticksRemaining > item.impact.duration) continue;
 
     for (const effect of item.impact.effects) {
       // Match by symbol or by tag
@@ -322,8 +325,9 @@ export function tick(state: GameState): GameState {
         description: `INSIDER: 90% chance of strong price ${insiderTip.direction === "up" ? "surge" : "crash"} in ${insiderTip.symbol}`,
         effects: [{ symbol: insiderTip.symbol, direction: insiderTip.direction, strength: "strong" }],
         probability: 0.9,
-        duration: 40 + Math.floor(Math.random() * 20),
-        ticksRemaining: 40 + Math.floor(Math.random() * 20),
+        delay: 5,
+        duration: 40,
+        ticksRemaining: 45,
       };
       // Add as a hidden news item that drives prices but isn't shown in feeds
       newNews.push({
