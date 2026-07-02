@@ -107,6 +107,21 @@ export interface SECFine {
   day: number;
 }
 
+export type OrderType = "market" | "limit" | "stop-loss";
+export type OrderSide = "buy" | "short" | "sell" | "cover";
+
+export interface PendingOrder {
+  id: string;
+  symbol: string;
+  side: OrderSide;
+  shares: number;
+  orderType: OrderType;
+  limitPrice?: number; // for limit orders: buy/short when price reaches this
+  stopPrice?: number;  // for stop-loss: sell/cover when price drops/rises to this
+  createdAt: number;   // timeOfDay tick when placed
+  day: number;
+}
+
 export interface GameState {
   day: number;
   cash: number;
@@ -132,4 +147,5 @@ export interface GameState {
   // accumulated realized profit from selling/covering the insider stock after viewing
   insiderRealizedProfit: number;
   secFines: SECFine[];
+  pendingOrders: PendingOrder[];
 }

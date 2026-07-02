@@ -1,4 +1,4 @@
-import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip } from "./types";
+import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType } from "./types";
 
 interface BusinessTemplate {
   headline: string;
@@ -402,21 +402,24 @@ export function tick(state: GameState): GameState {
   // Update stock prices using impact system
   const newStocks = state.stocks.map((s) => updateStockPrice(s, newNews));
 
+  // Process pending orders after price updates
+  let postOrderState = processOrders({ ...state, stocks: newStocks, news: newNews });
+
   // End of day
   if (newTimeOfDay >= 100) {
-    const interest = state.loan * state.interestRate;
-    const newCash = state.cash - interest;
-    const portfolioValue = state.portfolio.reduce((sum, pos) => {
+    const interest = postOrderState.loan * postOrderState.interestRate;
+    const newCash = postOrderState.cash - interest;
+    const portfolioValue = postOrderState.portfolio.reduce((sum, pos) => {
       const stock = newStocks.find((s) => s.symbol === pos.symbol);
       return sum + (stock ? stock.price * pos.shares : 0);
     }, 0);
 
     // Short positions: liability is current market value
-    const shortLiability = state.shorts.reduce((sum, pos) => {
+    const shortLiability = postOrderState.shorts.reduce((sum, pos) => {
       const stock = newStocks.find((s) => s.symbol === pos.symbol);
       return sum + (stock ? stock.price * pos.shares : 0);
     }, 0);
-    const shortCollateral = state.shorts.reduce(
+    const shortCollateral = postOrderState.shorts.reduce(
       (sum, pos) => sum + pos.entryPrice * pos.shares,
       0
     );
@@ -426,28 +429,27 @@ export function tick(state: GameState): GameState {
     // SEC fine check: only if player viewed the insider channel
     let secFine = null;
     let finalCash = newCash;
-    if (state.insiderViewed && insiderTip) {
+    if (postOrderState.insiderViewed && insiderTip) {
       const tipSymbol = insiderTip.symbol;
       const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
 
       if (tipStock) {
         // Realized profit from sells/covers already tracked
-        let totalInsiderProfit = state.insiderRealizedProfit;
+        let totalInsiderProfit = postOrderState.insiderRealizedProfit;
 
         // Unrealized gains on long shares bought AFTER viewing (still held)
-        const currentPos = state.portfolio.find((p) => p.symbol === tipSymbol);
-        const snapPos = state.insiderSnapshotHoldings.find((p) => p.symbol === tipSymbol);
+        const currentPos = postOrderState.portfolio.find((p) => p.symbol === tipSymbol);
+        const snapPos = postOrderState.insiderSnapshotHoldings.find((p) => p.symbol === tipSymbol);
         const currentShares = currentPos?.shares ?? 0;
         const snapShares = snapPos?.shares ?? 0;
         if (currentShares > snapShares) {
           const newShares = currentShares - snapShares;
-          // Unrealized gain on shares bought after viewing
           totalInsiderProfit += (tipStock.price - currentPos!.avgCost) * newShares;
         }
 
         // Unrealized gains on short positions opened AFTER viewing (still open)
-        const currentShort = state.shorts.find((p) => p.symbol === tipSymbol);
-        const snapShort = state.insiderSnapshotShorts.find((p) => p.symbol === tipSymbol);
+        const currentShort = postOrderState.shorts.find((p) => p.symbol === tipSymbol);
+        const snapShort = postOrderState.insiderSnapshotShorts.find((p) => p.symbol === tipSymbol);
         const currentShortShares = currentShort?.shares ?? 0;
         const snapShortShares = snapShort?.shares ?? 0;
         if (currentShortShares > snapShortShares) {
@@ -456,7 +458,6 @@ export function tick(state: GameState): GameState {
         }
 
         if (totalInsiderProfit > 0) {
-          // Chance of getting caught: $100→15%, $500→50%, $1000→75%, $3000→95%
           const catchChance = Math.min(0.95, totalInsiderProfit / 3500 + 0.1);
           if (Math.random() < catchChance) {
             const fineMultiplier = 2 + Math.random();
@@ -474,7 +475,7 @@ export function tick(state: GameState): GameState {
     }
 
     return {
-      ...state,
+      ...postOrderState,
       day: state.day + 1,
       cash: finalCash,
       stocks: newStocks,
@@ -482,19 +483,20 @@ export function tick(state: GameState): GameState {
       timeOfDay: 0,
       marketOpen: false,
       gameOver,
-      totalProfit: finalCash + portfolioValue + shortCollateral - shortLiability - state.loan,
+      totalProfit: finalCash + portfolioValue + shortCollateral - shortLiability - postOrderState.loan,
       insiderTip: null,
       insiderViewed: false,
       insiderViewedTick: 0,
       insiderSnapshotHoldings: [],
       insiderSnapshotShorts: [],
       insiderRealizedProfit: 0,
-      secFines: secFine ? [...state.secFines, secFine] : state.secFines,
+      pendingOrders: [], // clear all pending orders at end of day
+      secFines: secFine ? [...postOrderState.secFines, secFine] : postOrderState.secFines,
     };
   }
 
   return {
-    ...state,
+    ...postOrderState,
     stocks: newStocks,
     news: newNews,
     timeOfDay: newTimeOfDay,
@@ -674,4 +676,96 @@ export function purchaseUpgrade(state: GameState, upgradeId: string): GameState 
   }
 
   return newState;
+}
+
+let orderIdCounter = 0;
+
+export function placeOrder(
+  state: GameState,
+  symbol: string,
+  side: OrderSide,
+  shares: number,
+  orderType: OrderType,
+  limitPrice?: number,
+  stopPrice?: number,
+): GameState {
+  const stock = state.stocks.find((s) => s.symbol === symbol);
+  if (!stock || shares <= 0) return state;
+
+  // Market orders execute immediately
+  if (orderType === "market") {
+    switch (side) {
+      case "buy": return buyStock(state, symbol, shares);
+      case "sell": return sellStock(state, symbol, shares);
+      case "short": return shortStock(state, symbol, shares);
+      case "cover": return coverShort(state, symbol, shares);
+    }
+  }
+
+  const order: PendingOrder = {
+    id: `order-${++orderIdCounter}-${Date.now()}`,
+    symbol,
+    side,
+    shares,
+    orderType,
+    limitPrice,
+    stopPrice,
+    createdAt: state.timeOfDay,
+    day: state.day,
+  };
+
+  return { ...state, pendingOrders: [...state.pendingOrders, order] };
+}
+
+export function cancelOrder(state: GameState, orderId: string): GameState {
+  return {
+    ...state,
+    pendingOrders: state.pendingOrders.filter((o) => o.id !== orderId),
+  };
+}
+
+export function processOrders(state: GameState): GameState {
+  let newState = state;
+  const remainingOrders: PendingOrder[] = [];
+
+  for (const order of state.pendingOrders) {
+    const stock = newState.stocks.find((s) => s.symbol === order.symbol);
+    if (!stock) {
+      remainingOrders.push(order);
+      continue;
+    }
+
+    let shouldFill = false;
+
+    if (order.orderType === "limit") {
+      // Limit buy/short: fill when price drops to or below limit
+      // Limit sell/cover: fill when price rises to or above limit
+      if (order.side === "buy" || order.side === "short") {
+        shouldFill = stock.price <= (order.limitPrice ?? 0);
+      } else {
+        shouldFill = stock.price >= (order.limitPrice ?? Infinity);
+      }
+    } else if (order.orderType === "stop-loss") {
+      // Stop-loss sell: triggers when price drops to stop price
+      // Stop-loss cover: triggers when price rises to stop price
+      if (order.side === "sell") {
+        shouldFill = stock.price <= (order.stopPrice ?? 0);
+      } else if (order.side === "cover") {
+        shouldFill = stock.price >= (order.stopPrice ?? Infinity);
+      }
+    }
+
+    if (shouldFill) {
+      switch (order.side) {
+        case "buy": newState = buyStock(newState, order.symbol, order.shares); break;
+        case "sell": newState = sellStock(newState, order.symbol, order.shares); break;
+        case "short": newState = shortStock(newState, order.symbol, order.shares); break;
+        case "cover": newState = coverShort(newState, order.symbol, order.shares); break;
+      }
+    } else {
+      remainingOrders.push(order);
+    }
+  }
+
+  return { ...newState, pendingOrders: remainingOrders };
 }

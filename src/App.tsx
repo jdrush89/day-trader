@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import { GameState, MonitorChannel } from "./game/types";
+import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, purchaseUpgrade, placeOrder, cancelOrder } from "./game/engine";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { UpgradeShop } from "./components/UpgradeShop";
@@ -91,6 +91,14 @@ function App() {
 
   const handleCover = useCallback((symbol: string, shares: number) => {
     setGameState((prev) => coverShort(prev, symbol, shares));
+  }, []);
+
+  const handlePlaceOrder = useCallback((symbol: string, side: OrderSide, shares: number, orderType: OrderType, limitPrice?: number, stopPrice?: number) => {
+    setGameState((prev) => placeOrder(prev, symbol, side, shares, orderType, limitPrice, stopPrice));
+  }, []);
+
+  const handleCancelOrder = useCallback((orderId: string) => {
+    setGameState((prev) => cancelOrder(prev, orderId));
   }, []);
 
   const handlePurchase = useCallback((upgradeId: string) => {
@@ -317,6 +325,8 @@ function App() {
             onSell={handleSell}
             onShort={handleShort}
             onCover={handleCover}
+            onPlaceOrder={handlePlaceOrder}
+            onCancelOrder={handleCancelOrder}
           />
         </aside>
       </div>

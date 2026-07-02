@@ -161,5 +161,6 @@ export function createInitialState(): GameState {
     insiderSnapshotShorts: [],
     insiderRealizedProfit: 0,
     secFines: [],
+    pendingOrders: [],
   };
 }
