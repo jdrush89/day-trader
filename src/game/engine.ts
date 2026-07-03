@@ -170,22 +170,75 @@ const BUSINESS_TEMPLATES: BusinessTemplate[] = [
 ];
 
 const GLOBAL_TEMPLATES = [
+  // Finance
   { headline: "BREAKING: Fed signals interest rate hike next quarter — markets brace for tightening", sentiment: "negative" as const, affectedTags: ["finance"] },
-  { headline: "BREAKING: Trade deal reached between US and China — tariffs to be rolled back", sentiment: "positive" as const, affectedTags: ["tech"] },
-  { headline: "ALERT: Oil prices surge 8% on Middle East conflict escalation — defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["energy"] },
-  { headline: "DEVELOPING: GDP growth exceeds forecasts at 3.2% — strongest quarter in two years", sentiment: "positive" as const, affectedTags: ["large-cap"] },
-  { headline: "BREAKING: New 25% tariffs announced on tech imports — semiconductor stocks in freefall", sentiment: "negative" as const, affectedTags: ["tech"] },
   { headline: "ALERT: Central bank announces emergency liquidity injection — $500B in stimulus", sentiment: "positive" as const, affectedTags: ["finance", "speculative"] },
-  { headline: "DEVELOPING: Unemployment hits 50-year low at 3.1% — wage growth accelerating", sentiment: "positive" as const, affectedTags: ["consumer"] },
-  { headline: "BREAKING: Global supply chain crisis deepens — shipping delays hit 6-month highs", sentiment: "negative" as const, affectedTags: ["retail"] },
-  { headline: "ALERT: War unfolds in Eastern Europe — NATO activates rapid response force, defense spending to skyrocket", sentiment: "negative" as const, affectedTags: ["large-cap"] },
   { headline: "BREAKING: Inflation falls to 2.1% — Fed pivot expected, markets rally", sentiment: "positive" as const, affectedTags: ["banking"] },
   { headline: "DEVELOPING: Major bank collapse triggers contagion fears — regulators step in", sentiment: "negative" as const, affectedTags: ["banking"] },
-  { headline: "ALERT: Historic climate accord signed — renewable energy subsidies tripled", sentiment: "positive" as const, affectedTags: ["renewable"] },
+  { headline: "BREAKING: Fintech disruption accelerates — digital payments volume doubles", sentiment: "positive" as const, affectedTags: ["fintech"] },
+  { headline: "ALERT: Crypto exchange scandal sparks fintech regulatory crackdown", sentiment: "negative" as const, affectedTags: ["fintech"] },
+
+  // Tech
+  { headline: "BREAKING: Trade deal reached between US and China — tariffs to be rolled back", sentiment: "positive" as const, affectedTags: ["tech"] },
+  { headline: "BREAKING: New 25% tariffs announced on tech imports — semiconductor stocks in freefall", sentiment: "negative" as const, affectedTags: ["semiconductor"] },
+  { headline: "ALERT: AI regulation bill passes committee — new compliance requirements for AI companies", sentiment: "negative" as const, affectedTags: ["ai"] },
+  { headline: "DEVELOPING: Breakthrough in AI capabilities drives enterprise adoption surge", sentiment: "positive" as const, affectedTags: ["ai", "enterprise"] },
+  { headline: "BREAKING: Major cloud outage disrupts services worldwide — infrastructure stocks slide", sentiment: "negative" as const, affectedTags: ["cloud"] },
+  { headline: "DEVELOPING: Cloud spending hits record $150B — hyperscalers can't keep up with demand", sentiment: "positive" as const, affectedTags: ["cloud"] },
+  { headline: "ALERT: Critical zero-day exploit hits Fortune 500 — cybersecurity spending to surge", sentiment: "positive" as const, affectedTags: ["cybersecurity"] },
+  { headline: "BREAKING: 5G rollout reaches 80% coverage nationwide — telecom revenues surge", sentiment: "positive" as const, affectedTags: ["telecom"] },
+  { headline: "DEVELOPING: Telecom price war intensifies — margins under pressure", sentiment: "negative" as const, affectedTags: ["telecom"] },
+
+  // Energy
+  { headline: "ALERT: Oil prices surge 8% on Middle East conflict escalation", sentiment: "positive" as const, affectedTags: ["oil"] },
+  { headline: "BREAKING: Oil glut sends crude prices to 3-year low — OPEC emergency meeting called", sentiment: "negative" as const, affectedTags: ["oil"] },
+  { headline: "ALERT: Historic climate accord signed — renewable energy subsidies tripled", sentiment: "positive" as const, affectedTags: ["renewable", "green"] },
+  { headline: "DEVELOPING: Green energy mandate passed — all new construction must be carbon neutral", sentiment: "positive" as const, affectedTags: ["green"] },
+  { headline: "ALERT: Energy crisis deepens — rolling blackouts across major cities", sentiment: "negative" as const, affectedTags: ["energy"] },
+  { headline: "BREAKING: Mining boom as rare earth demand outpaces supply — prices skyrocket", sentiment: "positive" as const, affectedTags: ["mining"] },
+  { headline: "DEVELOPING: Environmental protests shut down mining operations in three states", sentiment: "negative" as const, affectedTags: ["mining"] },
+
+  // Healthcare
   { headline: "BREAKING: FDA fast-tracks approval for new drug class — pharma stocks surge", sentiment: "positive" as const, affectedTags: ["pharma"] },
-  { headline: "ALERT: Social media regulation bill passes Senate — tech companies scramble", sentiment: "negative" as const, affectedTags: ["social-media"] },
+  { headline: "ALERT: Generic drug ruling slashes pharma revenues — patent protections weakened", sentiment: "negative" as const, affectedTags: ["pharma"] },
+  { headline: "DEVELOPING: Breakthrough gene therapy shows 95% efficacy — biotech revolution begins", sentiment: "positive" as const, affectedTags: ["biotech"] },
+  { headline: "ALERT: Clinical trial failures rock biotech sector — two major drugs pulled", sentiment: "negative" as const, affectedTags: ["biotech"] },
+  { headline: "BREAKING: Universal healthcare bill advances — hospital and insurance stocks react", sentiment: "negative" as const, affectedTags: ["healthcare"] },
+  { headline: "DEVELOPING: Aging population drives healthcare spending to new highs", sentiment: "positive" as const, affectedTags: ["healthcare"] },
+
+  // Consumer / Retail
+  { headline: "DEVELOPING: Unemployment hits 50-year low at 3.1% — wage growth accelerating", sentiment: "positive" as const, affectedTags: ["consumer"] },
   { headline: "BREAKING: Retail spending surges over holiday weekend — consumer confidence soars", sentiment: "positive" as const, affectedTags: ["retail", "consumer"] },
+  { headline: "BREAKING: Global supply chain crisis deepens — shipping delays hit 6-month highs", sentiment: "negative" as const, affectedTags: ["retail", "logistics"] },
+  { headline: "ALERT: Food prices spike 12% on drought — agricultural commodities at decade high", sentiment: "negative" as const, affectedTags: ["food"] },
+  { headline: "DEVELOPING: Plant-based food market doubles — major chains adopt alt-protein menus", sentiment: "positive" as const, affectedTags: ["food"] },
+  { headline: "BREAKING: Gaming industry hits $200B — streaming and esports drive growth", sentiment: "positive" as const, affectedTags: ["gaming", "entertainment"] },
+  { headline: "ALERT: Streaming wars escalate — entertainment stocks volatile as subscribers shift", sentiment: "negative" as const, affectedTags: ["entertainment"] },
+  { headline: "DEVELOPING: Box office records shattered — entertainment spending at all-time high", sentiment: "positive" as const, affectedTags: ["entertainment"] },
+
+  // Social Media
+  { headline: "ALERT: Social media regulation bill passes Senate — tech companies scramble", sentiment: "negative" as const, affectedTags: ["social-media"] },
+  { headline: "DEVELOPING: Social media ad revenue surges 30% — digital advertising boom continues", sentiment: "positive" as const, affectedTags: ["social-media"] },
+
+  // Defense / Manufacturing
+  { headline: "BREAKING: Pentagon announces $800B defense budget — largest in history", sentiment: "positive" as const, affectedTags: ["defense"] },
+  { headline: "DEVELOPING: Peace accord reduces defense spending outlook — military contractors slide", sentiment: "negative" as const, affectedTags: ["defense"] },
+  { headline: "ALERT: Manufacturing renaissance — reshoring initiative brings factories back to US", sentiment: "positive" as const, affectedTags: ["manufacturing"] },
+  { headline: "BREAKING: Steel tariffs imposed — manufacturing costs surge across sectors", sentiment: "negative" as const, affectedTags: ["manufacturing"] },
+  { headline: "DEVELOPING: Logistics boom as e-commerce doubles — shipping and freight capacity maxed", sentiment: "positive" as const, affectedTags: ["logistics"] },
+  { headline: "ALERT: Port strike cripples global logistics — container shipping rates triple", sentiment: "negative" as const, affectedTags: ["logistics"] },
+
+  // Real Estate
+  { headline: "BREAKING: Housing market crash fears grow — mortgage rates hit 8%", sentiment: "negative" as const, affectedTags: ["real-estate"] },
+  { headline: "DEVELOPING: Commercial real estate boom — office vacancy rates plummet", sentiment: "positive" as const, affectedTags: ["real-estate"] },
+
+  // Market-wide
+  { headline: "DEVELOPING: GDP growth exceeds forecasts at 3.2% — strongest quarter in two years", sentiment: "positive" as const, affectedTags: ["large-cap"] },
+  { headline: "ALERT: War unfolds in Eastern Europe — NATO activates rapid response force", sentiment: "negative" as const, affectedTags: ["large-cap", "defense"] },
   { headline: "DEVELOPING: Small-cap rally as investors rotate out of mega-caps", sentiment: "positive" as const, affectedTags: ["small-cap"] },
+  { headline: "ALERT: Mid-cap stocks surge on earnings season surprises — sector rotation underway", sentiment: "positive" as const, affectedTags: ["mid-cap"] },
+  { headline: "DEVELOPING: Speculative bubble warnings from economists — meme stocks under scrutiny", sentiment: "negative" as const, affectedTags: ["speculative"] },
+  { headline: "BREAKING: Enterprise software spending surges — digital transformation accelerates", sentiment: "positive" as const, affectedTags: ["enterprise"] },
 ];
 
 const SOCIAL_TEMPLATES = [
@@ -262,7 +315,11 @@ function generateNews(stocks: Stock[], category: NewsItem["category"], rumorMill
     return { id: `news-${++newsIdCounter}`, headline: template.headline.replace("{stock}", stock.symbol), body: template.body.replace("{name}", stock.name), category, timestamp: Date.now(), affectedStocks: [stock.symbol], sentiment: template.sentiment, earnings: template.earningsGen(stock), impact };
   }
   if (category === "global") {
-    const template = GLOBAL_TEMPLATES[Math.floor(Math.random() * GLOBAL_TEMPLATES.length)];
+    // Only pick templates whose tags match at least one stock in the market
+    const allTags = new Set(stocks.flatMap((s) => s.tags));
+    const relevant = GLOBAL_TEMPLATES.filter((t) => t.affectedTags.some((tag) => allTags.has(tag)));
+    const pool = relevant.length > 0 ? relevant : GLOBAL_TEMPLATES;
+    const template = pool[Math.floor(Math.random() * pool.length)];
     const impact = generateImpact(category, template.sentiment, stock, stocks, template.affectedTags, rumorMill);
     return { id: `news-${++newsIdCounter}`, headline: template.headline, body: "", category, timestamp: Date.now(), sentiment: template.sentiment, affectedTags: template.affectedTags, impact };
   }
