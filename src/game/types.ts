@@ -1,7 +1,7 @@
 export type HistoryRange = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "MAX";
 
 export interface DailyPrice {
-  day: number; // game day (negative for pre-game history)
+  day: number;
   close: number;
 }
 
@@ -10,10 +10,10 @@ export interface Stock {
   name: string;
   price: number;
   openPrice: number;
-  history: number[]; // intraday ticks
-  dailyHistory: DailyPrice[]; // end-of-day closing prices
+  history: number[];
+  dailyHistory: DailyPrice[];
   tags: string[];
-  ipoDay: number; // how many trading days ago this stock IPO'd (for fake history)
+  ipoDay: number;
 }
 
 export interface EarningsData {
@@ -25,11 +25,11 @@ export interface EarningsData {
 }
 
 export interface NewsImpact {
-  description: string; // human-readable for debug view
+  description: string;
   effects: { symbol?: string; tag?: string; direction: "up" | "down"; strength: "weak" | "moderate" | "strong" }[];
-  probability: number; // 0-1, how likely it is to actually fire each tick
-  delay: number; // ticks before the effect starts
-  duration: number; // how many ticks the effect lasts once active
+  probability: number;
+  delay: number;
+  duration: number;
   ticksRemaining: number;
 }
 
@@ -54,6 +54,7 @@ export interface Position {
   symbol: string;
   shares: number;
   avgCost: number;
+  dayAcquired: number;
 }
 
 export interface ShortPosition {
@@ -61,21 +62,6 @@ export interface ShortPosition {
   shares: number;
   entryPrice: number;
 }
-
-export interface Upgrade {
-  id: string;
-  name: string;
-  description: string;
-  cost: number;
-  purchased: boolean;
-  effect: UpgradeEffect;
-}
-
-export type UpgradeEffect =
-  | { type: "extra_monitor" }
-  | { type: "faster_news" }
-  | { type: "better_charts"; detail: string }
-  | { type: "insider_tips" };
 
 export type MonitorChannel =
   | "business_news"
@@ -115,10 +101,17 @@ export interface PendingOrder {
   side: OrderSide;
   shares: number;
   orderType: OrderType;
-  limitPrice?: number; // for limit orders: buy/short when price reaches this
-  stopPrice?: number;  // for stop-loss: sell/cover when price drops/rises to this
-  createdAt: number;   // timeOfDay tick when placed
+  limitPrice?: number;
+  stopPrice?: number;
+  createdAt: number;
   day: number;
+}
+
+export interface InstitutionalOrder {
+  firm: string;
+  symbol: string;
+  side: "buy" | "sell";
+  shares: number;
 }
 
 export interface GameState {
@@ -129,13 +122,17 @@ export interface GameState {
   monitors: Monitor[];
   stocks: Stock[];
   news: NewsItem[];
-  upgrades: Upgrade[];
-  timeOfDay: number; // 0-100, representing market hours
+  acquiredUpgrades: string[];
+  upgradeDraftOptions: string[];
+  stopLossEnabled: boolean;
+  goldenParachutes: number;
+  timeOfDay: number;
   marketOpen: boolean;
   gameOver: boolean;
   totalProfit: number;
   dayStartNetWorth: number;
   insiderTip: InsiderTip | null;
+  insiderTip2: InsiderTip | null;
   insiderViewed: boolean;
   insiderViewedTick: number;
   insiderSnapshotHoldings: { symbol: string; shares: number; avgCost: number }[];
@@ -143,8 +140,9 @@ export interface GameState {
   insiderRealizedProfit: number;
   secFines: SECFine[];
   pendingOrders: PendingOrder[];
-  stockDraftOptions: Stock[]; // 3 candidates to choose from at end of day
-  draftedSymbols: string[]; // symbols already drafted (to avoid repeats)
-  recentTrades: string[]; // most recently traded symbols (newest first)
-  pinnedStocks: string[]; // symbols pinned to quick buy
+  stockDraftOptions: Stock[];
+  draftedSymbols: string[];
+  recentTrades: string[];
+  pinnedStocks: string[];
+  institutionalOrders: InstitutionalOrder[];
 }

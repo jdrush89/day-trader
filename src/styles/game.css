@@ -145,8 +145,7 @@ body {
   color: var(--text);
 }
 
-.speed-controls button,
-.shop-btn {
+.speed-controls button {
   padding: 4px 10px;
   border: 1px solid var(--border);
   background: var(--bg-dark);
@@ -163,9 +162,6 @@ body {
   border-color: var(--accent);
 }
 
-.shop-btn:hover {
-  background: var(--border);
-}
 
 /* Main Layout */
 .main-layout {
@@ -1469,8 +1465,7 @@ body {
 /* Overlays */
 .pause-overlay,
 .game-over-overlay,
-.end-of-day-overlay,
-.upgrade-shop-overlay {
+.end-of-day-overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -1756,75 +1751,6 @@ body {
   justify-content: center;
 }
 
-/* Upgrade Shop */
-.upgrade-shop {
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
-  width: 400px;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.shop-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.shop-header h2 { font-size: 1rem; }
-
-.close-btn {
-  background: none;
-  border: none;
-  color: var(--text);
-  font-size: 1.2rem;
-  cursor: pointer;
-}
-
-.shop-items {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.upgrade-card {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
-
-.upgrade-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.upgrade-name { font-size: 0.8rem; font-weight: bold; }
-.upgrade-desc { font-size: 0.7rem; color: var(--text-dim); }
-
-.upgrade-buy-btn {
-  padding: 6px 12px;
-  background: var(--gold);
-  color: #000;
-  border: none;
-  border-radius: 4px;
-  font-weight: bold;
-  font-size: 0.75rem;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.upgrade-buy-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* Insider Feed */
 .insider-feed-view {
   display: flex;
@@ -2085,3 +2011,149 @@ body {
 .stat-value.milestone-ok {
   color: var(--green);
 }
+
+
+.impact-strength-badge {
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 999px;
+  font-size: 0.65rem;
+  white-space: nowrap;
+}
+
+.analyst-rating {
+  margin: 4px 0 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+.analyst-bullish { color: var(--green); }
+.analyst-bearish { color: var(--red); }
+.analyst-neutral { color: var(--text-dim); }
+
+.stop-loss-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin: 0 12px 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.7rem;
+}
+
+.stop-loss-toggle {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.7rem;
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.stop-loss-toggle.enabled { color: var(--green); border-color: var(--green); }
+.stop-loss-toggle.disabled { color: var(--red); border-color: var(--red); }
+
+.owned-upgrades {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+  padding: 10px 12px 12px;
+}
+
+.owned-upgrades-title {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.owned-upgrades-list { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.owned-upgrade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  background: rgba(88, 166, 255, 0.06);
+}
+
+.owned-upgrade-count { font-size: 0.65rem; color: var(--text-dim); }
+.buy-100 { border-color: var(--gold); color: var(--gold); }
+.buy-100:hover:not(:disabled) { background: var(--gold); color: #000; }
+
+.institutional-orders-overlay {
+  margin: 8px 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.18);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.institutional-orders-title {
+  font-size: 0.7rem;
+  color: var(--gold);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.institutional-order {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.68rem;
+  padding: 2px 0;
+}
+
+.institutional-order.buy { color: var(--green); }
+.institutional-order.sell { color: #ff9b9b; }
+
+.upgrade-draft {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 28px;
+  max-width: 700px;
+  width: 90vw;
+  text-align: center;
+}
+
+.upgrade-draft h2 { color: var(--accent); margin-bottom: 6px; }
+.upgrade-draft-sub { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 20px; }
+.upgrade-draft-options { display: flex; gap: 12px; justify-content: center; }
+
+.upgrade-draft-card {
+  flex: 1;
+  background: rgba(88, 166, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-family: inherit;
+  color: var(--text);
+}
+
+.upgrade-draft-card:hover {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+  transform: translateY(-2px);
+}
+
+.upgrade-card-icon { font-size: 2rem; }
+.upgrade-card-name { font-size: 0.9rem; font-weight: bold; color: var(--accent); }
+.upgrade-card-desc { font-size: 0.75rem; color: var(--text-dim); line-height: 1.4; }
+.upgrade-card-category { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-dim); opacity: 0.6; }
+.upgrade-card-owned { font-size: 0.65rem; color: var(--green); font-weight: bold; }

@@ -1,16 +1,90 @@
-import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType, DailyPrice } from "./types";
+import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType, DailyPrice, InstitutionalOrder, Position } from "./types";
 import { STOCK_POOL, StockCandidate } from "./stock-pool";
+import { UPGRADE_POOL } from "./upgrades";
 
 // Milestone: every 3 days, player must reach this net worth or lose
 // Day 3: $1500, Day 6: $2500, Day 9: $4000, etc.
 export function getMilestone(day: number): { checkDay: number; required: number } | null {
-  // Next milestone check day (next multiple of 3)
   const nextCheck = Math.ceil(day / 3) * 3;
   const milestoneNum = nextCheck / 3;
   return {
     checkDay: nextCheck,
     required: 1000 + 250 * milestoneNum * (milestoneNum + 1),
   };
+}
+
+export function upgradeCount(state: GameState, id: string): number {
+  return state.acquiredUpgrades.filter((u) => u === id).length;
+}
+
+export function hasUpgrade(state: GameState, id: string): boolean {
+  return state.acquiredUpgrades.includes(id);
+}
+
+function getPortfolioValue(state: GameState): number {
+  return state.portfolio.reduce((sum, pos) => {
+    const stock = state.stocks.find((s) => s.symbol === pos.symbol);
+    return sum + (stock ? stock.price * pos.shares : 0);
+  }, 0);
+}
+
+function getShortCollateral(state: GameState): number {
+  return state.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
+}
+
+function getShortLiability(state: GameState): number {
+  return state.shorts.reduce((sum, pos) => {
+    const stock = state.stocks.find((s) => s.symbol === pos.symbol);
+    return sum + (stock ? stock.price * pos.shares : 0);
+  }, 0);
+}
+
+function getNetWorth(state: GameState): number {
+  return state.cash + getPortfolioValue(state) + getShortCollateral(state) - getShortLiability(state);
+}
+
+export function getBuyingPower(state: GameState): number {
+  const marginStacks = upgradeCount(state, "margin");
+  if (marginStacks === 0) return state.cash;
+  const portfolioValue = getPortfolioValue(state);
+  const shortCollateral = getShortCollateral(state);
+  return state.cash + (portfolioValue + shortCollateral) * 0.5 * marginStacks;
+}
+
+function isTipSymbol(state: GameState, symbol: string): boolean {
+  return [state.insiderTip?.symbol, state.insiderTip2?.symbol].filter(Boolean).includes(symbol);
+}
+
+function getViewedTipSymbols(state: GameState): string[] {
+  return Array.from(new Set([state.insiderTip?.symbol, state.insiderTip2?.symbol].filter(Boolean) as string[]));
+}
+
+function applyProfitModifiers(state: GameState, stock: Stock, position: Position, profit: number): number {
+  let adjusted = profit;
+  if (profit > 0) {
+    if (hasUpgrade(state, "super_chip") && stock.tags.includes("tech")) adjusted *= 1.15;
+    if (hasUpgrade(state, "penny_picker") && stock.tags.includes("speculative")) adjusted *= 1.2;
+    if (hasUpgrade(state, "green_thumb") && (stock.tags.includes("green") || stock.tags.includes("renewable"))) adjusted *= 1.15;
+    if (hasUpgrade(state, "pharma_bro") && stock.tags.includes("healthcare")) adjusted *= 1.15;
+    if (hasUpgrade(state, "war_profiteer") && stock.tags.includes("defense")) adjusted *= 1.15;
+    if (hasUpgrade(state, "day_trader") && position.dayAcquired === state.day) adjusted *= 1.05;
+  } else if (profit < 0) {
+    if (hasUpgrade(state, "small_biz_medal") && stock.tags.includes("small-cap")) adjusted *= 0.8;
+  }
+  return adjusted;
+}
+
+function generateInstitutionalOrders(stocks: Stock[]): InstitutionalOrder[] {
+  const firms = ["Goldman Sachs", "BlackRock", "Citadel", "Bridgewater", "Vanguard"];
+  const pool = [...stocks];
+  const orders: InstitutionalOrder[] = [];
+  const count = Math.min(3, pool.length);
+  for (let i = 0; i < count; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    const stock = pool.splice(idx, 1)[0];
+    orders.push({ firm: firms[Math.floor(Math.random() * firms.length)], symbol: stock.symbol, side: Math.random() > 0.45 ? "buy" : "sell", shares: (Math.floor(Math.random() * 8) + 2) * 2500 });
+  }
+  return orders;
 }
 
 interface BusinessTemplate {
@@ -136,17 +210,12 @@ const INSIDER_TIP_TEMPLATES = [
 
 let insiderIdCounter = 0;
 
-function generateInsiderTip(stocks: Stock[], day: number): InsiderTip {
-  const stock = stocks[Math.floor(Math.random() * stocks.length)];
+function generateInsiderTip(stocks: Stock[], day: number, excludedSymbols: string[] = []): InsiderTip {
+  const available = stocks.filter((stock) => !excludedSymbols.includes(stock.symbol));
+  const pool = available.length > 0 ? available : stocks;
+  const stock = pool[Math.floor(Math.random() * pool.length)];
   const template = INSIDER_TIP_TEMPLATES[Math.floor(Math.random() * INSIDER_TIP_TEMPLATES.length)];
-  return {
-    id: `insider-${++insiderIdCounter}`,
-    symbol: stock.symbol,
-    companyName: stock.name,
-    tipText: template.text.replace(/\{name\}/g, stock.name),
-    direction: template.direction,
-    day,
-  };
+  return { id: `insider-${++insiderIdCounter}`, symbol: stock.symbol, companyName: stock.name, tipText: template.text.replace(/\{name\}/g, stock.name), direction: template.direction, day };
 }
 
 let newsIdCounter = 0;
@@ -156,123 +225,51 @@ function generateImpact(
   sentiment: "positive" | "negative",
   targetStock: Stock,
   _allStocks: Stock[],
-  affectedTags?: string[]
+  affectedTags?: string[],
+  rumorMill: boolean = false,
 ): NewsImpact {
   const direction = sentiment === "positive" ? "up" : "down";
-  const delay = 5; // 5 tick delay before effect kicks in
-  const duration = 20; // 20 ticks of active effect
-
+  const delay = category === "social" && rumorMill ? 0 : 5;
+  const duration = 20;
   if (category === "business") {
     const strength = Math.random() > 0.4 ? "strong" : "moderate";
     const probability = 0.7 + Math.random() * 0.2;
     const description = `${Math.round(probability * 100)}% chance of ${strength} price ${direction === "up" ? "surge" : "drop"} in ${targetStock.symbol}`;
-    return {
-      description,
-      effects: [{ symbol: targetStock.symbol, direction, strength }],
-      probability,
-      delay,
-      duration,
-      ticksRemaining: delay + duration,
-    };
+    return { description, effects: [{ symbol: targetStock.symbol, direction, strength }], probability, delay, duration, ticksRemaining: delay + duration };
   }
-
   if (category === "global") {
     const probability = 0.6 + Math.random() * 0.25;
     const tags = affectedTags ?? [];
     const strength = (Math.random() > 0.5 ? "moderate" : "weak") as "weak" | "moderate" | "strong";
-
-    const effects: NewsImpact["effects"] = tags.map((t) => ({
-      tag: t,
-      direction: direction as "up" | "down",
-      strength,
-    }));
-
-    if (effects.length === 0) {
-      effects.push({ symbol: targetStock.symbol, direction, strength: "moderate" as const });
-    }
-
-    const tagList = tags.join(", ");
-    const description = `${Math.round(probability * 100)}% chance: [${tagList}] stocks go ${direction}`;
-
-    return {
-      description,
-      effects,
-      probability,
-      delay,
-      duration,
-      ticksRemaining: delay + duration,
-    };
+    const effects: NewsImpact["effects"] = tags.map((t) => ({ tag: t, direction, strength }));
+    if (effects.length === 0) effects.push({ symbol: targetStock.symbol, direction, strength: "moderate" });
+    const description = `${Math.round(probability * 100)}% chance: [${tags.join(", ")}] stocks go ${direction}`;
+    return { description, effects, probability, delay, duration, ticksRemaining: delay + duration };
   }
-
-  // Social
   const strength = "moderate";
   const probability = 0.5 + Math.random() * 0.3;
   const willSellOff = sentiment === "positive" && Math.random() > 0.6;
   let description = `${Math.round(probability * 100)}% chance of ${strength} price ${direction === "up" ? "surge" : "drop"} in ${targetStock.symbol}`;
   if (willSellOff) description += " followed by quick sell-off";
-
-  return {
-    description,
-    effects: [{ symbol: targetStock.symbol, direction, strength }],
-    probability,
-    delay,
-    duration,
-    ticksRemaining: delay + duration,
-  };
+  return { description, effects: [{ symbol: targetStock.symbol, direction, strength }], probability, delay, duration, ticksRemaining: delay + duration };
 }
 
-function generateNews(stocks: Stock[], category: NewsItem["category"]): NewsItem {
+function generateNews(stocks: Stock[], category: NewsItem["category"], rumorMill: boolean = false): NewsItem {
   const stock = stocks[Math.floor(Math.random() * stocks.length)];
-
   if (category === "business") {
     const template = BUSINESS_TEMPLATES[Math.floor(Math.random() * BUSINESS_TEMPLATES.length)];
-    const impact = generateImpact(category, template.sentiment, stock, stocks);
-    return {
-      id: `news-${++newsIdCounter}`,
-      headline: template.headline.replace("{stock}", stock.symbol),
-      body: template.body.replace("{name}", stock.name),
-      category,
-      timestamp: Date.now(),
-      affectedStocks: [stock.symbol],
-      sentiment: template.sentiment,
-      earnings: template.earningsGen(stock),
-      impact,
-    };
+    const impact = generateImpact(category, template.sentiment, stock, stocks, undefined, rumorMill);
+    return { id: `news-${++newsIdCounter}`, headline: template.headline.replace("{stock}", stock.symbol), body: template.body.replace("{name}", stock.name), category, timestamp: Date.now(), affectedStocks: [stock.symbol], sentiment: template.sentiment, earnings: template.earningsGen(stock), impact };
   }
-
   if (category === "global") {
     const template = GLOBAL_TEMPLATES[Math.floor(Math.random() * GLOBAL_TEMPLATES.length)];
-    const impact = generateImpact(category, template.sentiment, stock, stocks, template.affectedTags);
-    return {
-      id: `news-${++newsIdCounter}`,
-      headline: template.headline,
-      body: "",
-      category,
-      timestamp: Date.now(),
-      sentiment: template.sentiment,
-      affectedTags: template.affectedTags,
-      impact,
-    };
+    const impact = generateImpact(category, template.sentiment, stock, stocks, template.affectedTags, rumorMill);
+    return { id: `news-${++newsIdCounter}`, headline: template.headline, body: "", category, timestamp: Date.now(), sentiment: template.sentiment, affectedTags: template.affectedTags, impact };
   }
-
-  // social
   const template = SOCIAL_TEMPLATES[Math.floor(Math.random() * SOCIAL_TEMPLATES.length)];
   const initialMomentum = Math.random() * 3 + 0.5;
-  const impact = generateImpact(category, template.sentiment, stock, stocks);
-  return {
-    id: `news-${++newsIdCounter}`,
-    headline: template.headline.replace(/\{stock\}/g, stock.symbol),
-    body: template.body.replace(/\{stock\}/g, stock.symbol).replace(/\{name\}/g, stock.name),
-    category,
-    timestamp: Date.now(),
-    affectedStocks: [stock.symbol],
-    sentiment: template.sentiment,
-    author: template.author,
-    upvotes: Math.floor(Math.random() * 20 + 1),
-    commentCount: Math.floor(Math.random() * 5),
-    momentum: initialMomentum,
-    impact,
-  };
+  const impact = generateImpact(category, template.sentiment, stock, stocks, undefined, rumorMill);
+  return { id: `news-${++newsIdCounter}`, headline: template.headline.replace(/\{stock\}/g, stock.symbol), body: template.body.replace(/\{stock\}/g, stock.symbol).replace(/\{name\}/g, stock.name), category, timestamp: Date.now(), affectedStocks: [stock.symbol], sentiment: template.sentiment, author: template.author, upvotes: Math.floor(Math.random() * 20 + 1), commentCount: Math.floor(Math.random() * 5), momentum: initialMomentum, impact };
 }
 
 function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
@@ -317,225 +314,123 @@ function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
 
 export function tick(state: GameState): GameState {
   if (state.gameOver || !state.marketOpen) return state;
+  let workingState = state;
+  const newTimeOfDay = workingState.timeOfDay + 1;
 
-  const newTimeOfDay = state.timeOfDay + 1;
-
-  // Generate news occasionally
-  let newNews = [...state.news];
-  let insiderTip = state.insiderTip;
-
-  // Generate insider tip once per day (early)
-  if (newTimeOfDay <= 2 && !insiderTip) {
-    insiderTip = generateInsiderTip(state.stocks, state.day);
-  }
-
-  // Inject insider tip as a hidden high-impact news event
-  // This drives the stock move but doesn't appear in normal news channels
-  if (insiderTip && newTimeOfDay === 3) {
-    const insiderStock = state.stocks.find((s) => s.symbol === insiderTip!.symbol);
-    if (insiderStock) {
-      const impact: NewsImpact = {
-        description: `INSIDER: 90% chance of strong price ${insiderTip.direction === "up" ? "surge" : "crash"} in ${insiderTip.symbol}`,
-        effects: [{ symbol: insiderTip.symbol, direction: insiderTip.direction, strength: "strong" }],
-        probability: 0.9,
-        delay: 5,
-        duration: 40,
-        ticksRemaining: 45,
-      };
-      // Add as a hidden news item that drives prices but isn't shown in feeds
-      newNews.push({
-        id: `insider-impact-${insiderTip.id}`,
-        headline: "",
-        body: "",
-        category: "business",
-        timestamp: Date.now(),
-        affectedStocks: [insiderTip.symbol],
-        sentiment: insiderTip.direction === "up" ? "positive" : "negative",
-        impact,
-      });
+  if (hasUpgrade(workingState, "stop_loss_ins") && workingState.stopLossEnabled) {
+    for (const position of [...workingState.portfolio]) {
+      const stock = workingState.stocks.find((s) => s.symbol === position.symbol);
+      if (stock && stock.price <= position.avgCost * 0.85) workingState = sellStock(workingState, position.symbol, position.shares);
     }
   }
 
-  // Seed first stories early in the day
+  if (hasUpgrade(workingState, "royalties")) {
+    const royalties = workingState.portfolio.reduce((sum, pos) => {
+      const stock = workingState.stocks.find((s) => s.symbol === pos.symbol);
+      return stock && stock.tags.includes("entertainment") ? sum + pos.shares * 5 : sum;
+    }, 0);
+    if (royalties > 0) workingState = { ...workingState, cash: workingState.cash + royalties };
+  }
+
+  const rumorMill = hasUpgrade(workingState, "rumor_mill");
+  let newNews = [...workingState.news];
+  let insiderTip = workingState.insiderTip;
+  let insiderTip2 = workingState.insiderTip2;
+  let institutionalOrders = hasUpgrade(workingState, "dark_pool") ? [...workingState.institutionalOrders] : [];
+
+  if (newTimeOfDay <= 2 && !insiderTip) insiderTip = generateInsiderTip(workingState.stocks, workingState.day);
+  if (newTimeOfDay <= 2 && hasUpgrade(workingState, "insider_rolodex") && !insiderTip2) insiderTip2 = generateInsiderTip(workingState.stocks, workingState.day, insiderTip ? [insiderTip.symbol] : []);
+
+  if (newTimeOfDay === 3) {
+    for (const tip of [insiderTip, insiderTip2].filter(Boolean) as InsiderTip[]) {
+      const impact: NewsImpact = { description: `INSIDER: 90% chance of strong price ${tip.direction === "up" ? "surge" : "crash"} in ${tip.symbol}`, effects: [{ symbol: tip.symbol, direction: tip.direction, strength: "strong" }], probability: 0.9, delay: 5, duration: 40, ticksRemaining: 45 };
+      newNews.push({ id: `insider-impact-${tip.id}`, headline: "", body: "", category: "business", timestamp: Date.now(), affectedStocks: [tip.symbol], sentiment: tip.direction === "up" ? "positive" : "negative", impact });
+    }
+  }
+
+  if (hasUpgrade(workingState, "dark_pool") && (institutionalOrders.length === 0 || newTimeOfDay % 25 === 0)) institutionalOrders = generateInstitutionalOrders(workingState.stocks);
+
   if (newTimeOfDay <= 3) {
-    if (!newNews.some((n) => n.category === "business")) {
-      newNews = [generateNews(state.stocks, "business"), ...newNews];
-    }
-    if (!newNews.some((n) => n.category === "global")) {
-      newNews = [generateNews(state.stocks, "global"), ...newNews];
-    }
-    if (!newNews.some((n) => n.category === "social")) {
-      newNews = [generateNews(state.stocks, "social"), ...newNews];
-    }
+    if (!newNews.some((n) => n.category === "business")) newNews = [generateNews(workingState.stocks, "business", rumorMill), ...newNews];
+    if (!newNews.some((n) => n.category === "global")) newNews = [generateNews(workingState.stocks, "global", rumorMill), ...newNews];
+    if (!newNews.some((n) => n.category === "social")) newNews = [generateNews(workingState.stocks, "social", rumorMill), ...newNews];
   }
 
-  // Ongoing news generation
   if (Math.random() < 0.18) {
     const categories: NewsItem["category"][] = ["business", "global", "social"];
     const category = categories[Math.floor(Math.random() * categories.length)];
-    newNews = [generateNews(state.stocks, category), ...newNews].slice(0, 30);
+    newNews = [generateNews(workingState.stocks, category, rumorMill), ...newNews].slice(0, 30);
   }
 
-  // Simulate social post upvote growth each tick
   newNews = newNews.map((item) => {
-    // Decrement impact ticks
-    const updatedImpact = item.impact && item.impact.ticksRemaining > 0
-      ? { ...item.impact, ticksRemaining: item.impact.ticksRemaining - 1 }
-      : item.impact;
-
-    if (item.category !== "social" || item.upvotes == null || item.momentum == null) {
-      return updatedImpact !== item.impact ? { ...item, impact: updatedImpact } : item;
-    }
-
-    // Momentum decays over time — high-upvote posts sustain much longer
+    const updatedImpact = item.impact && item.impact.ticksRemaining > 0 ? { ...item.impact, ticksRemaining: item.impact.ticksRemaining - 1 } : item.impact;
+    if (item.category !== "social" || item.upvotes == null || item.momentum == null) return updatedImpact !== item.impact ? { ...item, impact: updatedImpact } : item;
     const age = (Date.now() - item.timestamp) / 1000;
-    const upvoteBoost = Math.min(item.upvotes / 200, 5); // up to 5x longer decay
-    const decayTime = 120 + upvoteBoost * 120; // 2-12 minutes based on upvotes
+    const upvoteBoost = Math.min(item.upvotes / 200, 5);
+    const decayTime = 120 + upvoteBoost * 120;
     const decayFactor = Math.max(0, 1 - age / decayTime);
-    const jitter = (Math.random() - 0.3) * item.momentum; // biased upward
-    const newUpvotes = Math.max(
-      item.upvotes,
-      item.upvotes + Math.floor(jitter * decayFactor * 15)
-    );
+    const jitter = (Math.random() - 0.3) * item.momentum;
+    const newUpvotes = Math.max(item.upvotes, item.upvotes + Math.floor(jitter * decayFactor * 15));
     const newComments = item.commentCount! + (Math.random() < 0.3 ? Math.floor(Math.random() * 3) : 0);
-
-    // Small chance momentum spikes (post goes viral)
     let newMomentum = item.momentum * (0.98 + Math.random() * 0.04);
-    if (Math.random() < 0.02) {
-      newMomentum = item.momentum * (1.5 + Math.random());
-    }
-
-    // Extend impact duration for high-upvote posts
+    if (Math.random() < 0.02) newMomentum = item.momentum * (1.5 + Math.random());
     let socialImpact = updatedImpact;
-    if (socialImpact && newUpvotes > 100) {
-      const bonusTicks = Math.floor(Math.min(newUpvotes / 50, 40));
-      if (socialImpact.ticksRemaining > 0 && socialImpact.ticksRemaining < bonusTicks) {
-        socialImpact = { ...socialImpact, ticksRemaining: bonusTicks };
-      }
-    }
-
-    return {
-      ...item,
-      upvotes: newUpvotes,
-      commentCount: newComments,
-      momentum: newMomentum,
-      impact: socialImpact,
-    };
+    if (socialImpact && newUpvotes > 100) { const bonusTicks = Math.floor(Math.min(newUpvotes / 50, 40)); if (socialImpact.ticksRemaining > 0 && socialImpact.ticksRemaining < bonusTicks) socialImpact = { ...socialImpact, ticksRemaining: bonusTicks }; }
+    return { ...item, upvotes: newUpvotes, commentCount: newComments, momentum: newMomentum, impact: socialImpact };
   });
 
-  // Update stock prices using impact system
-  const newStocks = state.stocks.map((s) => updateStockPrice(s, newNews));
+  const newStocks = workingState.stocks.map((s) => updateStockPrice(s, newNews));
+  const postOrderState = processOrders({ ...workingState, stocks: newStocks, news: newNews, institutionalOrders });
 
-  // Process pending orders after price updates
-  let postOrderState = processOrders({ ...state, stocks: newStocks, news: newNews });
-
-  // End of day
   if (newTimeOfDay >= 100) {
-    const portfolioValue = postOrderState.portfolio.reduce((sum, pos) => {
-      const stock = newStocks.find((s) => s.symbol === pos.symbol);
-      return sum + (stock ? stock.price * pos.shares : 0);
-    }, 0);
+    const portfolioValue = postOrderState.portfolio.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return sum + (stock ? stock.price * pos.shares : 0); }, 0);
+    const shortLiability = postOrderState.shorts.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return sum + (stock ? stock.price * pos.shares : 0); }, 0);
+    const shortCollateral = postOrderState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
+    const cashBeforeBonuses = postOrderState.cash;
+    const dividends = hasUpgrade(postOrderState, "dividends") ? portfolioValue * 0.02 : 0;
+    const interest = hasUpgrade(postOrderState, "interest") ? cashBeforeBonuses * 0.005 : 0;
+    const staking = hasUpgrade(postOrderState, "staking") ? postOrderState.portfolio.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return stock && state.day - pos.dayAcquired >= 3 ? sum + stock.price * pos.shares * 0.01 : sum; }, 0) : 0;
+    const heldTags = hasUpgrade(postOrderState, "diversification") ? new Set(postOrderState.portfolio.flatMap((pos) => newStocks.find((s) => s.symbol === pos.symbol)?.tags ?? [])) : new Set<string>();
+    const netWorthBeforeBonuses = cashBeforeBonuses + portfolioValue + shortCollateral - shortLiability;
+    const diversification = heldTags.size > 0 ? netWorthBeforeBonuses * 0.02 * heldTags.size : 0;
+    let finalCash = cashBeforeBonuses + dividends + interest + staking + diversification;
+    const dayFines = [];
 
-    // Short positions: liability is current market value
-    const shortLiability = postOrderState.shorts.reduce((sum, pos) => {
-      const stock = newStocks.find((s) => s.symbol === pos.symbol);
-      return sum + (stock ? stock.price * pos.shares : 0);
-    }, 0);
-    const shortCollateral = postOrderState.shorts.reduce(
-      (sum, pos) => sum + pos.entryPrice * pos.shares,
-      0
-    );
-
-    // SEC fine check: only if player viewed the insider channel
-    let secFine = null;
-    let finalCash = postOrderState.cash;
-    if (postOrderState.insiderViewed && insiderTip) {
-      const tipSymbol = insiderTip.symbol;
-      const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
-
-      if (tipStock) {
-        // Realized profit from sells/covers already tracked
-        let totalInsiderProfit = postOrderState.insiderRealizedProfit;
-
-        // Unrealized gains on long shares bought AFTER viewing (still held)
+    if (postOrderState.insiderViewed && getViewedTipSymbols(postOrderState).length > 0) {
+      let totalInsiderProfit = postOrderState.insiderRealizedProfit;
+      for (const tipSymbol of getViewedTipSymbols(postOrderState)) {
+        const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
+        if (!tipStock) continue;
         const currentPos = postOrderState.portfolio.find((p) => p.symbol === tipSymbol);
         const snapPos = postOrderState.insiderSnapshotHoldings.find((p) => p.symbol === tipSymbol);
-        const currentShares = currentPos?.shares ?? 0;
-        const snapShares = snapPos?.shares ?? 0;
-        if (currentShares > snapShares) {
-          const newShares = currentShares - snapShares;
-          totalInsiderProfit += (tipStock.price - currentPos!.avgCost) * newShares;
-        }
-
-        // Unrealized gains on short positions opened AFTER viewing (still open)
+        const currentShares = currentPos?.shares ?? 0; const snapShares = snapPos?.shares ?? 0;
+        if (currentPos && currentShares > snapShares) totalInsiderProfit += (tipStock.price - currentPos.avgCost) * (currentShares - snapShares);
         const currentShort = postOrderState.shorts.find((p) => p.symbol === tipSymbol);
         const snapShort = postOrderState.insiderSnapshotShorts.find((p) => p.symbol === tipSymbol);
-        const currentShortShares = currentShort?.shares ?? 0;
-        const snapShortShares = snapShort?.shares ?? 0;
-        if (currentShortShares > snapShortShares) {
-          const newShortShares = currentShortShares - snapShortShares;
-          totalInsiderProfit += (currentShort!.entryPrice - tipStock.price) * newShortShares;
-        }
-
-        if (totalInsiderProfit > 0) {
-          const catchChance = Math.min(0.95, totalInsiderProfit / 3500 + 0.1);
-          if (Math.random() < catchChance) {
-            const fineMultiplier = 2 + Math.random();
-            const fineAmount = Math.round(totalInsiderProfit * fineMultiplier * 100) / 100;
-            secFine = {
-              amount: fineAmount,
-              symbol: tipSymbol,
-              profit: Math.round(totalInsiderProfit * 100) / 100,
-              day: state.day,
-            };
-            finalCash -= fineAmount;
-          }
+        const currentShortShares = currentShort?.shares ?? 0; const snapShortShares = snapShort?.shares ?? 0;
+        if (currentShort && currentShortShares > snapShortShares) totalInsiderProfit += (currentShort.entryPrice - tipStock.price) * (currentShortShares - snapShortShares);
+      }
+      if (totalInsiderProfit > 0) {
+        const catchChance = Math.min(0.95, totalInsiderProfit / 3500 + 0.1);
+        if (Math.random() < catchChance) {
+          let fineAmount = Math.round(totalInsiderProfit * (2 + Math.random()) * 100) / 100;
+          if (hasUpgrade(postOrderState, "bail_out")) fineAmount *= 0.8;
+          fineAmount = Math.round(fineAmount * 100) / 100;
+          finalCash -= fineAmount;
+          dayFines.push({ amount: fineAmount, symbol: getViewedTipSymbols(postOrderState).join("/"), profit: Math.round(totalInsiderProfit * 100) / 100, day: state.day });
         }
       }
     }
 
     const finalNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability;
-
-    // Milestone check every 3 days: milestone n requires 1000 + 250*n*(n+1)
-    const completedDay = state.day;
-    let gameOver = false;
-    if (completedDay % 3 === 0) {
-      const milestoneNum = completedDay / 3;
-      const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1);
-      gameOver = finalNetWorth < requiredNetWorth;
-    }
-
-    const endOfDayState: GameState = {
-      ...postOrderState,
-      day: state.day + 1,
-      cash: finalCash,
-      stocks: newStocks,
-      news: newNews,
-      timeOfDay: 0,
-      marketOpen: false,
-      gameOver,
-      totalProfit: finalNetWorth - 1000,
-      insiderTip: null,
-      insiderViewed: false,
-      insiderViewedTick: 0,
-      insiderSnapshotHoldings: [],
-      insiderSnapshotShorts: [],
-      insiderRealizedProfit: 0,
-      pendingOrders: [], // clear all pending orders at end of day
-      secFines: secFine ? [...postOrderState.secFines, secFine] : postOrderState.secFines,
-    };
-
-    // Generate 3 stock draft options for the player to choose from
-    return gameOver ? endOfDayState : generateDraftOptions(endOfDayState);
+    const completedDay = state.day; let gameOver = false; let goldenParachutes = postOrderState.goldenParachutes;
+    if (completedDay % 3 === 0) { const milestoneNum = completedDay / 3; const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1); gameOver = finalNetWorth < requiredNetWorth; if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; } }
+    const pendingOrders = hasUpgrade(postOrderState, "limit_order_pro") ? postOrderState.pendingOrders : [];
+    const endOfDayState: GameState = { ...postOrderState, day: state.day + 1, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOrderState.secFines, ...dayFines] : postOrderState.secFines, institutionalOrders: [] };
+    return gameOver ? endOfDayState : generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 
-  return {
-    ...postOrderState,
-    stocks: newStocks,
-    news: newNews,
-    timeOfDay: newTimeOfDay,
-    insiderTip,
-  };
+  return { ...postOrderState, stocks: newStocks, news: newNews, timeOfDay: newTimeOfDay, insiderTip, insiderTip2, institutionalOrders };
 }
 
 function pushRecent(recent: string[], symbol: string): string[] {
@@ -551,172 +446,90 @@ export function togglePinStock(state: GameState, symbol: string): GameState {
 
 export function buyStock(state: GameState, symbol: string, shares: number): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
-  if (!stock) return state;
-
+  if (!stock || shares <= 0) return state;
   const cost = stock.price * shares;
-  if (cost > state.cash) return state;
-
+  if (cost > getBuyingPower(state)) return state;
+  const bonusShares = hasUpgrade(state, "bogo") && Math.random() < 0.04 ? 1 : 0;
+  const totalNewShares = shares + bonusShares;
   const existingPosition = state.portfolio.find((p) => p.symbol === symbol);
   let newPortfolio;
-
   if (existingPosition) {
-    const totalShares = existingPosition.shares + shares;
+    const totalShares = existingPosition.shares + totalNewShares;
     const totalCost = existingPosition.avgCost * existingPosition.shares + cost;
-    newPortfolio = state.portfolio.map((p) =>
-      p.symbol === symbol
-        ? { ...p, shares: totalShares, avgCost: totalCost / totalShares }
-        : p
-    );
+    newPortfolio = state.portfolio.map((p) => p.symbol === symbol ? { ...p, shares: totalShares, avgCost: totalCost / totalShares } : p);
   } else {
-    newPortfolio = [...state.portfolio, { symbol, shares, avgCost: stock.price }];
+    newPortfolio = [...state.portfolio, { symbol, shares: totalNewShares, avgCost: cost / totalNewShares, dayAcquired: state.day }];
   }
-
   return { ...state, cash: state.cash - cost, portfolio: newPortfolio, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function sellStock(state: GameState, symbol: string, shares: number): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
   const position = state.portfolio.find((p) => p.symbol === symbol);
-  if (!stock || !position || position.shares < shares) return state;
-
+  if (!stock || !position || position.shares < shares || shares <= 0) return state;
   const revenue = stock.price * shares;
+  const costBasis = position.avgCost * shares;
+  const profit = revenue - costBasis;
+  const adjustedProfit = applyProfitModifiers(state, stock, position, profit);
+  const cashDelta = revenue + (adjustedProfit - profit);
   const remainingShares = position.shares - shares;
-
-  const newPortfolio =
-    remainingShares === 0
-      ? state.portfolio.filter((p) => p.symbol !== symbol)
-      : state.portfolio.map((p) =>
-          p.symbol === symbol ? { ...p, shares: remainingShares } : p
-        );
-
-  // Track realized profit on insider stock (only shares bought after viewing)
+  const newPortfolio = remainingShares === 0 ? state.portfolio.filter((p) => p.symbol !== symbol) : state.portfolio.map((p) => p.symbol === symbol ? { ...p, shares: remainingShares } : p);
   let insiderRealizedProfit = state.insiderRealizedProfit;
-  if (state.insiderViewed && state.insiderTip && symbol === state.insiderTip.symbol) {
+  if (state.insiderViewed && isTipSymbol(state, symbol)) {
     const snapPos = state.insiderSnapshotHoldings.find((p) => p.symbol === symbol);
     const snapShares = snapPos?.shares ?? 0;
-    // Only count shares beyond the snapshot as insider-traded
     const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
-    if (insiderShares > 0) {
-      const profit = (stock.price - position.avgCost) * insiderShares;
-      insiderRealizedProfit += profit;
-    }
+    if (insiderShares > 0) insiderRealizedProfit += (stock.price - position.avgCost) * insiderShares;
   }
-
-  return { ...state, cash: state.cash + revenue, portfolio: newPortfolio, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol) };
+  return { ...state, cash: state.cash + cashDelta, portfolio: newPortfolio, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function shortStock(state: GameState, symbol: string, shares: number): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
-  if (!stock) return state;
-
-  // Require margin: must have enough cash to cover potential loss (100% collateral)
+  if (!stock || shares <= 0) return state;
   const collateral = stock.price * shares;
-  if (collateral > state.cash) return state;
-
+  if (collateral > getBuyingPower(state)) return state;
   const existing = state.shorts.find((p) => p.symbol === symbol);
   let newShorts;
-
   if (existing) {
     const totalShares = existing.shares + shares;
     const totalEntry = existing.entryPrice * existing.shares + stock.price * shares;
-    newShorts = state.shorts.map((p) =>
-      p.symbol === symbol
-        ? { ...p, shares: totalShares, entryPrice: totalEntry / totalShares }
-        : p
-    );
-  } else {
-    newShorts = [...state.shorts, { symbol, shares, entryPrice: stock.price }];
-  }
-
-  // Lock collateral from cash
+    newShorts = state.shorts.map((p) => p.symbol === symbol ? { ...p, shares: totalShares, entryPrice: totalEntry / totalShares } : p);
+  } else newShorts = [...state.shorts, { symbol, shares, entryPrice: stock.price }];
   return { ...state, cash: state.cash - collateral, shorts: newShorts, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function coverShort(state: GameState, symbol: string, shares: number): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
   const position = state.shorts.find((p) => p.symbol === symbol);
-  if (!stock || !position || position.shares < shares) return state;
-
-  const netCash = state.cash + (position.entryPrice - stock.price) * shares + position.entryPrice * shares;
-
+  if (!stock || !position || position.shares < shares || shares <= 0) return state;
+  let profit = (position.entryPrice - stock.price) * shares;
+  if (profit > 0 && hasUpgrade(state, "loan_shark") && stock.tags.includes("finance")) profit *= 1.15;
+  if (profit < 0 && hasUpgrade(state, "hedge_fund")) profit *= 0.75;
+  const netCash = state.cash + position.entryPrice * shares + profit;
   const remainingShares = position.shares - shares;
-  const newShorts =
-    remainingShares === 0
-      ? state.shorts.filter((p) => p.symbol !== symbol)
-      : state.shorts.map((p) =>
-          p.symbol === symbol ? { ...p, shares: remainingShares } : p
-        );
-
-  // Track realized profit on insider stock (only shorts opened after viewing)
+  const newShorts = remainingShares === 0 ? state.shorts.filter((p) => p.symbol !== symbol) : state.shorts.map((p) => p.symbol === symbol ? { ...p, shares: remainingShares } : p);
   let insiderRealizedProfit = state.insiderRealizedProfit;
-  if (state.insiderViewed && state.insiderTip && symbol === state.insiderTip.symbol) {
+  if (state.insiderViewed && isTipSymbol(state, symbol)) {
     const snapShort = state.insiderSnapshotShorts.find((p) => p.symbol === symbol);
     const snapShares = snapShort?.shares ?? 0;
     const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
-    if (insiderShares > 0) {
-      const profit = (position.entryPrice - stock.price) * insiderShares;
-      insiderRealizedProfit += profit;
-    }
+    if (insiderShares > 0) insiderRealizedProfit += (position.entryPrice - stock.price) * insiderShares;
   }
-
   return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol) };
 }
 
 export function openMarket(state: GameState): GameState {
-  const portfolioValue = state.portfolio.reduce((sum, pos) => {
-    const stock = state.stocks.find((s) => s.symbol === pos.symbol);
-    return sum + (stock ? stock.price * pos.shares : 0);
-  }, 0);
-  const shortLiability = state.shorts.reduce((sum, pos) => {
-    const stock = state.stocks.find((s) => s.symbol === pos.symbol);
-    return sum + (stock ? stock.price * pos.shares : 0);
-  }, 0);
-  const shortCollateral = state.shorts.reduce(
-    (sum, pos) => sum + pos.entryPrice * pos.shares, 0
-  );
-  const netWorth = state.cash + portfolioValue + shortCollateral - shortLiability;
-
-  return {
-    ...state,
-    marketOpen: true,
-    stocks: state.stocks.map((s) => ({
-      ...s,
-      openPrice: s.price,
-      dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }],
-      history: [s.price], // reset intraday history for new day
-    })),
-    dayStartNetWorth: netWorth,
-    insiderTip: null,
-    insiderViewed: false,
-    insiderViewedTick: 0,
-    insiderSnapshotHoldings: [],
-    insiderSnapshotShorts: [],
-    insiderRealizedProfit: 0,
-  };
+  const netWorth = getNetWorth(state);
+  return { ...state, marketOpen: true, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [] };
 }
 
-export function purchaseUpgrade(state: GameState, upgradeId: string): GameState {
-  const upgrade = state.upgrades.find((u) => u.id === upgradeId);
-  if (!upgrade || upgrade.purchased || state.cash < upgrade.cost) return state;
-
-  let newState = {
-    ...state,
-    cash: state.cash - upgrade.cost,
-    upgrades: state.upgrades.map((u) =>
-      u.id === upgradeId ? { ...u, purchased: true } : u
-    ),
-  };
-
-  // Apply upgrade effect
-  switch (upgrade.effect.type) {
-    case "extra_monitor":
-      newState.monitors = [
-        ...newState.monitors,
-        { id: newState.monitors.length, channel: "business_news" },
-      ];
-      break;
-  }
-
+export function acquireUpgrade(state: GameState, upgradeId: string): GameState {
+  const upgrade = UPGRADE_POOL.find((u) => u.id === upgradeId);
+  if (!upgrade || upgradeCount(state, upgradeId) >= upgrade.maxStacks) return state;
+  let newState: GameState = { ...state, acquiredUpgrades: [...state.acquiredUpgrades, upgradeId], upgradeDraftOptions: [] };
+  if (upgradeId === "monitor" && newState.monitors.length < 3) newState = { ...newState, monitors: [...newState.monitors, { id: newState.monitors.length, channel: "business_news" }] };
+  if (upgradeId === "golden_parachute") newState = { ...newState, goldenParachutes: newState.goldenParachutes + 1 };
   return newState;
 }
 
@@ -867,38 +680,26 @@ function candidateToStock(candidate: StockCandidate, seed: number): Stock {
 }
 
 export function generateDraftOptions(state: GameState): GameState {
-  const existingSymbols = new Set([
-    ...state.stocks.map((s) => s.symbol),
-    ...state.draftedSymbols,
-  ]);
-
+  const existingSymbols = new Set([...state.stocks.map((s) => s.symbol), ...state.draftedSymbols]);
   const available = STOCK_POOL.filter((c) => !existingSymbols.has(c.symbol));
-
-  // Pick 3 random candidates (or fewer if pool is exhausted)
-  const count = Math.min(3, available.length);
-  const picked: StockCandidate[] = [];
-  const pool = [...available];
-
-  for (let i = 0; i < count; i++) {
-    const idx = Math.floor(Math.random() * pool.length);
-    picked.push(pool[idx]);
-    pool.splice(idx, 1);
-  }
-
+  const count = Math.min(3, available.length); const picked: StockCandidate[] = []; const pool = [...available];
+  for (let i = 0; i < count; i++) { const idx = Math.floor(Math.random() * pool.length); picked.push(pool[idx]); pool.splice(idx, 1); }
   const seed = state.day * 31337;
   const options = picked.map((c, i) => candidateToStock(c, seed + i * 7919));
-
   return { ...state, stockDraftOptions: options };
+}
+
+export function generateUpgradeDraft(state: GameState): GameState {
+  const available = UPGRADE_POOL.filter((upgrade) => upgradeCount(state, upgrade.id) < upgrade.maxStacks);
+  const count = Math.min(3, available.length); const pool = [...available]; const picked: string[] = [];
+  for (let i = 0; i < count; i++) { const idx = Math.floor(Math.random() * pool.length); picked.push(pool[idx].id); pool.splice(idx, 1); }
+  return { ...state, upgradeDraftOptions: picked };
 }
 
 export function draftStock(state: GameState, symbol: string): GameState {
   const chosen = state.stockDraftOptions.find((s) => s.symbol === symbol);
   if (!chosen) return state;
-
-  return {
-    ...state,
-    stocks: [...state.stocks, chosen],
-    stockDraftOptions: [],
-    draftedSymbols: [...state.draftedSymbols, symbol],
-  };
+  const price = hasUpgrade(state, "ipo_access") ? Math.round(chosen.price * 0.9 * 100) / 100 : chosen.price;
+  const drafted = hasUpgrade(state, "ipo_access") ? { ...chosen, price, openPrice: price, history: [price] } : chosen;
+  return { ...state, stocks: [...state.stocks, drafted], stockDraftOptions: [], upgradeDraftOptions: [], draftedSymbols: [...state.draftedSymbols, symbol] };
 }
