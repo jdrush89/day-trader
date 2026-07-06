@@ -39,7 +39,7 @@ function getShortLiability(state: GameState): number {
   }, 0);
 }
 
-function getNetWorth(state: GameState): number {
+export function getNetWorth(state: GameState): number {
   return state.cash + getPortfolioValue(state) + getShortCollateral(state) - getShortLiability(state) + getOptionsValue(state);
 }
 
@@ -793,7 +793,7 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
 
 export function openMarket(state: GameState): GameState {
   const netWorth = getNetWorth(state);
-  return { ...state, marketOpen: true, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [] };
+  return { ...state, marketOpen: true, restaurantEarnings: 0, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [] };
 }
 
 export function acquireUpgrade(state: GameState, upgradeId: string): GameState {

@@ -2,10 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue } from "./game/engine";
+import { createRestaurantState, finishRestaurantDay } from "./game/restaurant-engine";
+import { RestaurantState } from "./game/restaurant-types";
 import { UPGRADE_POOL } from "./game/upgrades";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
+import { Restaurant } from "./components/Restaurant";
 import titleScreen from "./assets/title-screen.png";
 
 function App() {
@@ -16,6 +19,7 @@ function App() {
   const [debugMode, setDebugMode] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks">("summary");
+  const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
 
   useEffect(() => {
     if (gameState.gameOver || !gameState.marketOpen || paused) return;
@@ -32,7 +36,19 @@ function App() {
         return;
       }
 
-      const num = parseInt(e.key);
+      if (e.key === "Escape") {
+        setPaused((p) => !p);
+        return;
+      }
+
+      if (e.key === "n" || e.key === "N") {
+        setDebugMode((d) => !d);
+        return;
+      }
+
+      if (restaurantState) return;
+
+      const num = parseInt(e.key, 10);
       if (num >= 1 && num <= CHANNEL_KEYS.length) {
         const active = document.activeElement;
         const tag = active?.tagName.toLowerCase();
@@ -45,16 +61,12 @@ function App() {
           ...prev,
           monitors: prev.monitors.map((m) => (m.id === 0 ? { ...m, channel: CHANNEL_KEYS[num - 1] } : m)),
         }));
-        return;
       }
-
-      if (e.key === "Escape") setPaused((p) => !p);
-      else if (e.key === "n" || e.key === "N") setDebugMode((d) => !d);
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showTitle]);
+  }, [restaurantState, showTitle]);
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
@@ -94,25 +106,49 @@ function App() {
     setGameState((prev) => closeOption(prev, optionId));
   }, []);
 
+  const beginScheduledDay = useCallback((stateOverride?: GameState) => {
+    const nextState = stateOverride ?? gameState;
+    if (nextState.day % 2 === 0) {
+      setGameState(nextState);
+      setRestaurantState(createRestaurantState());
+      setEodPhase("summary");
+      return;
+    }
+
+    setRestaurantState(null);
+    setGameState(openMarket(nextState));
+    setEodPhase("summary");
+  }, [gameState]);
+
   const handleNewDay = useCallback(() => {
     if (gameState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
     else if (gameState.stockDraftOptions.length > 0) setEodPhase("stocks");
-    else setGameState((prev) => openMarket(prev));
-  }, [gameState.stockDraftOptions.length, gameState.upgradeDraftOptions.length]);
+    else beginScheduledDay();
+  }, [beginScheduledDay, gameState.stockDraftOptions.length, gameState.upgradeDraftOptions.length]);
 
   const handleAcquireUpgrade = useCallback((upgradeId: string) => {
-    setGameState((prev) => acquireUpgrade(prev, upgradeId));
-    if (gameState.stockDraftOptions.length > 0) setEodPhase("stocks");
-    else {
-      setGameState((prev) => openMarket(prev));
-      setEodPhase("summary");
+    const nextState = acquireUpgrade(gameState, upgradeId);
+    if (nextState.stockDraftOptions.length > 0) {
+      setGameState(nextState);
+      setEodPhase("stocks");
+      return;
     }
-  }, [gameState.stockDraftOptions.length]);
+
+    beginScheduledDay(nextState);
+  }, [beginScheduledDay, gameState]);
 
   const handleDraftStock = useCallback((symbol: string) => {
-    setGameState((prev) => openMarket(draftStock(prev, symbol)));
-    setEodPhase("summary");
-  }, []);
+    beginScheduledDay(draftStock(gameState, symbol));
+  }, [beginScheduledDay, gameState]);
+
+  const handleRestaurantFinish = useCallback((earnings: number) => {
+    const nextState = finishRestaurantDay(gameState, earnings);
+    setRestaurantState(null);
+    setGameState(nextState);
+    if (nextState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
+    else if (nextState.stockDraftOptions.length > 0) setEodPhase("stocks");
+    else beginScheduledDay(nextState);
+  }, [beginScheduledDay, gameState]);
 
   const handleViewInsider = useCallback(() => {
     setGameState((prev) => {
@@ -129,6 +165,7 @@ function App() {
 
   const handleRestart = useCallback(() => {
     setGameState(createInitialState());
+    setRestaurantState(null);
     setShowTitle(true);
     setEodPhase("summary");
   }, []);
@@ -147,6 +184,7 @@ function App() {
   const hasBloomberg = hasUpgrade(gameState, "bloomberg");
   const showAnalystRating = hasUpgrade(gameState, "analyst_ratings");
   const showDarkPool = hasUpgrade(gameState, "dark_pool");
+  const isRestaurantShift = restaurantState !== null;
 
   if (showTitle) {
     return (
@@ -162,20 +200,22 @@ function App() {
 
   return (
     <div className="game-container">
-      <header className="game-header">
-        <h1>📈 Day Trader</h1>
-        <div className="header-controls">
-          <div className="time-bar">
-            <div className="time-fill" style={{ width: `${gameState.timeOfDay}%` }} />
-            <span className="time-label">{paused ? "⏸ PAUSED" : gameState.marketOpen ? `Day ${gameState.day} — ${formatMarketTime(gameState.timeOfDay)}` : "Market Closed"}</span>
+      {!isRestaurantShift && (
+        <header className="game-header">
+          <h1>📈 Day Trader</h1>
+          <div className="header-controls">
+            <div className="time-bar">
+              <div className="time-fill" style={{ width: `${gameState.timeOfDay}%` }} />
+              <span className="time-label">{paused ? "⏸ PAUSED" : gameState.marketOpen ? `Day ${gameState.day} — ${formatMarketTime(gameState.timeOfDay)}` : "Market Closed"}</span>
+            </div>
+            <div className="speed-controls">
+              <button className={speed === 1 ? "active" : ""} onClick={() => setSpeed(1)}>1x</button>
+              <button className={speed === 2 ? "active" : ""} onClick={() => setSpeed(2)}>2x</button>
+              <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>
+            </div>
           </div>
-          <div className="speed-controls">
-            <button className={speed === 1 ? "active" : ""} onClick={() => setSpeed(1)}>1x</button>
-            <button className={speed === 2 ? "active" : ""} onClick={() => setSpeed(2)}>2x</button>
-            <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>
-          </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {paused && (
         <div className="pause-overlay">
@@ -199,151 +239,163 @@ function App() {
         </div>
       )}
 
-      {!gameState.marketOpen && !gameState.gameOver && eodPhase === "summary" && (() => {
-        const ranked = [...gameState.stocks].map((s) => ({ ...s, change: s.price - s.openPrice, changePct: ((s.price - s.openPrice) / s.openPrice) * 100 })).sort((a, b) => b.changePct - a.changePct);
-        const winners = ranked.filter((s) => s.changePct > 0);
-        const losers = ranked.filter((s) => s.changePct < 0).reverse();
-        const portfolioValue = gameState.portfolio.reduce((sum, pos) => {
-          const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
-          return sum + (stock ? stock.price * pos.shares : 0);
-        }, 0);
-        const shortLiability = gameState.shorts.reduce((sum, pos) => {
-          const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
-          return sum + (stock ? stock.price * pos.shares : 0);
-        }, 0);
-        const shortCollateral = gameState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
-        const optionsVal = getOptionsValue(gameState);
-        const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability + optionsVal;
-        const dailyPnL = currentNetWorth - gameState.dayStartNetWorth;
-        const completedDay = gameState.day - 1;
-        const milestone = completedDay % 3 === 0 ? getMilestone(completedDay) : null;
+      {isRestaurantShift && restaurantState && !gameState.gameOver ? (
+        <Restaurant
+          day={gameState.day}
+          paused={paused}
+          state={restaurantState}
+          setRestaurantState={setRestaurantState}
+          onFinish={handleRestaurantFinish}
+        />
+      ) : (
+        <>
+          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "summary" && (() => {
+            const ranked = [...gameState.stocks].map((s) => ({ ...s, change: s.price - s.openPrice, changePct: ((s.price - s.openPrice) / s.openPrice) * 100 })).sort((a, b) => b.changePct - a.changePct);
+            const winners = ranked.filter((s) => s.changePct > 0);
+            const losers = ranked.filter((s) => s.changePct < 0).reverse();
+            const portfolioValue = gameState.portfolio.reduce((sum, pos) => {
+              const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
+              return sum + (stock ? stock.price * pos.shares : 0);
+            }, 0);
+            const shortLiability = gameState.shorts.reduce((sum, pos) => {
+              const stock = gameState.stocks.find((s) => s.symbol === pos.symbol);
+              return sum + (stock ? stock.price * pos.shares : 0);
+            }, 0);
+            const shortCollateral = gameState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
+            const optionsVal = getOptionsValue(gameState);
+            const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability + optionsVal;
+            const dailyPnL = currentNetWorth - gameState.dayStartNetWorth;
+            const completedDay = gameState.day - 1;
+            const milestone = completedDay % 3 === 0 ? getMilestone(completedDay) : null;
 
-        return (
-          <div className="end-of-day-overlay">
-            <div className="end-of-day">
-              <h2>📋 End of Day {completedDay}</h2>
-              <div className="eod-pnl-hero">
-                <span className="eod-pnl-label">Today's P&L</span>
-                <span className={`eod-pnl-value ${dailyPnL >= 0 ? "up" : "down"}`}>{dailyPnL >= 0 ? "+$" : "-$"}{Math.abs(dailyPnL).toFixed(2)}</span>
-              </div>
-              <div className="eod-stats">
-                <div className="eod-stat-row"><span>Net worth</span><span>${currentNetWorth.toFixed(2)}</span></div>
-                <div className="eod-stat-row"><span>Cash</span><span>${gameState.cash.toFixed(2)}</span></div>
-                <div className="eod-stat-row"><span>Portfolio value</span><span>${portfolioValue.toFixed(2)}</span></div>
-                {gameState.goldenParachutes > 0 && <div className="eod-stat-row"><span>Golden Parachutes</span><span>{gameState.goldenParachutes}</span></div>}
-              </div>
-              {milestone && (
-                <div className={`milestone-check ${currentNetWorth >= milestone.required ? "passed" : "failed"}`}>
-                  <div className="milestone-header">{currentNetWorth >= milestone.required ? "✅ Milestone Passed!" : "❌ Milestone Failed!"}</div>
-                  <div className="milestone-body">Required: ${milestone.required.toLocaleString()} — Your net worth: ${currentNetWorth.toFixed(2)}</div>
-                </div>
-              )}
-              <div className="eod-movers">
-                <div className="eod-column">
-                  <h3 className="eod-winners-title">📈 Winners</h3>
-                  {winners.length === 0 && <span className="eod-none">None</span>}
-                  {winners.map((s) => <div key={s.symbol} className="eod-mover-row"><span className="eod-symbol">{s.symbol}</span><span className="eod-price">${s.price.toFixed(2)}</span><span className="eod-change up">+${s.change.toFixed(2)} (+{s.changePct.toFixed(1)}%)</span></div>)}
-                </div>
-                <div className="eod-column">
-                  <h3 className="eod-losers-title">📉 Losers</h3>
-                  {losers.length === 0 && <span className="eod-none">None</span>}
-                  {losers.map((s) => <div key={s.symbol} className="eod-mover-row"><span className="eod-symbol">{s.symbol}</span><span className="eod-price">${s.price.toFixed(2)}</span><span className="eod-change down">-${Math.abs(s.change).toFixed(2)} ({s.changePct.toFixed(1)}%)</span></div>)}
-                </div>
-              </div>
-              {gameState.secFines.filter((f) => f.day === gameState.day - 1).map((fine, i) => (
-                <div key={i} className="sec-fine-alert">
-                  <div className="sec-fine-header">🚨 SEC ENFORCEMENT ACTION 🚨</div>
-                  <div className="sec-fine-body">
-                    You have been fined for insider trading on <strong>${fine.symbol}</strong>.
-                    <br />Illegal profit detected: <span className="up">${fine.profit.toFixed(2)}</span>
-                    <br />Fine imposed: <span className="danger">-${fine.amount.toFixed(2)}</span>
+            return (
+              <div className="end-of-day-overlay">
+                <div className="end-of-day">
+                  <h2>📋 End of Day {completedDay}</h2>
+                  <div className="eod-pnl-hero">
+                    <span className="eod-pnl-label">Today's P&L</span>
+                    <span className={`eod-pnl-value ${dailyPnL >= 0 ? "up" : "down"}`}>{dailyPnL >= 0 ? "+$" : "-$"}{Math.abs(dailyPnL).toFixed(2)}</span>
                   </div>
+                  <div className="eod-stats">
+                    <div className="eod-stat-row"><span>Net worth</span><span>${currentNetWorth.toFixed(2)}</span></div>
+                    <div className="eod-stat-row"><span>Cash</span><span>${gameState.cash.toFixed(2)}</span></div>
+                    <div className="eod-stat-row"><span>Portfolio value</span><span>${portfolioValue.toFixed(2)}</span></div>
+                    {gameState.goldenParachutes > 0 && <div className="eod-stat-row"><span>Golden Parachutes</span><span>{gameState.goldenParachutes}</span></div>}
+                  </div>
+                  {milestone && (
+                    <div className={`milestone-check ${currentNetWorth >= milestone.required ? "passed" : "failed"}`}>
+                      <div className="milestone-header">{currentNetWorth >= milestone.required ? "✅ Milestone Passed!" : "❌ Milestone Failed!"}</div>
+                      <div className="milestone-body">Required: ${milestone.required.toLocaleString()} — Your net worth: ${currentNetWorth.toFixed(2)}</div>
+                    </div>
+                  )}
+                  <div className="eod-movers">
+                    <div className="eod-column">
+                      <h3 className="eod-winners-title">📈 Winners</h3>
+                      {winners.length === 0 && <span className="eod-none">None</span>}
+                      {winners.map((s) => <div key={s.symbol} className="eod-mover-row"><span className="eod-symbol">{s.symbol}</span><span className="eod-price">${s.price.toFixed(2)}</span><span className="eod-change up">+${s.change.toFixed(2)} (+{s.changePct.toFixed(1)}%)</span></div>)}
+                    </div>
+                    <div className="eod-column">
+                      <h3 className="eod-losers-title">📉 Losers</h3>
+                      {losers.length === 0 && <span className="eod-none">None</span>}
+                      {losers.map((s) => <div key={s.symbol} className="eod-mover-row"><span className="eod-symbol">{s.symbol}</span><span className="eod-price">${s.price.toFixed(2)}</span><span className="eod-change down">-${Math.abs(s.change).toFixed(2)} ({s.changePct.toFixed(1)}%)</span></div>)}
+                    </div>
+                  </div>
+                  {gameState.secFines.filter((f) => f.day === gameState.day - 1).map((fine, i) => (
+                    <div key={i} className="sec-fine-alert">
+                      <div className="sec-fine-header">🚨 SEC ENFORCEMENT ACTION 🚨</div>
+                      <div className="sec-fine-body">
+                        You have been fined for insider trading on <strong>${fine.symbol}</strong>.
+                        <br />Illegal profit detected: <span className="up">${fine.profit.toFixed(2)}</span>
+                        <br />Fine imposed: <span className="danger">-${fine.amount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <button onClick={handleNewDay}>Continue →</button>
                 </div>
+              </div>
+            );
+          })()}
+
+          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "upgrades" && (
+            <div className="end-of-day-overlay">
+              <div className="upgrade-draft">
+                <h2>⬆️ Choose an Upgrade</h2>
+                <p className="upgrade-draft-sub">Pick one upgrade to keep for the rest of the run</p>
+                <div className="upgrade-draft-options">
+                  {gameState.upgradeDraftOptions.map((id) => {
+                    const card = UPGRADE_POOL.find((u) => u.id === id);
+                    if (!card) return null;
+                    const owned = upgradeCount(gameState, id);
+                    return (
+                      <button key={id} className="upgrade-draft-card" onClick={() => handleAcquireUpgrade(id)}>
+                        <div className="upgrade-card-icon">{card.icon}</div>
+                        <div className="upgrade-card-name">{card.name}</div>
+                        <div className="upgrade-card-desc">{card.description}</div>
+                        <div className="upgrade-card-category">{card.category}</div>
+                        {owned > 0 && <div className="upgrade-card-owned">Owned: {owned}/{card.maxStacks}</div>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "stocks" && (
+            <div className="end-of-day-overlay">
+              <div className="stock-draft">
+                <h2>📊 New Stock Available</h2>
+                <p className="stock-draft-sub">Choose a company to add to the market for Day {gameState.day}</p>
+                <div className="stock-draft-options">
+                  {gameState.stockDraftOptions.map((stock) => (
+                    <button key={stock.symbol} className="stock-draft-card" onClick={() => handleDraftStock(stock.symbol)}>
+                      <div className="draft-card-symbol">{stock.symbol}</div>
+                      <div className="draft-card-name">{stock.name}</div>
+                      <div className="draft-card-price">${stock.price.toFixed(2)}</div>
+                      <div className="draft-card-tags">{stock.tags.map((tag) => <span key={tag} className="stock-tag">{tag}</span>)}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="main-layout">
+            <div className="monitors-area">
+              {gameState.monitors.map((monitor) => (
+                <Monitor
+                  key={monitor.id}
+                  monitor={monitor}
+                  gameState={gameState}
+                  debugMode={debugMode}
+                  paused={paused}
+                  hasBloomberg={hasBloomberg}
+                  showAnalystRating={showAnalystRating}
+                  showDarkPool={showDarkPool}
+                  onChangeChannel={handleChangeChannel}
+                  onSelectStock={handleSelectStock}
+                  onViewInsider={handleViewInsider}
+                  onBuy={handleBuy}
+                  onSell={handleSell}
+                  onShort={handleShort}
+                  onCover={handleCover}
+                />
               ))}
-              <button onClick={handleNewDay}>Continue →</button>
             </div>
+            <aside className="sidebar-area">
+              <OrdersPanel gameState={gameState} open={ordersOpen} onClose={() => setOrdersOpen(false)} onPlaceOrder={handlePlaceOrder} onCancelOrder={handleCancelOrder} onBuyOption={handleBuyOption} onSellOption={handleSellOption} onCloseOption={handleCloseOption} />
+              <button className={`orders-tab-strip ${ordersOpen ? "active" : ""}`} onClick={() => setOrdersOpen((o) => !o)} title="Custom Orders">
+                <span className="orders-tab-icon">📋</span>
+                <span className="orders-tab-label">O R D E R S</span>
+                {(gameState.pendingOrders.length + gameState.optionsPositions.length) > 0 && <span className="orders-tab-badge">{gameState.pendingOrders.length + gameState.optionsPositions.length}</span>}
+              </button>
+              <div className="sidebar">
+                <TradingPanel gameState={gameState} onBuy={handleBuy} onSell={handleSell} onShort={handleShort} onCover={handleCover} onTogglePin={handleTogglePin} onToggleStopLoss={handleToggleStopLoss} />
+              </div>
+            </aside>
           </div>
-        );
-      })()}
-
-      {!gameState.marketOpen && !gameState.gameOver && eodPhase === "upgrades" && (
-        <div className="end-of-day-overlay">
-          <div className="upgrade-draft">
-            <h2>⬆️ Choose an Upgrade</h2>
-            <p className="upgrade-draft-sub">Pick one upgrade to keep for the rest of the run</p>
-            <div className="upgrade-draft-options">
-              {gameState.upgradeDraftOptions.map((id) => {
-                const card = UPGRADE_POOL.find((u) => u.id === id);
-                if (!card) return null;
-                const owned = upgradeCount(gameState, id);
-                return (
-                  <button key={id} className="upgrade-draft-card" onClick={() => handleAcquireUpgrade(id)}>
-                    <div className="upgrade-card-icon">{card.icon}</div>
-                    <div className="upgrade-card-name">{card.name}</div>
-                    <div className="upgrade-card-desc">{card.description}</div>
-                    <div className="upgrade-card-category">{card.category}</div>
-                    {owned > 0 && <div className="upgrade-card-owned">Owned: {owned}/{card.maxStacks}</div>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        </>
       )}
-
-      {!gameState.marketOpen && !gameState.gameOver && eodPhase === "stocks" && (
-        <div className="end-of-day-overlay">
-          <div className="stock-draft">
-            <h2>📊 New Stock Available</h2>
-            <p className="stock-draft-sub">Choose a company to add to the market for Day {gameState.day}</p>
-            <div className="stock-draft-options">
-              {gameState.stockDraftOptions.map((stock) => (
-                <button key={stock.symbol} className="stock-draft-card" onClick={() => handleDraftStock(stock.symbol)}>
-                  <div className="draft-card-symbol">{stock.symbol}</div>
-                  <div className="draft-card-name">{stock.name}</div>
-                  <div className="draft-card-price">${stock.price.toFixed(2)}</div>
-                  <div className="draft-card-tags">{stock.tags.map((tag) => <span key={tag} className="stock-tag">{tag}</span>)}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="main-layout">
-        <div className="monitors-area">
-          {gameState.monitors.map((monitor) => (
-            <Monitor
-              key={monitor.id}
-              monitor={monitor}
-              gameState={gameState}
-              debugMode={debugMode}
-              paused={paused}
-              hasBloomberg={hasBloomberg}
-              showAnalystRating={showAnalystRating}
-              showDarkPool={showDarkPool}
-              onChangeChannel={handleChangeChannel}
-              onSelectStock={handleSelectStock}
-              onViewInsider={handleViewInsider}
-              onBuy={handleBuy}
-              onSell={handleSell}
-              onShort={handleShort}
-              onCover={handleCover}
-            />
-          ))}
-        </div>
-        <aside className="sidebar-area">
-          <OrdersPanel gameState={gameState} open={ordersOpen} onClose={() => setOrdersOpen(false)} onPlaceOrder={handlePlaceOrder} onCancelOrder={handleCancelOrder} onBuyOption={handleBuyOption} onSellOption={handleSellOption} onCloseOption={handleCloseOption} />
-          <button className={`orders-tab-strip ${ordersOpen ? "active" : ""}`} onClick={() => setOrdersOpen((o) => !o)} title="Custom Orders">
-            <span className="orders-tab-icon">📋</span>
-            <span className="orders-tab-label">O R D E R S</span>
-            {(gameState.pendingOrders.length + gameState.optionsPositions.length) > 0 && <span className="orders-tab-badge">{gameState.pendingOrders.length + gameState.optionsPositions.length}</span>}
-          </button>
-          <div className="sidebar">
-            <TradingPanel gameState={gameState} onBuy={handleBuy} onSell={handleSell} onShort={handleShort} onCover={handleCover} onTogglePin={handleTogglePin} onToggleStopLoss={handleToggleStopLoss} />
-          </div>
-        </aside>
-      </div>
     </div>
   );
 }

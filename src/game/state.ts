@@ -51,6 +51,7 @@ export function createInitialState(): GameState {
   return {
     day: 1,
     cash: 1000,
+    restaurantEarnings: 0,
     portfolio: [],
     shorts: [],
     monitors: [{ id: 0, channel: "stock_ticker", selectedStock: "MEGA" }],

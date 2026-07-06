@@ -129,6 +129,7 @@ export interface OptionsContract {
 export interface GameState {
   day: number;
   cash: number;
+  restaurantEarnings: number;
   portfolio: Position[];
   shorts: ShortPosition[];
   monitors: Monitor[];
