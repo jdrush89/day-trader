@@ -37,7 +37,9 @@ function App() {
         const active = document.activeElement;
         const tag = active?.tagName.toLowerCase();
         const isStockSearch = active?.classList.contains("stock-search-input");
+        const isStockNav = active?.closest(".stock-ticker-view") && tag === "button";
         if ((tag === "input" || tag === "select" || tag === "textarea") && !isStockSearch) return;
+        if (isStockNav) return;
         e.preventDefault();
         setGameState((prev) => ({
           ...prev,
