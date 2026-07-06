@@ -2273,10 +2273,27 @@ body {
 
 .institutional-order {
   display: flex;
-  justify-content: space-between;
   gap: 8px;
   font-size: 0.68rem;
   padding: 2px 0;
+}
+
+.institutional-order > span:nth-child(1) {
+  flex: 0 0 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.institutional-order > span:nth-child(2) {
+  flex: 0 0 80px;
+  text-align: center;
+  font-weight: bold;
+}
+
+.institutional-order > span:nth-child(3) {
+  flex: 1;
+  text-align: right;
 }
 
 .institutional-order.buy { color: var(--green); }

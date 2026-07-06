@@ -177,9 +177,26 @@ export function Monitor({ monitor, gameState, debugMode, paused, hasBloomberg, s
                       <div key={`${order.firm}-${order.symbol}-${index}`} className={`institutional-order ${order.side}`}>
                         <span>{order.firm}</span>
                         <span>{order.side === "buy" ? "BUY" : "SELL"} {order.symbol}</span>
-                        <span>{order.shares.toLocaleString()}</span>
+                        <span>{order.shares.toLocaleString()} shr</span>
                       </div>
                     ))}
+                    {debugMode && (
+                      <div className="debug-impact active" style={{ marginTop: 6 }}>
+                        <span className="debug-label">🔍 DEBUG</span>
+                        <span className="debug-desc">
+                          Dark pool orders are intel only — they signal institutional sentiment but don't directly move prices. Use as a leading indicator for your own trades.
+                          {" "}Net flow: {(() => {
+                            const bySymbol: Record<string, number> = {};
+                            for (const o of gameState.institutionalOrders) {
+                              bySymbol[o.symbol] = (bySymbol[o.symbol] || 0) + (o.side === "buy" ? o.shares : -o.shares);
+                            }
+                            return Object.entries(bySymbol).map(([sym, net]) =>
+                              `${sym}: ${net > 0 ? "+" : ""}${net.toLocaleString()} (${net > 0 ? "bullish" : "bearish"})`
+                            ).join(", ");
+                          })()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 {selectedStock && filteredStocks.some((s) => s.symbol === selectedStock.symbol) && (
