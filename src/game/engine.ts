@@ -1,4 +1,4 @@
-import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType, DailyPrice, InstitutionalOrder, Position } from "./types";
+import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType, DailyPrice, InstitutionalOrder, Position, OptionsContract } from "./types";
 import { STOCK_POOL, StockCandidate } from "./stock-pool";
 import { UPGRADE_POOL } from "./upgrades";
 
@@ -40,7 +40,7 @@ function getShortLiability(state: GameState): number {
 }
 
 function getNetWorth(state: GameState): number {
-  return state.cash + getPortfolioValue(state) + getShortCollateral(state) - getShortLiability(state);
+  return state.cash + getPortfolioValue(state) + getShortCollateral(state) - getShortLiability(state) + getOptionsValue(state);
 }
 
 export function getBuyingPower(state: GameState): number {
@@ -49,6 +49,218 @@ export function getBuyingPower(state: GameState): number {
   const portfolioValue = getPortfolioValue(state);
   const shortCollateral = getShortCollateral(state);
   return state.cash + (portfolioValue + shortCollateral) * 0.5 * marginStacks;
+}
+
+// --- Options Pricing (simplified Black-Scholes) ---
+
+function normalCDF(x: number): number {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429;
+  const p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  const t = 1 / (1 + p * Math.abs(x));
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x / 2);
+  return 0.5 * (1 + sign * y);
+}
+
+/** Estimate volatility from a stock's recent price history */
+function estimateVolatility(stock: Stock): number {
+  const prices = stock.dailyHistory.length > 1
+    ? stock.dailyHistory.slice(-30).map((d) => d.close)
+    : stock.history.length > 5
+    ? stock.history.slice(-50)
+    : [stock.price];
+  if (prices.length < 2) return 0.4; // default medium volatility
+  const returns: number[] = [];
+  for (let i = 1; i < prices.length; i++) {
+    if (prices[i - 1] > 0) returns.push(Math.log(prices[i] / prices[i - 1]));
+  }
+  if (returns.length === 0) return 0.4;
+  const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+  const variance = returns.reduce((sum, r) => sum + (r - mean) ** 2, 0) / returns.length;
+  // Annualize: multiply by sqrt(252 trading days)
+  return Math.max(0.15, Math.min(1.5, Math.sqrt(variance) * Math.sqrt(252)));
+}
+
+/** Calculate option premium using Black-Scholes model */
+export function calculateOptionPremium(
+  spotPrice: number,
+  strikePrice: number,
+  daysToExpiry: number,
+  type: "call" | "put",
+  volatility: number,
+): number {
+  const r = 0.05; // risk-free rate
+  const T = Math.max(daysToExpiry / 252, 0.004); // time in years (min ~1 day)
+  const sqrtT = Math.sqrt(T);
+  const d1 = (Math.log(spotPrice / strikePrice) + (r + volatility * volatility / 2) * T) / (volatility * sqrtT);
+  const d2 = d1 - volatility * sqrtT;
+
+  let premium: number;
+  if (type === "call") {
+    premium = spotPrice * normalCDF(d1) - strikePrice * Math.exp(-r * T) * normalCDF(d2);
+  } else {
+    premium = strikePrice * Math.exp(-r * T) * normalCDF(-d2) - spotPrice * normalCDF(-d1);
+  }
+
+  // Floor at intrinsic value
+  const intrinsic = type === "call"
+    ? Math.max(0, spotPrice - strikePrice)
+    : Math.max(0, strikePrice - spotPrice);
+  premium = Math.max(premium, intrinsic + 0.01);
+
+  return Math.round(premium * 100) / 100;
+}
+
+/** Get the current market value of an options contract */
+export function getOptionValue(contract: OptionsContract, stock: Stock, currentDay: number): number {
+  const daysLeft = Math.max(0, contract.expirationDay - currentDay);
+  if (daysLeft === 0) {
+    // At expiration, value is intrinsic only
+    const intrinsic = contract.type === "call"
+      ? Math.max(0, stock.price - contract.strikePrice)
+      : Math.max(0, contract.strikePrice - stock.price);
+    return intrinsic;
+  }
+  const vol = estimateVolatility(stock);
+  return calculateOptionPremium(stock.price, contract.strikePrice, daysLeft, contract.type, vol);
+}
+
+let optionIdCounter = 0;
+
+export function buyOption(
+  state: GameState,
+  symbol: string,
+  type: "call" | "put",
+  strikePrice: number,
+  expirationDays: number,
+  contracts: number,
+): GameState {
+  const stock = state.stocks.find((s) => s.symbol === symbol);
+  if (!stock || contracts <= 0 || expirationDays < 1 || expirationDays > 7) return state;
+  const vol = estimateVolatility(stock);
+  const premiumPerShare = calculateOptionPremium(stock.price, strikePrice, expirationDays, type, vol);
+  const totalCost = premiumPerShare * contracts * 100; // each contract = 100 shares
+  if (totalCost > getBuyingPower(state)) return state;
+
+  const option: OptionsContract = {
+    id: `opt-${++optionIdCounter}-${Date.now()}`,
+    symbol,
+    type,
+    strikePrice: Math.round(strikePrice * 100) / 100,
+    expirationDay: state.day + expirationDays,
+    premium: premiumPerShare,
+    contracts,
+    side: "long",
+    dayOpened: state.day,
+  };
+
+  return {
+    ...state,
+    cash: state.cash - totalCost,
+    optionsPositions: [...state.optionsPositions, option],
+    recentTrades: pushRecent(state.recentTrades, symbol),
+  };
+}
+
+export function sellOption(
+  state: GameState,
+  symbol: string,
+  type: "call" | "put",
+  strikePrice: number,
+  expirationDays: number,
+  contracts: number,
+): GameState {
+  const stock = state.stocks.find((s) => s.symbol === symbol);
+  if (!stock || contracts <= 0 || expirationDays < 1 || expirationDays > 7) return state;
+  const vol = estimateVolatility(stock);
+  const premiumPerShare = calculateOptionPremium(stock.price, strikePrice, expirationDays, type, vol);
+  const totalPremium = premiumPerShare * contracts * 100;
+  // Writing options requires collateral equal to the premium collected
+  const collateralRequired = totalPremium;
+  if (collateralRequired > getBuyingPower(state)) return state;
+
+  const option: OptionsContract = {
+    id: `opt-${++optionIdCounter}-${Date.now()}`,
+    symbol,
+    type,
+    strikePrice: Math.round(strikePrice * 100) / 100,
+    expirationDay: state.day + expirationDays,
+    premium: premiumPerShare,
+    contracts,
+    side: "short",
+    dayOpened: state.day,
+  };
+
+  return {
+    ...state,
+    cash: state.cash + totalPremium,
+    optionsPositions: [...state.optionsPositions, option],
+    recentTrades: pushRecent(state.recentTrades, symbol),
+  };
+}
+
+export function closeOption(state: GameState, optionId: string): GameState {
+  const option = state.optionsPositions.find((o) => o.id === optionId);
+  if (!option) return state;
+  const stock = state.stocks.find((s) => s.symbol === option.symbol);
+  if (!stock) return state;
+
+  const currentValue = getOptionValue(option, stock, state.day);
+  const valuePerContract = currentValue * 100;
+
+  let cashDelta: number;
+  if (option.side === "long") {
+    // Selling back a long option: receive current value
+    cashDelta = valuePerContract * option.contracts;
+  } else {
+    // Buying back a short option: pay current value
+    cashDelta = -valuePerContract * option.contracts;
+    if (state.cash + cashDelta < 0 && cashDelta < 0) return state; // can't afford buyback
+  }
+
+  return {
+    ...state,
+    cash: state.cash + cashDelta,
+    optionsPositions: state.optionsPositions.filter((o) => o.id !== optionId),
+  };
+}
+
+/** Process options at end of day — expire or exercise ITM options */
+function processOptionsExpiration(state: GameState): GameState {
+  const expiring = state.optionsPositions.filter((o) => o.expirationDay <= state.day);
+  const remaining = state.optionsPositions.filter((o) => o.expirationDay > state.day);
+
+  let cash = state.cash;
+  for (const option of expiring) {
+    const stock = state.stocks.find((s) => s.symbol === option.symbol);
+    if (!stock) continue;
+
+    const intrinsic = option.type === "call"
+      ? Math.max(0, stock.price - option.strikePrice)
+      : Math.max(0, option.strikePrice - stock.price);
+
+    const payout = intrinsic * option.contracts * 100;
+
+    if (option.side === "long") {
+      // Long options: receive intrinsic value (auto-exercise if ITM)
+      cash += payout;
+    } else {
+      // Short options: pay intrinsic value if ITM
+      cash -= payout;
+    }
+  }
+
+  return { ...state, cash, optionsPositions: remaining };
+}
+
+/** Get total options exposure for net worth calculation */
+export function getOptionsValue(state: GameState): number {
+  return state.optionsPositions.reduce((sum, option) => {
+    const stock = state.stocks.find((s) => s.symbol === option.symbol);
+    if (!stock) return sum;
+    const value = getOptionValue(option, stock, state.day) * option.contracts * 100;
+    return sum + (option.side === "long" ? value : -value);
+  }, 0);
 }
 
 function isTipSymbol(state: GameState, symbol: string): boolean {
@@ -440,30 +652,33 @@ export function tick(state: GameState): GameState {
   const postOrderState = processOrders({ ...workingState, stocks: newStocks, news: newNews, institutionalOrders });
 
   if (newTimeOfDay >= 100) {
-    const portfolioValue = postOrderState.portfolio.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return sum + (stock ? stock.price * pos.shares : 0); }, 0);
-    const shortLiability = postOrderState.shorts.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return sum + (stock ? stock.price * pos.shares : 0); }, 0);
-    const shortCollateral = postOrderState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
-    const cashBeforeBonuses = postOrderState.cash;
-    const dividends = hasUpgrade(postOrderState, "dividends") ? portfolioValue * 0.02 : 0;
-    const interest = hasUpgrade(postOrderState, "interest") ? cashBeforeBonuses * 0.005 : 0;
-    const staking = hasUpgrade(postOrderState, "staking") ? postOrderState.portfolio.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return stock && state.day - pos.dayAcquired >= 3 ? sum + stock.price * pos.shares * 0.01 : sum; }, 0) : 0;
-    const heldTags = hasUpgrade(postOrderState, "diversification") ? new Set(postOrderState.portfolio.flatMap((pos) => newStocks.find((s) => s.symbol === pos.symbol)?.tags ?? [])) : new Set<string>();
-    const netWorthBeforeBonuses = cashBeforeBonuses + portfolioValue + shortCollateral - shortLiability;
+    // Process options expiration first
+    const postOptionsState = processOptionsExpiration(postOrderState);
+    const portfolioValue = postOptionsState.portfolio.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return sum + (stock ? stock.price * pos.shares : 0); }, 0);
+    const shortLiability = postOptionsState.shorts.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return sum + (stock ? stock.price * pos.shares : 0); }, 0);
+    const shortCollateral = postOptionsState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
+    const optionsValue = getOptionsValue(postOptionsState);
+    const cashBeforeBonuses = postOptionsState.cash;
+    const dividends = hasUpgrade(postOptionsState, "dividends") ? portfolioValue * 0.02 : 0;
+    const interest = hasUpgrade(postOptionsState, "interest") ? cashBeforeBonuses * 0.005 : 0;
+    const staking = hasUpgrade(postOptionsState, "staking") ? postOptionsState.portfolio.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return stock && state.day - pos.dayAcquired >= 3 ? sum + stock.price * pos.shares * 0.01 : sum; }, 0) : 0;
+    const heldTags = hasUpgrade(postOptionsState, "diversification") ? new Set(postOptionsState.portfolio.flatMap((pos) => newStocks.find((s) => s.symbol === pos.symbol)?.tags ?? [])) : new Set<string>();
+    const netWorthBeforeBonuses = cashBeforeBonuses + portfolioValue + shortCollateral - shortLiability + optionsValue;
     const diversification = heldTags.size > 0 ? netWorthBeforeBonuses * 0.02 * heldTags.size : 0;
     let finalCash = cashBeforeBonuses + dividends + interest + staking + diversification;
     const dayFines = [];
 
-    if (postOrderState.insiderViewed && getViewedTipSymbols(postOrderState).length > 0) {
-      let totalInsiderProfit = postOrderState.insiderRealizedProfit;
-      for (const tipSymbol of getViewedTipSymbols(postOrderState)) {
+    if (postOptionsState.insiderViewed && getViewedTipSymbols(postOptionsState).length > 0) {
+      let totalInsiderProfit = postOptionsState.insiderRealizedProfit;
+      for (const tipSymbol of getViewedTipSymbols(postOptionsState)) {
         const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
         if (!tipStock) continue;
-        const currentPos = postOrderState.portfolio.find((p) => p.symbol === tipSymbol);
-        const snapPos = postOrderState.insiderSnapshotHoldings.find((p) => p.symbol === tipSymbol);
+        const currentPos = postOptionsState.portfolio.find((p) => p.symbol === tipSymbol);
+        const snapPos = postOptionsState.insiderSnapshotHoldings.find((p) => p.symbol === tipSymbol);
         const currentShares = currentPos?.shares ?? 0; const snapShares = snapPos?.shares ?? 0;
         if (currentPos && currentShares > snapShares) totalInsiderProfit += (tipStock.price - currentPos.avgCost) * (currentShares - snapShares);
-        const currentShort = postOrderState.shorts.find((p) => p.symbol === tipSymbol);
-        const snapShort = postOrderState.insiderSnapshotShorts.find((p) => p.symbol === tipSymbol);
+        const currentShort = postOptionsState.shorts.find((p) => p.symbol === tipSymbol);
+        const snapShort = postOptionsState.insiderSnapshotShorts.find((p) => p.symbol === tipSymbol);
         const currentShortShares = currentShort?.shares ?? 0; const snapShortShares = snapShort?.shares ?? 0;
         if (currentShort && currentShortShares > snapShortShares) totalInsiderProfit += (currentShort.entryPrice - tipStock.price) * (currentShortShares - snapShortShares);
       }
@@ -471,19 +686,19 @@ export function tick(state: GameState): GameState {
         const catchChance = Math.min(0.95, totalInsiderProfit / 3500 + 0.1);
         if (Math.random() < catchChance) {
           let fineAmount = Math.round(totalInsiderProfit * (2 + Math.random()) * 100) / 100;
-          if (hasUpgrade(postOrderState, "bail_out")) fineAmount *= 0.8;
+          if (hasUpgrade(postOptionsState, "bail_out")) fineAmount *= 0.8;
           fineAmount = Math.round(fineAmount * 100) / 100;
           finalCash -= fineAmount;
-          dayFines.push({ amount: fineAmount, symbol: getViewedTipSymbols(postOrderState).join("/"), profit: Math.round(totalInsiderProfit * 100) / 100, day: state.day });
+          dayFines.push({ amount: fineAmount, symbol: getViewedTipSymbols(postOptionsState).join("/"), profit: Math.round(totalInsiderProfit * 100) / 100, day: state.day });
         }
       }
     }
 
-    const finalNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability;
-    const completedDay = state.day; let gameOver = false; let goldenParachutes = postOrderState.goldenParachutes;
+    const finalNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
+    const completedDay = state.day; let gameOver = false; let goldenParachutes = postOptionsState.goldenParachutes;
     if (completedDay % 3 === 0) { const milestoneNum = completedDay / 3; const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1); gameOver = finalNetWorth < requiredNetWorth; if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; } }
-    const pendingOrders = hasUpgrade(postOrderState, "limit_order_pro") ? postOrderState.pendingOrders : [];
-    const endOfDayState: GameState = { ...postOrderState, day: state.day + 1, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOrderState.secFines, ...dayFines] : postOrderState.secFines, institutionalOrders: [] };
+    const pendingOrders = hasUpgrade(postOptionsState, "limit_order_pro") ? postOptionsState.pendingOrders : [];
+    const endOfDayState: GameState = { ...postOptionsState, day: state.day + 1, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [] };
     return gameOver ? endOfDayState : generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 

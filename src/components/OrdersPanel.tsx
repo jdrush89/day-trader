@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { GameState, OrderType, OrderSide, PendingOrder } from "../game/types";
+import { GameState, OrderType, OrderSide, PendingOrder, OptionsContract } from "../game/types";
+import { calculateOptionPremium, getOptionValue } from "../game/engine";
 
 interface OrdersPanelProps {
   gameState: GameState;
@@ -7,6 +8,9 @@ interface OrdersPanelProps {
   onClose: () => void;
   onPlaceOrder: (symbol: string, side: OrderSide, shares: number, orderType: OrderType, limitPrice?: number, stopPrice?: number) => void;
   onCancelOrder: (orderId: string) => void;
+  onBuyOption: (symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => void;
+  onSellOption: (symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => void;
+  onCloseOption: (optionId: string) => void;
 }
 
 function OrderForm({ gameState, onPlaceOrder }: { gameState: GameState; onPlaceOrder: OrdersPanelProps["onPlaceOrder"] }) {
@@ -106,6 +110,187 @@ function OrderForm({ gameState, onPlaceOrder }: { gameState: GameState; onPlaceO
   );
 }
 
+function OptionsForm({ gameState, onBuyOption, onSellOption }: {
+  gameState: GameState;
+  onBuyOption: OrdersPanelProps["onBuyOption"];
+  onSellOption: OrdersPanelProps["onSellOption"];
+}) {
+  const [symbol, setSymbol] = useState(gameState.stocks[0]?.symbol ?? "");
+  const [optionType, setOptionType] = useState<"call" | "put">("call");
+  const [strikeInput, setStrikeInput] = useState("");
+  const [daysInput, setDaysInput] = useState("1");
+  const [contractsInput, setContractsInput] = useState("1");
+
+  const stock = gameState.stocks.find((s) => s.symbol === symbol);
+  const strikePrice = parseFloat(strikeInput) || (stock ? Math.round(stock.price) : 0);
+  const days = Math.max(1, Math.min(7, parseInt(daysInput) || 1));
+  const contracts = Math.max(1, parseInt(contractsInput) || 1);
+
+  // Estimate volatility from daily history
+  const estimateVol = (s: GameState["stocks"][0]): number => {
+    const prices = s.dailyHistory.length > 1
+      ? s.dailyHistory.slice(-30).map((d) => d.close)
+      : s.history.length > 5 ? s.history.slice(-50) : [s.price];
+    if (prices.length < 2) return 0.4;
+    const returns: number[] = [];
+    for (let i = 1; i < prices.length; i++) {
+      if (prices[i - 1] > 0) returns.push(Math.log(prices[i] / prices[i - 1]));
+    }
+    if (returns.length === 0) return 0.4;
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((sum, r) => sum + (r - mean) ** 2, 0) / returns.length;
+    return Math.max(0.15, Math.min(1.5, Math.sqrt(variance) * Math.sqrt(252)));
+  };
+
+  const premium = stock
+    ? calculateOptionPremium(stock.price, strikePrice, days, optionType, estimateVol(stock))
+    : 0;
+  const totalCost = premium * contracts * 100;
+
+  const handleBuy = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stock || contracts <= 0) return;
+    onBuyOption(symbol, optionType, strikePrice, days, contracts);
+  };
+
+  const handleSell = () => {
+    if (!stock || contracts <= 0) return;
+    onSellOption(symbol, optionType, strikePrice, days, contracts);
+  };
+
+  // Generate strike price suggestions
+  const strikeOptions = stock ? [
+    Math.round(stock.price * 0.85 * 100) / 100,
+    Math.round(stock.price * 0.90 * 100) / 100,
+    Math.round(stock.price * 0.95 * 100) / 100,
+    Math.round(stock.price * 100) / 100,
+    Math.round(stock.price * 1.05 * 100) / 100,
+    Math.round(stock.price * 1.10 * 100) / 100,
+    Math.round(stock.price * 1.15 * 100) / 100,
+  ] : [];
+
+  return (
+    <form className="order-form options-form" onSubmit={handleBuy}>
+      <div className="order-form-row">
+        <select value={symbol} onChange={(e) => { setSymbol(e.target.value); setStrikeInput(""); }} className="order-select">
+          {gameState.stocks.map((s) => (
+            <option key={s.symbol} value={s.symbol}>{s.symbol} — ${s.price.toFixed(2)}</option>
+          ))}
+        </select>
+        <select value={optionType} onChange={(e) => setOptionType(e.target.value as "call" | "put")} className="order-select">
+          <option value="call">📈 Call</option>
+          <option value="put">📉 Put</option>
+        </select>
+      </div>
+      <div className="order-form-row">
+        <div className="option-field">
+          <label className="option-label">Strike $</label>
+          <select
+            value={strikeInput || (stock ? Math.round(stock.price).toString() : "")}
+            onChange={(e) => setStrikeInput(e.target.value)}
+            className="order-select"
+          >
+            {strikeOptions.map((s) => (
+              <option key={s} value={s}>
+                ${s.toFixed(2)} {stock && s < stock.price ? "(ITM)" : stock && s > stock.price ? "(OTM)" : "(ATM)"}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <div className="order-form-row">
+        <div className="option-field">
+          <label className="option-label">Expiry</label>
+          <select value={daysInput} onChange={(e) => setDaysInput(e.target.value)} className="order-select">
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+              <option key={d} value={d}>{d} day{d > 1 ? "s" : ""}</option>
+            ))}
+          </select>
+        </div>
+        <div className="option-field">
+          <label className="option-label">Contracts</label>
+          <input
+            type="number"
+            min="1"
+            value={contractsInput}
+            onChange={(e) => setContractsInput(e.target.value)}
+            className="order-input"
+          />
+        </div>
+      </div>
+      <div className="option-premium-display">
+        <div className="option-premium-row">
+          <span>Premium per share:</span>
+          <span className="option-premium-value">${premium.toFixed(2)}</span>
+        </div>
+        <div className="option-premium-row">
+          <span>Total cost ({contracts} × 100 shares):</span>
+          <span className="option-premium-value">${totalCost.toFixed(2)}</span>
+        </div>
+      </div>
+      <div className="option-action-buttons">
+        <button type="submit" className="order-submit option-buy" disabled={totalCost > gameState.cash}>
+          Buy {optionType === "call" ? "Call" : "Put"}
+        </button>
+        <button type="button" className="order-submit option-write" onClick={handleSell} disabled={totalCost > gameState.cash}>
+          Write {optionType === "call" ? "Call" : "Put"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function OptionsPositionsList({ positions, stocks, currentDay, onClose }: {
+  positions: OptionsContract[];
+  stocks: GameState["stocks"];
+  currentDay: number;
+  onClose: (id: string) => void;
+}) {
+  if (positions.length === 0) return <div className="empty">No options positions</div>;
+
+  return (
+    <div className="pending-orders-list">
+      {positions.map((opt) => {
+        const stock = stocks.find((s) => s.symbol === opt.symbol);
+        const currentValue = stock ? getOptionValue(opt, stock, currentDay) : 0;
+        const costBasis = opt.premium;
+        const pnl = opt.side === "long"
+          ? (currentValue - costBasis) * opt.contracts * 100
+          : (costBasis - currentValue) * opt.contracts * 100;
+        const daysLeft = opt.expirationDay - currentDay;
+        const isITM = stock
+          ? opt.type === "call" ? stock.price > opt.strikePrice : stock.price < opt.strikePrice
+          : false;
+
+        return (
+          <div key={opt.id} className="pending-order-row option-position-row">
+            <div className="option-pos-top">
+              <span className={`order-side ${opt.side === "long" ? "buy" : "short"}`}>
+                {opt.side === "long" ? "LONG" : "SHORT"}
+              </span>
+              <span className={`option-type-badge ${opt.type}`}>
+                {opt.type === "call" ? "CALL" : "PUT"}
+              </span>
+              <span className="order-detail">{opt.contracts}× {opt.symbol}</span>
+              <button className="order-cancel-btn" onClick={() => onClose(opt.id)}>
+                {opt.side === "long" ? "Sell" : "Buy Back"}
+              </button>
+            </div>
+            <div className="option-pos-details">
+              <span>Strike: ${opt.strikePrice.toFixed(2)}</span>
+              <span className={isITM ? "up" : "down"}>{isITM ? "ITM" : "OTM"}</span>
+              <span>{daysLeft}d left</span>
+              <span className={pnl >= 0 ? "up" : "down"}>
+                {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function PendingOrdersList({ orders, stocks, onCancel }: { orders: PendingOrder[]; stocks: GameState["stocks"]; onCancel: (id: string) => void }) {
   if (orders.length === 0) return <div className="empty">No pending orders</div>;
 
@@ -137,23 +322,50 @@ function PendingOrdersList({ orders, stocks, onCancel }: { orders: PendingOrder[
   );
 }
 
-export function OrdersPanel({ gameState, open, onClose, onPlaceOrder, onCancelOrder }: OrdersPanelProps) {
+export function OrdersPanel({ gameState, open, onClose, onPlaceOrder, onCancelOrder, onBuyOption, onSellOption, onCloseOption }: OrdersPanelProps) {
+  const [tab, setTab] = useState<"orders" | "options">("orders");
+
   return (
     <div className={`orders-flyout ${open ? "open" : ""}`}>
       <div className="orders-flyout-header">
-        <h3>📋 Custom Orders</h3>
+        <h3>📋 {tab === "orders" ? "Custom Orders" : "Options"}</h3>
         <button className="orders-flyout-close" onClick={onClose}>✕</button>
       </div>
+      <div className="orders-tab-bar">
+        <button className={`orders-tab-btn ${tab === "orders" ? "active" : ""}`} onClick={() => setTab("orders")}>
+          Orders
+        </button>
+        <button className={`orders-tab-btn ${tab === "options" ? "active" : ""}`} onClick={() => setTab("options")}>
+          Options {gameState.optionsPositions.length > 0 && <span className="tab-badge">{gameState.optionsPositions.length}</span>}
+        </button>
+      </div>
       <div className="orders-flyout-content">
-        <OrderForm gameState={gameState} onPlaceOrder={onPlaceOrder} />
-        <div className="pending-orders">
-          <h4>Pending ({gameState.pendingOrders.length})</h4>
-          <PendingOrdersList
-            orders={gameState.pendingOrders}
-            stocks={gameState.stocks}
-            onCancel={onCancelOrder}
-          />
-        </div>
+        {tab === "orders" ? (
+          <>
+            <OrderForm gameState={gameState} onPlaceOrder={onPlaceOrder} />
+            <div className="pending-orders">
+              <h4>Pending ({gameState.pendingOrders.length})</h4>
+              <PendingOrdersList
+                orders={gameState.pendingOrders}
+                stocks={gameState.stocks}
+                onCancel={onCancelOrder}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <OptionsForm gameState={gameState} onBuyOption={onBuyOption} onSellOption={onSellOption} />
+            <div className="pending-orders">
+              <h4>Positions ({gameState.optionsPositions.length})</h4>
+              <OptionsPositionsList
+                positions={gameState.optionsPositions}
+                stocks={gameState.stocks}
+                currentDay={gameState.day}
+                onClose={onCloseOption}
+              />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

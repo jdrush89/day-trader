@@ -79,5 +79,6 @@ export function createInitialState(): GameState {
     recentTrades: [],
     pinnedStocks: [],
     institutionalOrders: [],
+    optionsPositions: [],
   };
 }

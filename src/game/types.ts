@@ -114,6 +114,18 @@ export interface InstitutionalOrder {
   shares: number;
 }
 
+export interface OptionsContract {
+  id: string;
+  symbol: string;
+  type: "call" | "put";
+  strikePrice: number;
+  expirationDay: number;
+  premium: number;
+  contracts: number;
+  side: "long" | "short";
+  dayOpened: number;
+}
+
 export interface GameState {
   day: number;
   cash: number;
@@ -145,4 +157,5 @@ export interface GameState {
   recentTrades: string[];
   pinnedStocks: string[];
   institutionalOrders: InstitutionalOrder[];
+  optionsPositions: OptionsContract[];
 }

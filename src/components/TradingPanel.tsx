@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { GameState } from "../game/types";
-import { getMilestone, getBuyingPower, hasUpgrade } from "../game/engine";
+import { getMilestone, getBuyingPower, hasUpgrade, getOptionsValue } from "../game/engine";
 import { UPGRADE_POOL } from "../game/upgrades";
 
 interface TradingPanelProps {
@@ -24,7 +24,8 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTog
     return sum + (stock ? stock.price * pos.shares : 0);
   }, 0);
   const shortCollateral = gameState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
-  const netWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability;
+  const optionsValue = getOptionsValue(gameState);
+  const netWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability + optionsValue;
   const buyingPower = getBuyingPower(gameState);
   const marginActive = buyingPower > gameState.cash + 0.01;
   const milestone = getMilestone(gameState.day);

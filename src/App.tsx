@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue } from "./game/engine";
 import { UPGRADE_POOL } from "./game/upgrades";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
@@ -82,6 +82,15 @@ function App() {
     setGameState((prev) => placeOrder(prev, symbol, side, shares, orderType, limitPrice, stopPrice));
   }, []);
   const handleCancelOrder = useCallback((orderId: string) => setGameState((prev) => cancelOrder(prev, orderId)), []);
+  const handleBuyOption = useCallback((symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => {
+    setGameState((prev) => buyOption(prev, symbol, type, strike, days, contracts));
+  }, []);
+  const handleSellOption = useCallback((symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => {
+    setGameState((prev) => sellOption(prev, symbol, type, strike, days, contracts));
+  }, []);
+  const handleCloseOption = useCallback((optionId: string) => {
+    setGameState((prev) => closeOption(prev, optionId));
+  }, []);
 
   const handleNewDay = useCallback(() => {
     if (gameState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
@@ -201,7 +210,8 @@ function App() {
           return sum + (stock ? stock.price * pos.shares : 0);
         }, 0);
         const shortCollateral = gameState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
-        const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability;
+        const optionsVal = getOptionsValue(gameState);
+        const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability + optionsVal;
         const dailyPnL = currentNetWorth - gameState.dayStartNetWorth;
         const completedDay = gameState.day - 1;
         const milestone = completedDay % 3 === 0 ? getMilestone(completedDay) : null;
@@ -321,11 +331,11 @@ function App() {
           ))}
         </div>
         <aside className="sidebar-area">
-          <OrdersPanel gameState={gameState} open={ordersOpen} onClose={() => setOrdersOpen(false)} onPlaceOrder={handlePlaceOrder} onCancelOrder={handleCancelOrder} />
+          <OrdersPanel gameState={gameState} open={ordersOpen} onClose={() => setOrdersOpen(false)} onPlaceOrder={handlePlaceOrder} onCancelOrder={handleCancelOrder} onBuyOption={handleBuyOption} onSellOption={handleSellOption} onCloseOption={handleCloseOption} />
           <button className={`orders-tab-strip ${ordersOpen ? "active" : ""}`} onClick={() => setOrdersOpen((o) => !o)} title="Custom Orders">
             <span className="orders-tab-icon">📋</span>
             <span className="orders-tab-label">O R D E R S</span>
-            {gameState.pendingOrders.length > 0 && <span className="orders-tab-badge">{gameState.pendingOrders.length}</span>}
+            {(gameState.pendingOrders.length + gameState.optionsPositions.length) > 0 && <span className="orders-tab-badge">{gameState.pendingOrders.length + gameState.optionsPositions.length}</span>}
           </button>
           <div className="sidebar">
             <TradingPanel gameState={gameState} onBuy={handleBuy} onSell={handleSell} onShort={handleShort} onCover={handleCover} onTogglePin={handleTogglePin} onToggleStopLoss={handleToggleStopLoss} />
