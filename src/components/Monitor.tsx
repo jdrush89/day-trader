@@ -34,7 +34,10 @@ export function Monitor({ monitor, gameState, debugMode, paused, hasBloomberg, s
 
   useEffect(() => { if (monitor.channel === "stock_ticker" && searchRef.current) searchRef.current.focus(); if (monitor.channel !== "stock_ticker") setSearchQuery(""); }, [monitor.channel]);
 
-  const filteredStocks = gameState.stocks.filter((s) => s.symbol.toLowerCase().startsWith(searchQuery.toLowerCase()));
+  const filteredStocks = gameState.stocks.filter((s) => {
+    const q = searchQuery.toLowerCase();
+    return s.symbol.toLowerCase().startsWith(q) || s.tags.some((t) => t.toLowerCase().startsWith(q));
+  });
 
   useEffect(() => { if (monitor.channel !== "stock_ticker" || filteredStocks.length === 0) return; const currentVisible = filteredStocks.some((s) => s.symbol === monitor.selectedStock); if (!currentVisible) onSelectStock(monitor.id, filteredStocks[0].symbol); }, [searchQuery, filteredStocks, monitor.channel, monitor.selectedStock, monitor.id, onSelectStock]);
 
