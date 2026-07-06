@@ -1535,6 +1535,14 @@ body {
   color: var(--red);
 }
 
+.option-strike-preview {
+  font-size: 0.6rem;
+  color: var(--accent);
+  white-space: nowrap;
+  min-width: 60px;
+  text-align: right;
+}
+
 .option-pos-details {
   display: flex;
   gap: 6px;

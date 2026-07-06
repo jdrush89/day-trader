@@ -117,16 +117,16 @@ function OptionsForm({ gameState, onBuyOption, onSellOption }: {
 }) {
   const [symbol, setSymbol] = useState(gameState.stocks[0]?.symbol ?? "");
   const [optionType, setOptionType] = useState<"call" | "put">("call");
-  const [strikeInput, setStrikeInput] = useState("");
+  const [strikeOffset, setStrikeOffset] = useState("0");
   const [daysInput, setDaysInput] = useState("1");
   const [contractsInput, setContractsInput] = useState("1");
 
   const stock = gameState.stocks.find((s) => s.symbol === symbol);
-  const strikePrice = parseFloat(strikeInput) || (stock ? Math.round(stock.price) : 0);
+  const offsetPct = parseFloat(strikeOffset) || 0;
+  const strikePrice = stock ? Math.round(stock.price * (1 + offsetPct / 100) * 100) / 100 : 0;
   const days = Math.max(1, Math.min(7, parseInt(daysInput) || 1));
   const contracts = Math.max(1, parseInt(contractsInput) || 1);
 
-  // Estimate volatility from daily history
   const estimateVol = (s: GameState["stocks"][0]): number => {
     const prices = s.dailyHistory.length > 1
       ? s.dailyHistory.slice(-30).map((d) => d.close)
@@ -158,21 +158,20 @@ function OptionsForm({ gameState, onBuyOption, onSellOption }: {
     onSellOption(symbol, optionType, strikePrice, days, contracts);
   };
 
-  // Generate strike price suggestions
-  const strikeOptions = stock ? [
-    Math.round(stock.price * 0.85 * 100) / 100,
-    Math.round(stock.price * 0.90 * 100) / 100,
-    Math.round(stock.price * 0.95 * 100) / 100,
-    Math.round(stock.price * 100) / 100,
-    Math.round(stock.price * 1.05 * 100) / 100,
-    Math.round(stock.price * 1.10 * 100) / 100,
-    Math.round(stock.price * 1.15 * 100) / 100,
-  ] : [];
+  const STRIKE_OFFSETS = [
+    { value: "-15", label: "-15% (Deep ITM)", itmLabel: "call" },
+    { value: "-10", label: "-10% (ITM)" },
+    { value: "-5", label: "-5% (Slight ITM)" },
+    { value: "0", label: "ATM (At the Money)" },
+    { value: "5", label: "+5% (Slight OTM)" },
+    { value: "10", label: "+10% (OTM)" },
+    { value: "15", label: "+15% (Deep OTM)" },
+  ];
 
   return (
     <form className="order-form options-form" onSubmit={handleBuy}>
       <div className="order-form-row">
-        <select value={symbol} onChange={(e) => { setSymbol(e.target.value); setStrikeInput(""); }} className="order-select">
+        <select value={symbol} onChange={(e) => setSymbol(e.target.value)} className="order-select">
           {gameState.stocks.map((s) => (
             <option key={s.symbol} value={s.symbol}>{s.symbol} — ${s.price.toFixed(2)}</option>
           ))}
@@ -184,19 +183,20 @@ function OptionsForm({ gameState, onBuyOption, onSellOption }: {
       </div>
       <div className="order-form-row">
         <div className="option-field">
-          <label className="option-label">Strike $</label>
+          <label className="option-label">Strike</label>
           <select
-            value={strikeInput || (stock ? Math.round(stock.price).toString() : "")}
-            onChange={(e) => setStrikeInput(e.target.value)}
+            value={strikeOffset}
+            onChange={(e) => setStrikeOffset(e.target.value)}
             className="order-select"
           >
-            {strikeOptions.map((s) => (
-              <option key={s} value={s}>
-                ${s.toFixed(2)} {stock && s < stock.price ? "(ITM)" : stock && s > stock.price ? "(OTM)" : "(ATM)"}
-              </option>
+            {STRIKE_OFFSETS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
             ))}
           </select>
         </div>
+        {stock && (
+          <span className="option-strike-preview">≈ ${strikePrice.toFixed(2)}</span>
+        )}
       </div>
       <div className="order-form-row">
         <div className="option-field">
