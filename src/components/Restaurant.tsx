@@ -91,22 +91,27 @@ function renderStepInstruction(order: ActiveOrder) {
   if (step.type === "grill" || step.type === "fry") {
     const rawPct = (order.prepProgress / step.duration) * 100;
     const progressPct = Math.min(130, rawPct);
-    const flipPct = step.type === "grill" && step.flipAt != null ? (step.flipAt / step.duration) * 100 : null;
+    const flipZone = step.type === "grill" && step.flipAt != null
+      ? { left: ((step.flipAt - step.flipWindow) / step.duration) * 100, width: ((step.flipWindow * 2) / step.duration) * 100 }
+      : null;
     const flipReady =
       step.type === "grill" &&
       step.flipAt != null &&
       !order.flipped &&
-      Math.abs(order.prepProgress - step.flipAt) <= step.flipWindow;
+      order.prepStarted &&
+      order.prepProgress >= step.flipAt - step.flipWindow &&
+      order.prepProgress <= step.flipAt + step.flipWindow;
     const readyToPlate = order.prepProgress >= step.duration;
     const inBurnZone = rawPct > 100 && rawPct <= 130;
     const burnTimeLeft = (step.duration * 1.3 - order.prepProgress) / 20;
+    const pastFlipZone = step.type === "grill" && step.flipAt != null && !order.flipped && order.prepProgress > step.flipAt + step.flipWindow;
 
     return (
       <div className="restaurant-step-card">
         <div className="restaurant-step-title">{step.label}</div>
         <div className="restaurant-step-copy">
           {!order.prepStarted && "Press G to start cooking."}
-          {order.prepStarted && step.type === "grill" && !order.flipped && !flipReady && !readyToPlate && "Watch the grill and flip on time."}
+          {order.prepStarted && step.type === "grill" && !order.flipped && !flipReady && !pastFlipZone && !readyToPlate && "Watch the grill and flip on time."}
           {flipReady && "Press F now to flip!"}
           {order.burnt && "🔥 Burnt! This order is lost."}
           {inBurnZone && !order.burnt && `⚠️ Remove NOW! Burns in ${burnTimeLeft.toFixed(1)}s`}
@@ -117,7 +122,9 @@ function renderStepInstruction(order: ActiveOrder) {
           <div className="cook-meter-fill" style={{ width: `${Math.min(100, progressPct)}%` }} />
           <div className="cook-meter-burn-zone" />
           {inBurnZone && <div className="cook-meter-burn-fill" style={{ width: `${((rawPct - 100) / 30) * 100}%` }} />}
-          {flipPct != null && <div className="cook-meter-flip" style={{ left: `${flipPct}%` }} />}
+          {flipZone && !order.flipped && (
+            <div className={`cook-meter-flip-zone ${flipReady ? "active" : ""}`} style={{ left: `${Math.max(0, flipZone.left)}%`, width: `${flipZone.width}%` }} />
+          )}
         </div>
         <div className="cook-meta">
           <span>{(order.prepProgress / 20).toFixed(1)}s / {(step.duration / 20).toFixed(1)}s</span>

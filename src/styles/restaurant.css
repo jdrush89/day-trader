@@ -345,13 +345,20 @@
   background: linear-gradient(90deg, #64c5ff, #7affc1);
 }
 
-.cook-meter-flip {
+.cook-meter-flip-zone {
   position: absolute;
-  top: -2px;
-  bottom: -2px;
-  width: 2px;
-  background: var(--green);
-  box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 255, 136, 0.15);
+  border-left: 2px solid rgba(0, 255, 136, 0.4);
+  border-right: 2px solid rgba(0, 255, 136, 0.4);
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.cook-meter-flip-zone.active {
+  background: rgba(0, 255, 136, 0.35);
+  box-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
 }
 
 .cook-meter-burn-zone {
