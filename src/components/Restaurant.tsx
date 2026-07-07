@@ -134,26 +134,24 @@ function renderStepInstruction(order: ActiveOrder) {
   const assembleStep = step as Extract<OrderStep, { type: "assemble" }>;
   const wanted = order.customizations[order.currentStepIndex];
   const activeIdx = wanted ? nextWantedIndex(order, order.assembleIndex) : order.assembleIndex;
-  const hasCustomization = wanted && wanted.some((w) => !w);
 
   return (
     <div className="restaurant-step-card">
       <div className="restaurant-step-title">{assembleStep.label}</div>
       <div className="restaurant-step-copy">
-        {hasCustomization ? "Press wanted ingredients — skip the ❌ ones!" : "Press the highlighted ingredients in order."}
+        Press the highlighted ingredients in order.
         {!order.orderCorrect && <span className="order-incorrect-badge"> ⚠️ Wrong ingredient added!</span>}
       </div>
       <div className="ingredient-sequence">
-        {assembleStep.ingredients.map((ingredient, index) => {
+        {assembleStep.ingredients.map((ing, index) => {
           const isWanted = !wanted || wanted[index];
           const done = isWanted && index < activeIdx;
           const skipped = !isWanted && index < activeIdx;
           const active = isWanted && index === activeIdx;
           return (
-            <div key={`${ingredient.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${active ? "active" : ""} ${!isWanted ? "unwanted" : ""} ${skipped ? "skipped" : ""}`}>
-              <span className="keycap">{ingredient.key.toUpperCase()}</span>
-              <span>{ingredient.name}</span>
-              {!isWanted && <span className="unwanted-badge">❌</span>}
+            <div key={`${ing.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${active ? "active" : ""} ${skipped ? "skipped" : ""}`}>
+              <span className="keycap">{ing.key.toUpperCase()}</span>
+              <span>{ing.name}</span>
             </div>
           );
         })}
@@ -202,7 +200,21 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
         return;
       }
 
-      if (event.key === "Enter" || /^[a-zA-Z]$/.test(event.key)) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        setRestaurantState((prev) => {
+          if (!prev) return prev;
+          // If active order is completed, Enter serves it
+          const activeSlotIdx = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
+          const active = activeSlotIdx >= 0 ? prev.orderSlots[activeSlotIdx] : null;
+          if (active?.completed) return serveOrder(prev, activeSlotIdx);
+          // Otherwise pass Enter to the step handler (e.g., take off grill)
+          return handleKeyPress(prev, event.key);
+        });
+        return;
+      }
+
+      if (/^[a-zA-Z]$/.test(event.key)) {
         event.preventDefault();
         setRestaurantState((prev) => (prev ? handleKeyPress(prev, event.key) : prev));
       }
@@ -341,7 +353,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
               ) : activeOrder.completed ? (
                 <div className="restaurant-step-card success-card">
                   <div className="restaurant-step-title">Order ready!</div>
-                  <div className="restaurant-step-copy">Press {state.orderSlots.findIndex((slot) => slot?.id === activeOrder.id) + 1} or click the ticket to serve it.</div>
+                  <div className="restaurant-step-copy">Press Enter, {state.orderSlots.findIndex((slot) => slot?.id === activeOrder.id) + 1}, or click the ticket to serve.</div>
                 </div>
               ) : (
                 renderStepInstruction(activeOrder)

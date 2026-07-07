@@ -14,7 +14,7 @@ const ORDER_INTERVAL_MIN = 8;
 const ORDER_INTERVAL_MAX = 15;
 const DEFAULT_FLIP_WINDOW = Math.round(TICKS_PER_SECOND * 0.75);
 
-const ingredient = (name: string, key: string): AssembleIngredient => ({ name, key });
+const ingredient = (name: string, key: string, essential?: boolean): AssembleIngredient => ({ name, key, ...(essential ? { essential: true } : {}) });
 const secondsToTicks = (seconds: number): number => Math.round(seconds * TICKS_PER_SECOND);
 
 export const MENU: MenuItem[] = [
@@ -25,7 +25,7 @@ export const MENU: MenuItem[] = [
     patience: 45,
     steps: [
       { type: "grill", label: "Grill patty", duration: secondsToTicks(8), flipAt: secondsToTicks(4), flipWindow: DEFAULT_FLIP_WINDOW },
-      { type: "assemble", label: "Build burger", ingredients: [ingredient("Bun", "b"), ingredient("Patty", "p"), ingredient("Lettuce", "l"), ingredient("Tomato", "t"), ingredient("Ketchup", "k"), ingredient("Top bun", "b")] },
+      { type: "assemble", label: "Build burger", ingredients: [ingredient("Bun", "b", true), ingredient("Patty", "p", true), ingredient("Lettuce", "l"), ingredient("Tomato", "t"), ingredient("Ketchup", "k"), ingredient("Top bun", "b", true)] },
     ],
   },
   {
@@ -35,7 +35,7 @@ export const MENU: MenuItem[] = [
     patience: 50,
     steps: [
       { type: "grill", label: "Grill chicken", duration: secondsToTicks(10), flipAt: secondsToTicks(5), flipWindow: DEFAULT_FLIP_WINDOW },
-      { type: "assemble", label: "Stack sandwich", ingredients: [ingredient("Bun", "b"), ingredient("Chicken", "c"), ingredient("Lettuce", "l"), ingredient("Mayo", "m"), ingredient("Top bun", "b")] },
+      { type: "assemble", label: "Stack sandwich", ingredients: [ingredient("Bun", "b", true), ingredient("Chicken", "c", true), ingredient("Lettuce", "l"), ingredient("Mayo", "m"), ingredient("Top bun", "b", true)] },
     ],
   },
   {
@@ -55,7 +55,7 @@ export const MENU: MenuItem[] = [
     patience: 35,
     steps: [
       { type: "chop", label: "Chop veggies", target: 8 },
-      { type: "assemble", label: "Toss salad", ingredients: [ingredient("Lettuce", "l"), ingredient("Tomato", "t"), ingredient("Cucumber", "c"), ingredient("Onion", "o"), ingredient("Dressing", "d")] },
+      { type: "assemble", label: "Toss salad", ingredients: [ingredient("Lettuce", "l", true), ingredient("Tomato", "t"), ingredient("Cucumber", "c"), ingredient("Onion", "o"), ingredient("Dressing", "d", true)] },
     ],
   },
   {
@@ -86,7 +86,7 @@ export const MENU: MenuItem[] = [
     steps: [
       { type: "grill", label: "Grill fish", duration: secondsToTicks(8), flipAt: secondsToTicks(4), flipWindow: DEFAULT_FLIP_WINDOW },
       { type: "chop", label: "Prep slaw", target: 6 },
-      { type: "assemble", label: "Build tacos", ingredients: [ingredient("Tortilla", "t"), ingredient("Fish", "f"), ingredient("Slaw", "s"), ingredient("Lime", "l"), ingredient("Sauce", "a")] },
+      { type: "assemble", label: "Build tacos", ingredients: [ingredient("Tortilla", "t", true), ingredient("Fish", "f", true), ingredient("Slaw", "s"), ingredient("Lime", "l"), ingredient("Sauce", "a")] },
     ],
   },
   {
@@ -131,10 +131,9 @@ function createOrder(menuItem: MenuItem, id: number): ActiveOrder {
     if (step.type !== "assemble") return;
     const ings = step.ingredients;
     const wanted = ings.map(() => true);
-    // 35% chance this order has customizations, only if 4+ ingredients
-    if (ings.length >= 4 && Math.random() < 0.35) {
-      // Remove 1-2 optional ingredients (skip first and last — structural like buns)
-      const optionalIndices = ings.map((_, i) => i).filter((i) => i > 0 && i < ings.length - 1);
+    // 35% chance this order has customizations, only if non-essential optional ingredients exist
+    const optionalIndices = ings.map((_, i) => i).filter((i) => !ings[i].essential);
+    if (optionalIndices.length >= 1 && Math.random() < 0.35) {
       const removeCount = Math.min(optionalIndices.length, Math.random() < 0.7 ? 1 : 2);
       const shuffled = optionalIndices.sort(() => Math.random() - 0.5);
       for (let r = 0; r < removeCount; r++) {

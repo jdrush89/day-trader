@@ -3,6 +3,7 @@ export type StepType = "grill" | "fry" | "chop" | "mix" | "assemble";
 export interface AssembleIngredient {
   name: string;
   key: string;
+  essential?: boolean; // cannot be removed by customization
 }
 
 export interface PrepStep {
