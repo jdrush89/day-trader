@@ -10,7 +10,6 @@ import { generateDraftOptions, generateUpgradeDraft, getNetWorth } from "./engin
 
 const TICKS_PER_SECOND = 20;
 const SHIFT_DURATION_SECONDS = 180;
-const MAX_QUEUE_SIZE = 5;
 const ORDER_INTERVAL_MIN = 8;
 const ORDER_INTERVAL_MAX = 15;
 const DEFAULT_FLIP_WINDOW = Math.round(TICKS_PER_SECOND * 0.75);
@@ -148,22 +147,25 @@ function createOrder(menuItem: MenuItem, id: number): ActiveOrder {
 }
 
 function replaceOrder(state: RestaurantState, updatedOrder: ActiveOrder, nextActiveOrderId: number | null = state.activeOrderId): RestaurantState {
-  const orderQueue = state.orderQueue.map((order) => (order.id === updatedOrder.id ? updatedOrder : order));
-  const activeStillValid = orderQueue.some((order) => order.id === nextActiveOrderId && !order.failed && !order.served);
+  const orderSlots = state.orderSlots.map((slot) => (slot && slot.id === updatedOrder.id ? updatedOrder : slot));
+  const activeStillValid = orderSlots.some((slot) => slot && slot.id === nextActiveOrderId && !slot.failed && !slot.served);
   return {
     ...state,
-    orderQueue,
+    orderSlots,
     activeOrderId: activeStillValid ? nextActiveOrderId : null,
   };
 }
 
 function spawnOrder(state: RestaurantState): RestaurantState {
-  if (state.orderQueue.length >= MAX_QUEUE_SIZE || state.shiftOver) return state;
+  const emptyIdx = state.orderSlots.findIndex((slot) => slot === null);
+  if (emptyIdx === -1 || state.shiftOver) return state;
   const menuItem = MENU[Math.floor(Math.random() * MENU.length)];
   const order = createOrder(menuItem, state.orderIdCounter);
+  const orderSlots = [...state.orderSlots];
+  orderSlots[emptyIdx] = order;
   return {
     ...state,
-    orderQueue: [...state.orderQueue, order],
+    orderSlots,
     orderIdCounter: state.orderIdCounter + 1,
     nextOrderTimer: randomOrderInterval(),
   };
@@ -236,7 +238,7 @@ function updateOrderTick(order: ActiveOrder, dt: number): ActiveOrder {
 export function createRestaurantState(): RestaurantState {
   const baseState: RestaurantState = {
     shiftActive: true,
-    orderQueue: [],
+    orderSlots: [null, null, null, null, null],
     activeOrderId: null,
     completedOrders: 0,
     totalEarnings: 0,
@@ -255,12 +257,19 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
 
   const shiftTimeRemaining = Math.max(0, state.shiftTimeRemaining - dt);
   const shiftOver = shiftTimeRemaining <= 0;
-  const orderQueue = state.orderQueue.map((order) => updateOrderTick(order, dt)).filter((order) => !order.failed);
-  const activeStillValid = orderQueue.some((order) => order.id === state.activeOrderId && !order.failed && !order.served);
+  // Update each slot: tick active orders, null out failed ones to free the slot
+  const orderSlots = state.orderSlots.map((slot) => {
+    if (!slot) return null;
+    const updated = updateOrderTick(slot, dt);
+    if (updated.failed) return null; // free the slot
+    return updated;
+  });
+  const activeStillValid = orderSlots.some((slot) => slot && slot.id === state.activeOrderId && !slot.failed && !slot.served);
+  const hasEmptySlot = orderSlots.some((slot) => slot === null);
 
   let nextState: RestaurantState = {
     ...state,
-    orderQueue,
+    orderSlots,
     activeOrderId: activeStillValid ? state.activeOrderId : null,
     shiftTimeRemaining,
     shiftActive: !shiftOver,
@@ -268,7 +277,7 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
     nextOrderTimer: Math.max(0, state.nextOrderTimer - dt),
   };
 
-  if (!shiftOver && nextState.orderQueue.length < MAX_QUEUE_SIZE && nextState.nextOrderTimer <= 0) {
+  if (!shiftOver && hasEmptySlot && nextState.nextOrderTimer <= 0) {
     nextState = spawnOrder(nextState);
   }
 
@@ -276,7 +285,7 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
 }
 
 export function acceptOrder(state: RestaurantState, slotIndex: number): RestaurantState {
-  const order = state.orderQueue[slotIndex];
+  const order = state.orderSlots[slotIndex];
   if (!order || order.failed || order.served) return state;
   if (state.activeOrderId === order.id) return state;
 
@@ -285,7 +294,7 @@ export function acceptOrder(state: RestaurantState, slotIndex: number): Restaura
 
 export function handleKeyPress(state: RestaurantState, key: string): RestaurantState {
   const normalizedKey = key.toLowerCase();
-  const activeOrder = state.orderQueue.find((order) => order.id === state.activeOrderId);
+  const activeOrder = state.orderSlots.find((slot) => slot?.id === state.activeOrderId);
   if (!activeOrder || activeOrder.completed || activeOrder.failed) return state;
 
   const step = getCurrentStep(activeOrder);
@@ -322,7 +331,7 @@ export function handleKeyPress(state: RestaurantState, key: string): RestaurantS
 }
 
 export function handleChopKey(state: RestaurantState, direction: "left" | "right"): RestaurantState {
-  const activeOrder = state.orderQueue.find((order) => order.id === state.activeOrderId);
+  const activeOrder = state.orderSlots.find((slot) => slot?.id === state.activeOrderId);
   if (!activeOrder || activeOrder.completed || activeOrder.failed) return state;
 
   const step = getCurrentStep(activeOrder);
@@ -338,7 +347,7 @@ export function handleChopKey(state: RestaurantState, direction: "left" | "right
 }
 
 export function handleMouseMove(state: RestaurantState, x: number, y: number): RestaurantState {
-  const activeOrder = state.orderQueue.find((order) => order.id === state.activeOrderId);
+  const activeOrder = state.orderSlots.find((slot) => slot?.id === state.activeOrderId);
   if (!activeOrder || activeOrder.completed || activeOrder.failed) return state;
 
   const step = getCurrentStep(activeOrder);
@@ -366,16 +375,18 @@ export function calculateTip(order: ActiveOrder): number {
 }
 
 export function serveOrder(state: RestaurantState, slotIndex: number): RestaurantState {
-  const order = state.orderQueue[slotIndex];
+  const order = state.orderSlots[slotIndex];
   if (!order || !order.completed || order.failed) return state;
 
   const tip = calculateTip(order);
   const payout = order.menuItem.basePay + tip;
-  const orderQueue = state.orderQueue.filter((queuedOrder) => queuedOrder.id !== order.id);
+  // Null out the slot instead of filtering
+  const orderSlots = [...state.orderSlots];
+  orderSlots[slotIndex] = null;
 
   return {
     ...state,
-    orderQueue,
+    orderSlots,
     activeOrderId: state.activeOrderId === order.id ? null : state.activeOrderId,
     completedOrders: state.completedOrders + 1,
     totalEarnings: Math.round((state.totalEarnings + payout) * 100) / 100,

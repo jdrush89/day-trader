@@ -130,8 +130,8 @@ function renderStepInstruction(order: ActiveOrder) {
 
 export function Restaurant({ day, paused, state, setRestaurantState, onFinish }: RestaurantProps) {
   const activeOrder = useMemo(
-    () => state.orderQueue.find((order) => order.id === state.activeOrderId) ?? null,
-    [state.activeOrderId, state.orderQueue],
+    () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
+    [state.activeOrderId, state.orderSlots],
   );
 
   useEffect(() => {
@@ -155,7 +155,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
         const slotIndex = Number(event.key) - 1;
         setRestaurantState((prev) => {
           if (!prev) return prev;
-          const order = prev.orderQueue[slotIndex];
+          const order = prev.orderSlots[slotIndex];
           if (!order) return prev;
           return order.completed ? serveOrder(prev, slotIndex) : acceptOrder(prev, slotIndex);
         });
@@ -208,7 +208,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
 
       <section className="restaurant-queue">
         {Array.from({ length: 5 }, (_, index) => {
-          const order = state.orderQueue[index];
+          const order = state.orderSlots[index];
           if (!order) {
             return (
               <div key={index} className="order-slot empty">
@@ -274,7 +274,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
               ) : activeOrder.completed ? (
                 <div className="restaurant-step-card success-card">
                   <div className="restaurant-step-title">Order ready!</div>
-                  <div className="restaurant-step-copy">Press {state.orderQueue.findIndex((order) => order.id === activeOrder.id) + 1} or click the ticket to serve it.</div>
+                  <div className="restaurant-step-copy">Press {state.orderSlots.findIndex((slot) => slot?.id === activeOrder.id) + 1} or click the ticket to serve it.</div>
                 </div>
               ) : (
                 renderStepInstruction(activeOrder)

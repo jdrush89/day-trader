@@ -63,7 +63,7 @@ export interface ActiveOrder {
 
 export interface RestaurantState {
   shiftActive: boolean;
-  orderQueue: ActiveOrder[];
+  orderSlots: (ActiveOrder | null)[]; // fixed 5 slots, null = empty
   activeOrderId: number | null;
   completedOrders: number;
   totalEarnings: number;
