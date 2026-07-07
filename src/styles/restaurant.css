@@ -99,6 +99,18 @@
   border-color: rgba(255, 68, 68, 0.4);
 }
 
+.order-slot.burnt {
+  opacity: 0.75;
+  border-color: rgba(255, 100, 30, 0.5);
+  background: linear-gradient(135deg, rgba(255, 60, 0, 0.15), rgba(80, 20, 0, 0.3)), var(--bg-panel);
+  animation: burnt-flash 0.4s ease-out;
+}
+
+@keyframes burnt-flash {
+  0% { background-color: rgba(255, 80, 0, 0.5); }
+  100% { background-color: transparent; }
+}
+
 .order-slot.empty {
   cursor: default;
   justify-content: center;
@@ -142,15 +154,76 @@
   font-size: 0.85rem;
 }
 
+.slot-customization {
+  color: #ff9944;
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
 .slot-ready {
   color: var(--green);
   font-weight: 800;
   animation: shwendys-pulse 0.75s ease-in-out infinite alternate;
 }
 
+.slot-ready.incorrect {
+  color: #ff9944;
+  animation: none;
+}
+
 .slot-ready.failed {
   color: var(--red);
   animation: none;
+}
+
+.slot-ready.burnt {
+  color: #ff6a1a;
+  animation: none;
+}
+
+/* Mini progress meter shown on each order slot card */
+.slot-mini-meter {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(10, 14, 23, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.slot-mini-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff8a3d, #ffd86f);
+  transition: width 0.1s linear;
+}
+
+.slot-mini-meter.chop .slot-mini-fill {
+  background: linear-gradient(90deg, #64c5ff, #7affc1);
+}
+
+.slot-mini-meter.mix .slot-mini-fill {
+  background: linear-gradient(90deg, #c87aff, #ff7ad4);
+}
+
+.slot-mini-meter.burn-zone .slot-mini-fill {
+  background: linear-gradient(90deg, #ff4444, #ff8800);
+}
+
+.slot-mini-danger {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 23%; /* represents the 30% burn zone (100% to 130%) scaled to meter */
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 60, 0, 0.25) 2px,
+    rgba(255, 60, 0, 0.25) 4px
+  );
+  border-left: 1px solid rgba(255, 60, 0, 0.4);
 }
 
 .patience-bar,
@@ -269,6 +342,42 @@
   box-shadow: 0 0 10px rgba(0, 255, 136, 0.6);
 }
 
+.cook-meter-burn-zone {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 23%;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 60, 0, 0.2) 2px,
+    rgba(255, 60, 0, 0.2) 4px
+  );
+  border-left: 1px dashed rgba(255, 60, 0, 0.5);
+}
+
+.cook-meter-burn-fill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 23%;
+  background: linear-gradient(90deg, #ff4400, #ff0000);
+  opacity: 0.7;
+}
+
+.cook-meter.burn-warning {
+  border-color: rgba(255, 60, 0, 0.6);
+  animation: burn-pulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes burn-pulse {
+  from { box-shadow: 0 0 4px rgba(255, 60, 0, 0.3); }
+  to { box-shadow: 0 0 12px rgba(255, 60, 0, 0.7); }
+}
+
 .cook-meta {
   display: flex;
   justify-content: space-between;
@@ -299,6 +408,30 @@
 .ingredient-chip.done {
   color: var(--green);
   border-color: rgba(0, 255, 136, 0.22);
+}
+
+.ingredient-chip.unwanted {
+  opacity: 0.55;
+  border-color: rgba(255, 68, 68, 0.25);
+  background: rgba(255, 30, 0, 0.08);
+  text-decoration: line-through;
+}
+
+.ingredient-chip.unwanted.skipped {
+  opacity: 0.35;
+}
+
+.unwanted-badge {
+  font-size: 0.75rem;
+}
+
+.order-incorrect-badge {
+  color: #ff9944;
+  font-weight: 700;
+}
+
+.order-slot.incorrect {
+  border-color: rgba(255, 153, 68, 0.35);
 }
 
 .keycap {

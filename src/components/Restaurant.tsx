@@ -4,6 +4,7 @@ import {
   handleChopKey,
   handleKeyPress,
   handleMouseMove as handleRestaurantMouseMove,
+  nextWantedIndex,
   restaurantTick,
   serveOrder,
 } from "../game/restaurant-engine";
@@ -24,7 +25,8 @@ function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
 }
 
 function getStepStatus(order: ActiveOrder): string {
-  if (order.failed) return "Customer left";
+  if (order.burnt) return "🔥 Burnt!";
+  if (order.failed) return "👋 Customer left";
   if (order.completed) return "Ready to serve";
   const step = getCurrentStep(order);
   if (!step) return "Ready";
@@ -32,6 +34,23 @@ function getStepStatus(order: ActiveOrder): string {
     return `${step.label} (${Math.min(100, Math.round((order.prepProgress / step.duration) * 100))}%)`;
   }
   return step.label;
+}
+
+function getSlotMiniProgress(order: ActiveOrder): { pct: number; type: string; burnZone: boolean } | null {
+  if (order.completed || order.failed) return null;
+  const step = getCurrentStep(order);
+  if (!step) return null;
+  if ((step.type === "grill" || step.type === "fry") && order.prepStarted) {
+    const pct = Math.min(130, (order.prepProgress / step.duration) * 100);
+    return { pct, type: step.type, burnZone: pct > 100 };
+  }
+  if (step.type === "chop") {
+    return { pct: Math.min(100, (order.chopCount / step.target) * 100), type: "chop", burnZone: false };
+  }
+  if (step.type === "mix") {
+    return { pct: Math.min(100, (order.mixProgress / step.target) * 100), type: "mix", burnZone: false };
+  }
+  return null;
 }
 
 function formatTime(seconds: number): string {
@@ -45,10 +64,13 @@ function renderStepInstruction(order: ActiveOrder) {
   if (!step) return null;
 
   if (step.type === "grill" || step.type === "fry") {
-    const progressPct = Math.min(100, (order.prepProgress / step.duration) * 100);
+    const rawPct = (order.prepProgress / step.duration) * 100;
+    const progressPct = Math.min(130, rawPct);
     const flipPct = step.type === "grill" && step.flipAt != null ? (step.flipAt / step.duration) * 100 : null;
     const flipReady = step.type === "grill" && step.flipAt != null && !order.flipped && Math.abs(order.prepProgress - step.flipAt) <= step.flipWindow;
     const readyToPlate = order.prepProgress >= step.duration;
+    const inBurnZone = rawPct > 100 && rawPct <= 130;
+    const burnTimeLeft = ((step.duration * 1.3 - order.prepProgress) / 20);
 
     return (
       <div className="restaurant-step-card">
@@ -57,12 +79,15 @@ function renderStepInstruction(order: ActiveOrder) {
           {!order.prepStarted && "Press G to start cooking."}
           {order.prepStarted && step.type === "grill" && !order.flipped && !flipReady && !readyToPlate && "Watch the grill and flip on time."}
           {flipReady && "Press F now to flip!"}
-          {order.burnt && "Burnt! This order is lost."}
-          {readyToPlate && !order.burnt && "Press Enter to take it off the heat."}
+          {order.burnt && "🔥 Burnt! This order is lost."}
+          {inBurnZone && !order.burnt && `⚠️ Remove NOW! Burns in ${burnTimeLeft.toFixed(1)}s`}
+          {readyToPlate && !inBurnZone && !order.burnt && "Press Enter to take it off the heat."}
           {order.prepStarted && step.type === "fry" && !readyToPlate && "Keep an eye on the fryer."}
         </div>
-        <div className="cook-meter">
-          <div className="cook-meter-fill" style={{ width: `${progressPct}%` }} />
+        <div className={`cook-meter ${inBurnZone ? "burn-warning" : ""}`}>
+          <div className="cook-meter-fill" style={{ width: `${Math.min(100, progressPct)}%` }} />
+          <div className="cook-meter-burn-zone" />
+          {inBurnZone && <div className="cook-meter-burn-fill" style={{ width: `${((rawPct - 100) / 30) * 100}%` }} />}
           {flipPct != null && <div className="cook-meter-flip" style={{ left: `${flipPct}%` }} />}
         </div>
         <div className="cook-meta">
@@ -107,19 +132,28 @@ function renderStepInstruction(order: ActiveOrder) {
   }
 
   const assembleStep = step as Extract<OrderStep, { type: "assemble" }>;
+  const wanted = order.customizations[order.currentStepIndex];
+  const activeIdx = wanted ? nextWantedIndex(order, order.assembleIndex) : order.assembleIndex;
+  const hasCustomization = wanted && wanted.some((w) => !w);
 
   return (
     <div className="restaurant-step-card">
       <div className="restaurant-step-title">{assembleStep.label}</div>
-      <div className="restaurant-step-copy">Press the highlighted ingredients in order.</div>
+      <div className="restaurant-step-copy">
+        {hasCustomization ? "Press wanted ingredients — skip the ❌ ones!" : "Press the highlighted ingredients in order."}
+        {!order.orderCorrect && <span className="order-incorrect-badge"> ⚠️ Wrong ingredient added!</span>}
+      </div>
       <div className="ingredient-sequence">
         {assembleStep.ingredients.map((ingredient, index) => {
-          const done = index < order.assembleIndex;
-          const active = index === order.assembleIndex;
+          const isWanted = !wanted || wanted[index];
+          const done = isWanted && index < activeIdx;
+          const skipped = !isWanted && index < activeIdx;
+          const active = isWanted && index === activeIdx;
           return (
-            <div key={`${ingredient.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${active ? "active" : ""}`}>
+            <div key={`${ingredient.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${active ? "active" : ""} ${!isWanted ? "unwanted" : ""} ${skipped ? "skipped" : ""}`}>
               <span className="keycap">{ingredient.key.toUpperCase()}</span>
               <span>{ingredient.name}</span>
+              {!isWanted && <span className="unwanted-badge">❌</span>}
             </div>
           );
         })}
@@ -211,7 +245,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
           const order = state.orderSlots[index];
           if (!order) {
             return (
-              <div key={index} className="order-slot empty">
+              <div key={`slot-${index}`} className="order-slot empty">
                 <div className="slot-number">{index + 1}</div>
                 <div className="slot-empty-copy">Waiting for next customer…</div>
               </div>
@@ -220,24 +254,57 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
 
           const patiencePct = Math.max(0, Math.min(100, (order.patienceRemaining / order.menuItem.patience) * 100));
           const currentStep = getCurrentStep(order);
+          const miniProgress = getSlotMiniProgress(order);
           return (
             <button
-              key={order.id}
+              key={`slot-${index}`}
               type="button"
-              className={`order-slot ${state.activeOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""}`}
-              onClick={() => setRestaurantState((prev) => (prev ? (order.completed ? serveOrder(prev, index) : acceptOrder(prev, index)) : prev))}
+              className={`order-slot ${state.activeOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""}`}
+              onClick={() => setRestaurantState((prev) => {
+                if (!prev) return prev;
+                const currentOrder = prev.orderSlots[index];
+                if (!currentOrder) return prev;
+                return currentOrder.completed ? serveOrder(prev, index) : acceptOrder(prev, index);
+              })}
             >
               <div className="slot-number">{index + 1}</div>
               <div className="slot-main">
                 <div className="slot-title-row">
                   <span className="slot-item">{order.menuItem.icon} {order.menuItem.name}</span>
-                  {order.completed && <span className="slot-ready">DONE!</span>}
-                  {order.failed && <span className="slot-ready failed">LEFT</span>}
+                  {order.completed && !order.orderCorrect && <span className="slot-ready incorrect">NO TIP</span>}
+                  {order.completed && order.orderCorrect && <span className="slot-ready">DONE!</span>}
+                  {order.burnt && <span className="slot-ready burnt">🔥 BURNT</span>}
+                  {order.failed && !order.burnt && <span className="slot-ready failed">LEFT</span>}
                 </div>
+                {(() => {
+                  // Show customization notes (e.g., "No lettuce, No tomato")
+                  const removedItems: string[] = [];
+                  order.menuItem.steps.forEach((step, si) => {
+                    if (step.type !== "assemble") return;
+                    const wanted = order.customizations[si];
+                    if (!wanted) return;
+                    step.ingredients.forEach((ing, ii) => {
+                      if (!wanted[ii]) removedItems.push(ing.name);
+                    });
+                  });
+                  return removedItems.length > 0 ? (
+                    <div className="slot-customization">No {removedItems.join(", No ")}</div>
+                  ) : null;
+                })()}
                 <div className="slot-step">{currentStep ? getStepStatus(order) : "Serve it up"}</div>
-                <div className="patience-bar">
-                  <div className="patience-fill" style={{ width: `${patiencePct}%` }} />
-                </div>
+                {miniProgress && (
+                  <div className={`slot-mini-meter ${miniProgress.type} ${miniProgress.burnZone ? "burn-zone" : ""}`}>
+                    <div className="slot-mini-fill" style={{ width: `${Math.min(100, miniProgress.pct)}%` }} />
+                    {(miniProgress.type === "grill" || miniProgress.type === "fry") && (
+                      <div className="slot-mini-danger" />
+                    )}
+                  </div>
+                )}
+                {!order.failed && (
+                  <div className="patience-bar">
+                    <div className="patience-fill" style={{ width: `${patiencePct}%` }} />
+                  </div>
+                )}
               </div>
             </button>
           );

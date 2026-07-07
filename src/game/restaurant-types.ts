@@ -59,6 +59,10 @@ export interface ActiveOrder {
   completed: boolean;
   served: boolean;
   failed: boolean;
+  failedTimer: number;
+  // Per-assemble-step customization: which ingredients are wanted (true) vs unwanted (false)
+  customizations: Record<number, boolean[]>;
+  orderCorrect: boolean;
 }
 
 export interface RestaurantState {

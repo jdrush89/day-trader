@@ -65,7 +65,7 @@ export const MENU: MenuItem[] = [
     patience: 30,
     steps: [
       { type: "assemble", label: "Load blender", ingredients: [ingredient("Milk", "m"), ingredient("Ice cream", "i"), ingredient("Syrup", "s")] },
-      { type: "mix", label: "Blend smooth", target: 200 },
+      { type: "mix", label: "Blend smooth", target: 1200 },
     ],
   },
   {
@@ -96,7 +96,7 @@ export const MENU: MenuItem[] = [
     patience: 30,
     steps: [
       { type: "assemble", label: "Fill blender", ingredients: [ingredient("Banana", "b"), ingredient("Strawberry", "s"), ingredient("Yogurt", "y"), ingredient("Juice", "j")] },
-      { type: "mix", label: "Blend smoothie", target: 150 },
+      { type: "mix", label: "Blend smoothie", target: 800 },
     ],
   },
 ];
@@ -125,6 +125,25 @@ function resetStepProgress(order: ActiveOrder): ActiveOrder {
 }
 
 function createOrder(menuItem: MenuItem, id: number): ActiveOrder {
+  // Generate customizations for assemble steps — ~35% of orders have a removed ingredient
+  const customizations: Record<number, boolean[]> = {};
+  menuItem.steps.forEach((step, stepIdx) => {
+    if (step.type !== "assemble") return;
+    const ings = step.ingredients;
+    const wanted = ings.map(() => true);
+    // 35% chance this order has customizations, only if 4+ ingredients
+    if (ings.length >= 4 && Math.random() < 0.35) {
+      // Remove 1-2 optional ingredients (skip first and last — structural like buns)
+      const optionalIndices = ings.map((_, i) => i).filter((i) => i > 0 && i < ings.length - 1);
+      const removeCount = Math.min(optionalIndices.length, Math.random() < 0.7 ? 1 : 2);
+      const shuffled = optionalIndices.sort(() => Math.random() - 0.5);
+      for (let r = 0; r < removeCount; r++) {
+        wanted[shuffled[r]] = false;
+      }
+    }
+    customizations[stepIdx] = wanted;
+  });
+
   return {
     id,
     menuItem,
@@ -143,7 +162,23 @@ function createOrder(menuItem: MenuItem, id: number): ActiveOrder {
     completed: false,
     served: false,
     failed: false,
+    failedTimer: 0,
+    customizations,
+    orderCorrect: true,
   };
+}
+
+// Skip past unwanted ingredients to find the next wanted index
+export function nextWantedIndex(order: ActiveOrder, fromIndex: number): number {
+  const step = order.menuItem.steps[order.currentStepIndex];
+  if (!step || step.type !== "assemble") return fromIndex;
+  const wanted = order.customizations[order.currentStepIndex];
+  if (!wanted) return fromIndex;
+  let idx = fromIndex;
+  while (idx < step.ingredients.length && !wanted[idx]) {
+    idx++;
+  }
+  return idx;
 }
 
 function replaceOrder(state: RestaurantState, updatedOrder: ActiveOrder, nextActiveOrderId: number | null = state.activeOrderId): RestaurantState {
@@ -184,8 +219,12 @@ export function isStepComplete(order: ActiveOrder): boolean {
       return order.chopCount >= step.target;
     case "mix":
       return order.mixProgress >= step.target;
-    case "assemble":
-      return order.assembleIndex >= step.ingredients.length;
+    case "assemble": {
+      const wanted = order.customizations[order.currentStepIndex];
+      if (!wanted) return order.assembleIndex >= step.ingredients.length;
+      // Complete when assembleIndex is past the last wanted ingredient
+      return nextWantedIndex(order, order.assembleIndex) >= step.ingredients.length;
+    }
     default:
       return false;
   }
@@ -212,11 +251,16 @@ function maybeAdvance(order: ActiveOrder): ActiveOrder {
 }
 
 function updateOrderTick(order: ActiveOrder, dt: number): ActiveOrder {
-  if (order.completed || order.served || order.failed) return order;
+  if (order.served) return order;
+  // Count down the failed timer — order stays visible briefly after failing
+  if (order.failed) {
+    return { ...order, failedTimer: order.failedTimer - dt * TICKS_PER_SECOND };
+  }
+  if (order.completed) return order;
 
   const patienceRemaining = Math.max(0, order.patienceRemaining - dt);
   let updatedOrder: ActiveOrder = { ...order, patienceRemaining };
-  if (patienceRemaining <= 0) return { ...updatedOrder, failed: true };
+  if (patienceRemaining <= 0) return { ...updatedOrder, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
 
   const step = getCurrentStep(updatedOrder);
   if (!step || (step.type !== "grill" && step.type !== "fry") || !updatedOrder.prepStarted) return updatedOrder;
@@ -225,11 +269,11 @@ function updateOrderTick(order: ActiveOrder, dt: number): ActiveOrder {
   updatedOrder = { ...updatedOrder, prepProgress };
 
   if (step.type === "grill" && step.flipAt != null && !updatedOrder.flipped && prepProgress > step.flipAt + step.flipWindow) {
-    return { ...updatedOrder, burnt: true, failed: true };
+    return { ...updatedOrder, burnt: true, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
   }
 
   if (prepProgress > step.duration * 1.3) {
-    return { ...updatedOrder, burnt: true, failed: true };
+    return { ...updatedOrder, burnt: true, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
   }
 
   return updatedOrder;
@@ -257,11 +301,11 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
 
   const shiftTimeRemaining = Math.max(0, state.shiftTimeRemaining - dt);
   const shiftOver = shiftTimeRemaining <= 0;
-  // Update each slot: tick active orders, null out failed ones to free the slot
+  // Update each slot: tick active orders, null out failed ones after their display timer expires
   const orderSlots = state.orderSlots.map((slot) => {
     if (!slot) return null;
     const updated = updateOrderTick(slot, dt);
-    if (updated.failed) return null; // free the slot
+    if (updated.failed && updated.failedTimer <= 0) return null; // timer expired, free the slot
     return updated;
   });
   const activeStillValid = orderSlots.some((slot) => slot && slot.id === state.activeOrderId && !slot.failed && !slot.served);
@@ -303,10 +347,34 @@ export function handleKeyPress(state: RestaurantState, key: string): RestaurantS
   let updatedOrder = activeOrder;
 
   if (step.type === "assemble") {
-    const expected = step.ingredients[activeOrder.assembleIndex];
-    if (!expected || normalizedKey !== expected.key.toLowerCase()) return state;
-    updatedOrder = maybeAdvance({ ...activeOrder, assembleIndex: activeOrder.assembleIndex + 1 });
-    return replaceOrder(state, updatedOrder);
+    const wanted = activeOrder.customizations[activeOrder.currentStepIndex];
+    // Find the next wanted ingredient the player should press
+    const targetIdx = wanted ? nextWantedIndex(activeOrder, activeOrder.assembleIndex) : activeOrder.assembleIndex;
+    const expected = step.ingredients[targetIdx];
+    if (!expected) {
+      // All wanted ingredients done — advance step
+      updatedOrder = maybeAdvance({ ...activeOrder, assembleIndex: step.ingredients.length });
+      return replaceOrder(state, updatedOrder);
+    }
+
+    if (normalizedKey === expected.key.toLowerCase()) {
+      // Correct wanted ingredient pressed — advance past it and skip any unwanted ones
+      const newIndex = wanted ? nextWantedIndex(activeOrder, targetIdx + 1) : targetIdx + 1;
+      updatedOrder = maybeAdvance({ ...activeOrder, assembleIndex: newIndex });
+      return replaceOrder(state, updatedOrder);
+    }
+
+    // Check if they pressed an unwanted ingredient's key — mark order incorrect
+    if (wanted) {
+      const pressedUnwanted = step.ingredients.some(
+        (ing, i) => ing.key.toLowerCase() === normalizedKey && !wanted[i] && i >= activeOrder.assembleIndex
+      );
+      if (pressedUnwanted) {
+        return replaceOrder(state, { ...activeOrder, orderCorrect: false });
+      }
+    }
+
+    return state;
   }
 
   if ((step.type === "grill" || step.type === "fry") && normalizedKey === "g" && !activeOrder.prepStarted) {
@@ -370,6 +438,7 @@ export function handleMouseMove(state: RestaurantState, x: number, y: number): R
 }
 
 export function calculateTip(order: ActiveOrder): number {
+  if (!order.orderCorrect) return 0;
   const patienceRatio = Math.max(0, Math.min(1, order.patienceRemaining / order.menuItem.patience));
   return Math.round(order.menuItem.basePay * 0.6 * patienceRatio * 100) / 100;
 }
