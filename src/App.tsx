@@ -21,6 +21,7 @@ function App() {
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
+  const [activeMonitorId, setActiveMonitorId] = useState(0);
 
   useEffect(() => {
     if (gameState.gameOver || !gameState.marketOpen || paused) return;
@@ -49,6 +50,16 @@ function App() {
 
       if (restaurantState) return;
 
+      // Shift+number selects which monitor is active
+      if (e.shiftKey && /^[1-3]$/.test(e.key)) {
+        const monitorIdx = parseInt(e.key, 10) - 1;
+        if (monitorIdx < gameState.monitors.length) {
+          e.preventDefault();
+          setActiveMonitorId(gameState.monitors[monitorIdx].id);
+        }
+        return;
+      }
+
       const num = parseInt(e.key, 10);
       if (num >= 1 && num <= CHANNEL_KEYS.length) {
         const active = document.activeElement;
@@ -60,14 +71,14 @@ function App() {
         e.preventDefault();
         setGameState((prev) => ({
           ...prev,
-          monitors: prev.monitors.map((m) => (m.id === 0 ? { ...m, channel: CHANNEL_KEYS[num - 1] } : m)),
+          monitors: prev.monitors.map((m) => (m.id === activeMonitorId ? { ...m, channel: CHANNEL_KEYS[num - 1] } : m)),
         }));
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [restaurantState, showTitle]);
+  }, [activeMonitorId, restaurantState, showTitle]);
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
@@ -423,10 +434,13 @@ function App() {
 
           <div className="main-layout">
             <div className="monitors-area">
-              {gameState.monitors.map((monitor) => (
+              {gameState.monitors.map((monitor, idx) => (
                 <Monitor
                   key={monitor.id}
                   monitor={monitor}
+                  monitorIndex={idx}
+                  isActive={monitor.id === activeMonitorId}
+                  totalMonitors={gameState.monitors.length}
                   gameState={gameState}
                   debugMode={debugMode}
                   paused={paused}

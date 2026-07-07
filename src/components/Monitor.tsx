@@ -6,6 +6,9 @@ import { NewsFeed, InsiderFeed } from "./NewsFeed";
 
 interface MonitorProps {
   monitor: MonitorType;
+  monitorIndex: number;
+  isActive: boolean;
+  totalMonitors: number;
   gameState: GameState;
   debugMode: boolean;
   paused: boolean;
@@ -25,7 +28,7 @@ const CHANNEL_LABELS: Record<MonitorChannel, string> = { business_news: "📊 Bi
 
 function getAnalystRating(symbol: string, stockTags: string[], news: NewsItem[]): "bullish" | "bearish" | "neutral" { let bullish = 0; let bearish = 0; for (const item of news) { if (!item.impact || item.impact.ticksRemaining <= 0 || item.impact.ticksRemaining > item.impact.duration) continue; for (const effect of item.impact.effects) { const matches = effect.symbol ? effect.symbol === symbol : effect.tag ? stockTags.includes(effect.tag) : false; if (!matches) continue; if (effect.direction === "up") bullish += 1; else bearish += 1; } } if (bullish > bearish) return "bullish"; if (bearish > bullish) return "bearish"; return "neutral"; }
 
-export function Monitor({ monitor, gameState, debugMode, paused, hasBloomberg, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover }: MonitorProps) {
+export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameState, debugMode, paused, hasBloomberg, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover }: MonitorProps) {
   const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -136,8 +139,13 @@ export function Monitor({ monitor, gameState, debugMode, paused, hasBloomberg, s
   }, [monitor.selectedStock, selectedStock, focusStockTab, onBuy, onSell, onShort, onCover]);
 
   return (
-    <div className="monitor">
+    <div className={`monitor ${isActive && totalMonitors > 1 ? "monitor-active" : ""}`}>
       <div className="monitor-bezel">
+        {totalMonitors > 1 && (
+          <div className={`monitor-label ${isActive ? "active" : ""}`}>
+            Monitor {monitorIndex + 1} {isActive ? "●" : ""} <span className="monitor-label-hint">Shift+{monitorIndex + 1}</span>
+          </div>
+        )}
         <div className="monitor-screen">
           <div className="monitor-content">
             {monitor.channel === "stock_ticker" && (
