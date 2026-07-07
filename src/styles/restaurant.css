@@ -412,18 +412,13 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.ingredient-chip.active {
-  border-color: #ffac5f;
-  box-shadow: 0 0 0 1px rgba(255, 172, 95, 0.22);
+.ingredient-chip.current {
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 .ingredient-chip.done {
   color: var(--green);
   border-color: rgba(0, 255, 136, 0.22);
-}
-
-.ingredient-chip.skipped {
-  opacity: 0.35;
 }
 
 .order-incorrect-badge {

@@ -5,7 +5,6 @@ import {
   handleKeyPress,
   handleKeyUp,
   handleMouseMove as handleRestaurantMouseMove,
-  nextWantedIndex,
   restaurantTick,
   serveOrder,
 } from "../game/restaurant-engine";
@@ -250,24 +249,20 @@ function renderStepInstruction(order: ActiveOrder) {
   }
 
   const assembleStep = step as Extract<OrderStep, { type: "assemble" }>;
-  const wanted = order.customizations[order.currentStepIndex];
-  const activeIndex = wanted ? nextWantedIndex(order, order.assembleIndex) : order.assembleIndex;
 
   return (
     <div className="restaurant-step-card">
       <div className="restaurant-step-title">{assembleStep.label}</div>
       <div className="restaurant-step-copy">
-        Press the highlighted ingredients in order.
-        {!order.orderCorrect && <span className="order-incorrect-badge"> ⚠️ Wrong ingredient added!</span>}
+        Press the key to add, or Space to skip.
+        {!order.orderCorrect && <span className="order-incorrect-badge"> ⚠️ Wrong ingredient!</span>}
       </div>
       <div className="ingredient-sequence">
         {assembleStep.ingredients.map((ingredient, index) => {
-          const isWanted = !wanted || wanted[index];
-          const done = isWanted && index < activeIndex;
-          const skipped = !isWanted && index < activeIndex;
-          const active = isWanted && index === activeIndex;
+          const done = index < order.assembleIndex;
+          const current = index === order.assembleIndex;
           return (
-            <div key={`${ingredient.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${active ? "active" : ""} ${skipped ? "skipped" : ""}`}>
+            <div key={`${ingredient.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${current ? "current" : ""}`}>
               <span className="keycap">{ingredient.key.toUpperCase()}</span>
               <span>{ingredient.name}</span>
             </div>
@@ -331,7 +326,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
         return;
       }
 
-      if (/^[a-zA-Z]$/.test(event.key)) {
+      if (/^[a-zA-Z]$/.test(event.key) || event.key === " ") {
         event.preventDefault();
         setRestaurantState((prev) => (prev ? handleKeyPress(prev, event.key) : prev));
       }
