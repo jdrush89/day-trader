@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue } from "./game/engine";
-import { createRestaurantState, finishRestaurantDay } from "./game/restaurant-engine";
+import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
+import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
@@ -18,7 +19,7 @@ function App() {
   const [paused, setPaused] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
-  const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks">("summary");
+  const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
 
   useEffect(() => {
@@ -110,7 +111,7 @@ function App() {
     const nextState = stateOverride ?? gameState;
     if (nextState.day % 2 === 0) {
       setGameState(nextState);
-      setRestaurantState(createRestaurantState());
+      setRestaurantState(createRestaurantState(nextState));
       setEodPhase("summary");
       return;
     }
@@ -125,6 +126,11 @@ function App() {
     else if (gameState.stockDraftOptions.length > 0) setEodPhase("stocks");
     else beginScheduledDay();
   }, [beginScheduledDay, gameState.stockDraftOptions.length, gameState.upgradeDraftOptions.length]);
+
+  const restaurantUpgradeCount = useCallback(
+    (upgradeId: string) => gameState.acquiredRestaurantUpgrades.filter((id) => id === upgradeId).length,
+    [gameState.acquiredRestaurantUpgrades],
+  );
 
   const handleAcquireUpgrade = useCallback((upgradeId: string) => {
     const nextState = acquireUpgrade(gameState, upgradeId);
@@ -141,12 +147,23 @@ function App() {
     beginScheduledDay(draftStock(gameState, symbol));
   }, [beginScheduledDay, gameState]);
 
+  const handleAcquireRestaurantUpgrade = useCallback((upgradeId: string) => {
+    const nextState = acquireRestaurantUpgrade(gameState, upgradeId);
+    setGameState(nextState);
+    if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
+    else beginScheduledDay(nextState);
+  }, [beginScheduledDay, gameState]);
+
+  const handleDraftMenuItem = useCallback((itemName: string) => {
+    beginScheduledDay(draftMenuItem(gameState, itemName));
+  }, [beginScheduledDay, gameState]);
+
   const handleRestaurantFinish = useCallback((earnings: number) => {
     const nextState = finishRestaurantDay(gameState, earnings);
     setRestaurantState(null);
     setGameState(nextState);
-    if (nextState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
-    else if (nextState.stockDraftOptions.length > 0) setEodPhase("stocks");
+    if (nextState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
+    else if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
     else beginScheduledDay(nextState);
   }, [beginScheduledDay, gameState]);
 
@@ -336,6 +353,50 @@ function App() {
                       </button>
                     );
                   })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "restaurant-upgrades" && (
+            <div className="end-of-day-overlay">
+              <div className="upgrade-draft">
+                <h2>🍽️ Choose a Restaurant Upgrade</h2>
+                <p className="upgrade-draft-sub">Pick one kitchen upgrade for every future Shwendy's shift</p>
+                <div className="upgrade-draft-options">
+                  {gameState.restaurantUpgradeDraftOptions.map((id) => {
+                    const card = RESTAURANT_UPGRADE_POOL.find((upgrade) => upgrade.id === id);
+                    if (!card) return null;
+                    const owned = restaurantUpgradeCount(id);
+                    return (
+                      <button key={id} className="upgrade-draft-card" onClick={() => handleAcquireRestaurantUpgrade(id)}>
+                        <div className="upgrade-card-icon">{card.icon}</div>
+                        <div className="upgrade-card-name">{card.name}</div>
+                        <div className="upgrade-card-desc">{card.description}</div>
+                        <div className="upgrade-card-category">{card.category}</div>
+                        {owned > 0 && <div className="upgrade-card-owned">Owned: {owned}/{card.maxStacks}</div>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "menu-draft" && (
+            <div className="end-of-day-overlay">
+              <div className="stock-draft">
+                <h2>🧾 Add a New Menu Item</h2>
+                <p className="stock-draft-sub">Choose one recipe to add to Shwendy's permanent menu for Day {gameState.day}</p>
+                <div className="stock-draft-options">
+                  {gameState.menuDraftOptions.map((item) => (
+                    <button key={item.name} className="stock-draft-card" onClick={() => handleDraftMenuItem(item.name)}>
+                      <div className="draft-card-symbol">{item.icon}</div>
+                      <div className="draft-card-name">{item.name}</div>
+                      <div className="draft-card-price">${item.basePay.toFixed(2)} • {item.patience}s patience</div>
+                      <div className="draft-card-tags">{item.steps.map((step, index) => <span key={`${item.name}-${step.type}-${index}`} className="stock-tag">{step.type}</span>)}</div>
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

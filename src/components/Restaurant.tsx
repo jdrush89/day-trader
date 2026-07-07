@@ -1,14 +1,15 @@
-import { useEffect, useMemo, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import {
   acceptOrder,
   handleChopKey,
   handleKeyPress,
+  handleKeyUp,
   handleMouseMove as handleRestaurantMouseMove,
   nextWantedIndex,
   restaurantTick,
   serveOrder,
 } from "../game/restaurant-engine";
-import { ActiveOrder, OrderStep, RestaurantState } from "../game/restaurant-types";
+import { ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
 
 const TICK_MS = 50;
 
@@ -33,6 +34,13 @@ function getStepStatus(order: ActiveOrder): string {
   if ((step.type === "grill" || step.type === "fry") && order.prepStarted) {
     return `${step.label} (${Math.min(100, Math.round((order.prepProgress / step.duration) * 100))}%)`;
   }
+  if (step.type === "rhythm") return `${step.label} (${order.rhythmHits}/${step.hits.length} hits)`;
+  if (step.type === "hold") return `${step.label} (${Math.round(order.holdProgress * 100)}%)`;
+  if (step.type === "memorize") {
+    return order.memorizeRevealed
+      ? `${step.label} (${(order.memorizeRevealTimer / 20).toFixed(1)}s left)`
+      : `${step.label} (${order.memorizeInputIndex}/${step.sequenceLength})`;
+  }
   return step.label;
 }
 
@@ -50,6 +58,18 @@ function getSlotMiniProgress(order: ActiveOrder): { pct: number; type: string; b
   if (step.type === "mix") {
     return { pct: Math.min(100, (order.mixProgress / step.target) * 100), type: "mix", burnZone: false };
   }
+  if (step.type === "rhythm") {
+    return { pct: Math.min(100, (order.rhythmHitIndex / step.hits.length) * 100), type: "rhythm", burnZone: false };
+  }
+  if (step.type === "hold") {
+    return { pct: Math.min(100, order.holdProgress * 100), type: "hold", burnZone: false };
+  }
+  if (step.type === "memorize") {
+    const pct = order.memorizeRevealed
+      ? Math.min(100, ((step.revealDuration - order.memorizeRevealTimer) / step.revealDuration) * 100)
+      : Math.min(100, (order.memorizeInputIndex / step.sequenceLength) * 100);
+    return { pct, type: "memorize", burnZone: false };
+  }
   return null;
 }
 
@@ -57,6 +77,12 @@ function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+function renderRhythmResult(result: RhythmResult, isActive: boolean): string {
+  if (result === "hit") return "done";
+  if (result === "miss") return "miss";
+  return isActive ? "active" : "pending";
 }
 
 function renderStepInstruction(order: ActiveOrder) {
@@ -67,10 +93,14 @@ function renderStepInstruction(order: ActiveOrder) {
     const rawPct = (order.prepProgress / step.duration) * 100;
     const progressPct = Math.min(130, rawPct);
     const flipPct = step.type === "grill" && step.flipAt != null ? (step.flipAt / step.duration) * 100 : null;
-    const flipReady = step.type === "grill" && step.flipAt != null && !order.flipped && Math.abs(order.prepProgress - step.flipAt) <= step.flipWindow;
+    const flipReady =
+      step.type === "grill" &&
+      step.flipAt != null &&
+      !order.flipped &&
+      Math.abs(order.prepProgress - step.flipAt) <= step.flipWindow;
     const readyToPlate = order.prepProgress >= step.duration;
     const inBurnZone = rawPct > 100 && rawPct <= 130;
-    const burnTimeLeft = ((step.duration * 1.3 - order.prepProgress) / 20);
+    const burnTimeLeft = (step.duration * 1.3 - order.prepProgress) / 20;
 
     return (
       <div className="restaurant-step-card">
@@ -121,7 +151,7 @@ function renderStepInstruction(order: ActiveOrder) {
       <div className="restaurant-step-card mix-card">
         <div className="restaurant-step-title">{step.label}</div>
         <div className="restaurant-step-copy">Swirl the mouse in circles!</div>
-        <div className="mix-ring" style={{ ['--mix-progress' as string]: `${progressPct}%` }}>
+        <div className="mix-ring" style={{ "--mix-progress": `${progressPct}%` } as CSSProperties}>
           <div className="mix-ring-inner">{Math.round(progressPct)}%</div>
         </div>
         <div className="cook-meta">
@@ -131,9 +161,97 @@ function renderStepInstruction(order: ActiveOrder) {
     );
   }
 
+  if (step.type === "rhythm") {
+    const totalDuration = step.hits[step.hits.length - 1].targetTick + step.hits[step.hits.length - 1].window;
+    const beatPct = Math.min(100, (order.prepProgress / totalDuration) * 100);
+    return (
+      <div className="restaurant-step-card rhythm-card">
+        <div className="restaurant-step-title">{step.label}</div>
+        <div className="restaurant-step-copy">Hit each key when the beat reaches its target zone. Misses still move the sequence forward.</div>
+        <div className="rhythm-lane">
+          <div className="rhythm-lane-progress" style={{ width: `${beatPct}%` }} />
+          {step.hits.map((hit, index) => {
+            const left = (hit.targetTick / totalDuration) * 100;
+            const width = ((hit.window * 2) / totalDuration) * 100;
+            const resultClass = renderRhythmResult(order.rhythmResults[index] ?? "pending", index === order.rhythmHitIndex);
+            return (
+              <div key={`${hit.key}-${hit.targetTick}`} className={`rhythm-hit rhythm-${resultClass}`} style={{ left: `${left}%`, width: `${Math.max(width, 4)}%` }}>
+                <span>{hit.key.toUpperCase()}</span>
+              </div>
+            );
+          })}
+          <div className="rhythm-cursor" style={{ left: `${beatPct}%` }} />
+        </div>
+        <div className="rhythm-sequence">
+          {step.hits.map((hit, index) => (
+            <div key={`${hit.key}-${index}-chip`} className={`rhythm-chip ${renderRhythmResult(order.rhythmResults[index] ?? "pending", index === order.rhythmHitIndex)}`}>
+              <span className="keycap">{hit.key.toUpperCase()}</span>
+              <span>{order.rhythmResults[index] === "hit" ? "Perfect" : order.rhythmResults[index] === "miss" ? "Miss" : "Ready"}</span>
+            </div>
+          ))}
+        </div>
+        <div className="cook-meta">
+          <span>{order.rhythmHits}/{step.hits.length} hits</span>
+          <span>Beat {(order.prepProgress / 20).toFixed(1)}s</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (step.type === "hold") {
+    const fillPct = Math.min(100, order.holdProgress * 100);
+    const zoneLeft = step.targetMin * 100;
+    const zoneWidth = (step.targetMax - step.targetMin) * 100;
+    const inZone = order.holdProgress >= step.targetMin && order.holdProgress <= step.targetMax;
+    return (
+      <div className="restaurant-step-card hold-card">
+        <div className="restaurant-step-title">{step.label}</div>
+        <div className="restaurant-step-copy">
+          {order.holdStartTick == null ? `Hold ${step.key.toUpperCase()} to fill the meter, then release in the green zone.` : "Keep holding... release at the sweet spot!"}
+        </div>
+        <div className="hold-meter">
+          <div className="hold-meter-zone" style={{ left: `${zoneLeft}%`, width: `${zoneWidth}%` }} />
+          <div className="hold-meter-fill" style={{ width: `${fillPct}%` }} />
+        </div>
+        <div className="hold-key-row">
+          <span className={`keycap hold-key ${order.holdStartTick != null && !order.holdReleased ? "active" : ""}`}>{step.key.toUpperCase()}</span>
+          <span className={`hold-status ${inZone ? "good" : ""}`}>{Math.round(fillPct)}%{inZone ? " — release!" : ""}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (step.type === "memorize") {
+    const showSequence = order.memorizeRevealed;
+    return (
+      <div className="restaurant-step-card memorize-card">
+        <div className="restaurant-step-title">{step.label}</div>
+        <div className="restaurant-step-copy">
+          {showSequence
+            ? `Memorize the sequence before it flips away. ${(order.memorizeRevealTimer / 20).toFixed(1)}s remaining.`
+            : "Repeat the hidden sequence from memory. One wrong key makes the order incorrect."}
+        </div>
+        <div className={`memorize-sequence ${showSequence ? "revealed" : "hidden"}`}>
+          {order.memorizeSequence.map((key, index) => {
+            const entered = index < order.memorizeInputIndex;
+            return (
+              <div key={`${key}-${index}`} className={`memorize-card-key ${entered ? "entered" : ""}`}>
+                {showSequence ? key.toUpperCase() : entered ? key.toUpperCase() : "?"}
+              </div>
+            );
+          })}
+        </div>
+        <div className="cook-meta">
+          <span>{showSequence ? "Remember it!" : `${order.memorizeInputIndex}/${step.sequenceLength} keys entered`}</span>
+          <span>{!order.orderCorrect ? "⚠️ No tip" : "Stay sharp"}</span>
+        </div>
+      </div>
+    );
+  }
+
   const assembleStep = step as Extract<OrderStep, { type: "assemble" }>;
   const wanted = order.customizations[order.currentStepIndex];
-  const activeIdx = wanted ? nextWantedIndex(order, order.assembleIndex) : order.assembleIndex;
+  const activeIndex = wanted ? nextWantedIndex(order, order.assembleIndex) : order.assembleIndex;
 
   return (
     <div className="restaurant-step-card">
@@ -143,15 +261,15 @@ function renderStepInstruction(order: ActiveOrder) {
         {!order.orderCorrect && <span className="order-incorrect-badge"> ⚠️ Wrong ingredient added!</span>}
       </div>
       <div className="ingredient-sequence">
-        {assembleStep.ingredients.map((ing, index) => {
+        {assembleStep.ingredients.map((ingredient, index) => {
           const isWanted = !wanted || wanted[index];
-          const done = isWanted && index < activeIdx;
-          const skipped = !isWanted && index < activeIdx;
-          const active = isWanted && index === activeIdx;
+          const done = isWanted && index < activeIndex;
+          const skipped = !isWanted && index < activeIndex;
+          const active = isWanted && index === activeIndex;
           return (
-            <div key={`${ing.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${active ? "active" : ""} ${skipped ? "skipped" : ""}`}>
-              <span className="keycap">{ing.key.toUpperCase()}</span>
-              <span>{ing.name}</span>
+            <div key={`${ingredient.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${active ? "active" : ""} ${skipped ? "skipped" : ""}`}>
+              <span className="keycap">{ingredient.key.toUpperCase()}</span>
+              <span>{ingredient.name}</span>
             </div>
           );
         })}
@@ -182,9 +300,10 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
       const tag = activeElement?.tagName.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
 
-      if (/^[1-5]$/.test(event.key)) {
+      const slotNumber = Number.parseInt(event.key, 10);
+      if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= state.orderSlots.length) {
         event.preventDefault();
-        const slotIndex = Number(event.key) - 1;
+        const slotIndex = slotNumber - 1;
         setRestaurantState((prev) => {
           if (!prev) return prev;
           const order = prev.orderSlots[slotIndex];
@@ -204,11 +323,9 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
         event.preventDefault();
         setRestaurantState((prev) => {
           if (!prev) return prev;
-          // If active order is completed, Enter serves it
-          const activeSlotIdx = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
-          const active = activeSlotIdx >= 0 ? prev.orderSlots[activeSlotIdx] : null;
-          if (active?.completed) return serveOrder(prev, activeSlotIdx);
-          // Otherwise pass Enter to the step handler (e.g., take off grill)
+          const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
+          const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
+          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex);
           return handleKeyPress(prev, event.key);
         });
         return;
@@ -220,18 +337,27 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
       }
     };
 
+    const handleGlobalKeyUp = (event: KeyboardEvent) => {
+      if (paused || state.shiftOver) return;
+      if (/^[a-zA-Z]$/.test(event.key)) {
+        setRestaurantState((prev) => (prev ? handleKeyUp(prev, event.key) : prev));
+      }
+    };
+
     const handleMouseMove = (event: MouseEvent) => {
       if (paused || state.shiftOver) return;
       setRestaurantState((prev) => (prev ? handleRestaurantMouseMove(prev, event.clientX, event.clientY) : prev));
     };
 
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleGlobalKeyUp);
     window.addEventListener("mousemove", handleMouseMove);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleGlobalKeyUp);
       window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [paused, setRestaurantState, state.shiftOver]);
+  }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver]);
 
   return (
     <div className="restaurant-screen">
@@ -253,7 +379,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
       </header>
 
       <section className="restaurant-queue">
-        {Array.from({ length: 5 }, (_, index) => {
+        {Array.from({ length: state.orderSlots.length }, (_, index) => {
           const order = state.orderSlots[index];
           if (!order) {
             return (
@@ -272,12 +398,14 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
               key={`slot-${index}`}
               type="button"
               className={`order-slot ${state.activeOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""}`}
-              onClick={() => setRestaurantState((prev) => {
-                if (!prev) return prev;
-                const currentOrder = prev.orderSlots[index];
-                if (!currentOrder) return prev;
-                return currentOrder.completed ? serveOrder(prev, index) : acceptOrder(prev, index);
-              })}
+              onClick={() =>
+                setRestaurantState((prev) => {
+                  if (!prev) return prev;
+                  const currentOrder = prev.orderSlots[index];
+                  if (!currentOrder) return prev;
+                  return currentOrder.completed ? serveOrder(prev, index) : acceptOrder(prev, index);
+                })
+              }
             >
               <div className="slot-number">{index + 1}</div>
               <div className="slot-main">
@@ -289,14 +417,13 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
                   {order.failed && !order.burnt && <span className="slot-ready failed">LEFT</span>}
                 </div>
                 {(() => {
-                  // Show customization notes (e.g., "No lettuce, No tomato")
                   const removedItems: string[] = [];
-                  order.menuItem.steps.forEach((step, si) => {
-                    if (step.type !== "assemble") return;
-                    const wanted = order.customizations[si];
+                  order.menuItem.steps.forEach((orderStep, stepIndex) => {
+                    if (orderStep.type !== "assemble") return;
+                    const wanted = order.customizations[stepIndex];
                     if (!wanted) return;
-                    step.ingredients.forEach((ing, ii) => {
-                      if (!wanted[ii]) removedItems.push(ing.name);
+                    orderStep.ingredients.forEach((ingredient, ingredientIndex) => {
+                      if (!wanted[ingredientIndex]) removedItems.push(ingredient.name);
                     });
                   });
                   return removedItems.length > 0 ? (
@@ -307,9 +434,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
                 {miniProgress && (
                   <div className={`slot-mini-meter ${miniProgress.type} ${miniProgress.burnZone ? "burn-zone" : ""}`}>
                     <div className="slot-mini-fill" style={{ width: `${Math.min(100, miniProgress.pct)}%` }} />
-                    {(miniProgress.type === "grill" || miniProgress.type === "fry") && (
-                      <div className="slot-mini-danger" />
-                    )}
+                    {(miniProgress.type === "grill" || miniProgress.type === "fry") && <div className="slot-mini-danger" />}
                   </div>
                 )}
                 {!order.failed && (
@@ -363,7 +488,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
         ) : (
           <div className="restaurant-empty-state">
             <h2>{state.shiftOver ? "Shift complete" : "Pick an order"}</h2>
-            <p>{state.shiftOver ? "Cash out and head back to the market." : "Hit 1-5 or click a ticket to start cooking."}</p>
+            <p>{state.shiftOver ? "Cash out and head back to the market." : `Hit 1-${state.orderSlots.length} or click a ticket to start cooking.`}</p>
           </div>
         )}
       </section>

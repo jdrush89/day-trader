@@ -1,3 +1,5 @@
+import type { MenuItem } from "./restaurant-types";
+
 export type HistoryRange = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "MAX";
 
 export interface DailyPrice {
@@ -136,7 +138,9 @@ export interface GameState {
   stocks: Stock[];
   news: NewsItem[];
   acquiredUpgrades: string[];
+  acquiredRestaurantUpgrades: string[];
   upgradeDraftOptions: string[];
+  restaurantUpgradeDraftOptions: string[];
   stopLossEnabled: boolean;
   goldenParachutes: number;
   timeOfDay: number;
@@ -154,7 +158,9 @@ export interface GameState {
   secFines: SECFine[];
   pendingOrders: PendingOrder[];
   stockDraftOptions: Stock[];
+  menuDraftOptions: MenuItem[];
   draftedSymbols: string[];
+  draftedMenuItems: string[];
   recentTrades: string[];
   pinnedStocks: string[];
   institutionalOrders: InstitutionalOrder[];

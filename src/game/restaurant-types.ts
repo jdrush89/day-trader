@@ -1,4 +1,4 @@
-export type StepType = "grill" | "fry" | "chop" | "mix" | "assemble";
+export type StepType = "grill" | "fry" | "chop" | "mix" | "assemble" | "rhythm" | "hold" | "memorize";
 
 export interface AssembleIngredient {
   name: string;
@@ -32,7 +32,36 @@ export interface AssembleStep {
   ingredients: AssembleIngredient[];
 }
 
-export type OrderStep = PrepStep | ChopStep | MixStep | AssembleStep;
+export interface RhythmHit {
+  key: string;
+  targetTick: number;
+  window: number;
+}
+
+export interface RhythmStep {
+  type: "rhythm";
+  label: string;
+  hits: RhythmHit[];
+}
+
+export interface HoldStep {
+  type: "hold";
+  label: string;
+  key: string;
+  targetMin: number;
+  targetMax: number;
+  maxDuration: number;
+}
+
+export interface MemorizeStep {
+  type: "memorize";
+  label: string;
+  sequenceLength: number;
+  revealDuration: number;
+}
+
+export type OrderStep = PrepStep | ChopStep | MixStep | AssembleStep | RhythmStep | HoldStep | MemorizeStep;
+export type RhythmResult = "pending" | "hit" | "miss";
 
 export interface MenuItem {
   name: string;
@@ -55,6 +84,16 @@ export interface ActiveOrder {
   mixProgress: number;
   lastMousePos: { x: number; y: number } | null;
   assembleIndex: number;
+  rhythmHitIndex: number;
+  rhythmHits: number;
+  rhythmResults: RhythmResult[];
+  holdStartTick: number | null;
+  holdProgress: number;
+  holdReleased: boolean;
+  memorizeSequence: string[];
+  memorizeRevealed: boolean;
+  memorizeRevealTimer: number;
+  memorizeInputIndex: number;
   startTime: number;
   patienceRemaining: number;
   completed: boolean;
@@ -68,7 +107,7 @@ export interface ActiveOrder {
 
 export interface RestaurantState {
   shiftActive: boolean;
-  orderSlots: (ActiveOrder | null)[]; // fixed 5 slots, null = empty
+  orderSlots: (ActiveOrder | null)[];
   activeOrderId: number | null;
   completedOrders: number;
   totalEarnings: number;
@@ -77,4 +116,7 @@ export interface RestaurantState {
   nextOrderTimer: number;
   orderIdCounter: number;
   shiftOver: boolean;
+  availableMenu: MenuItem[];
+  acquiredUpgrades: string[];
+  comboStreak: number;
 }
