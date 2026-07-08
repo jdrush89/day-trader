@@ -17,7 +17,7 @@ function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [speed, setSpeed] = useState<number>(1);
   const [paused, setPaused] = useState(false);
-  const [debugMode, setDebugMode] = useState(false);
+
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
@@ -43,10 +43,6 @@ function App() {
         return;
       }
 
-      if (e.key === "n" || e.key === "N") {
-        setDebugMode((d) => !d);
-        return;
-      }
 
       if (restaurantState) return;
 
@@ -209,7 +205,6 @@ function App() {
     return `${displayHour}:${mins.toString().padStart(2, "0")} ${ampm}`;
   };
 
-  const hasBloomberg = hasUpgrade(gameState, "bloomberg");
   const showAnalystRating = hasUpgrade(gameState, "analyst_ratings");
   const showDarkPool = hasUpgrade(gameState, "dark_pool");
   const isRestaurantShift = restaurantState !== null;
@@ -442,9 +437,7 @@ function App() {
                   isActive={monitor.id === activeMonitorId}
                   totalMonitors={gameState.monitors.length}
                   gameState={gameState}
-                  debugMode={debugMode}
                   paused={paused}
-                  hasBloomberg={hasBloomberg}
                   showAnalystRating={showAnalystRating}
                   showDarkPool={showDarkPool}
                   onChangeChannel={handleChangeChannel}

@@ -16,7 +16,6 @@ export const UPGRADE_POOL: UpgradeCard[] = [
   { id: "loan_shark", name: "Loan Shark", description: "+15% profits from shorting finance stocks", icon: "🦈", category: "profit", maxStacks: 1 },
   { id: "day_trader", name: "Day Trader Badge", description: "+5% on all trades closed same day they're opened", icon: "📅", category: "profit", maxStacks: 1 },
   { id: "rumor_mill", name: "Rumor Mill", description: "See social media posts 5 ticks before they affect prices", icon: "👂", category: "info", maxStacks: 1 },
-  { id: "bloomberg", name: "Bloomberg Terminal", description: "News shows impact strength without debug mode", icon: "📺", category: "info", maxStacks: 1 },
   { id: "analyst_ratings", name: "Analyst Ratings", description: "See bull/bear consensus on each stock", icon: "📊", category: "info", maxStacks: 1 },
   { id: "dark_pool", name: "Dark Pool Access", description: "See institutional orders before they execute", icon: "🏦", category: "info", maxStacks: 1 },
   { id: "insider_rolodex", name: "Insider Rolodex", description: "Get 2 insider tips per day instead of 1", icon: "📇", category: "info", maxStacks: 1 },

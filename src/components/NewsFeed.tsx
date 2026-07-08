@@ -4,9 +4,7 @@ import { NewsItem, InsiderTip } from "../game/types";
 interface NewsFeedProps {
   news: NewsItem[];
   category: "business" | "global" | "social";
-  debugMode?: boolean;
   paused?: boolean;
-  hasBloomberg?: boolean;
 }
 
 interface Commercial {
@@ -55,7 +53,7 @@ function getStrengthBadge(item: NewsItem) {
   return null;
 }
 
-function BusinessNewsView({ news, debugMode, paused, hasBloomberg }: { news: NewsItem[]; debugMode?: boolean; paused?: boolean; hasBloomberg?: boolean }) {
+function BusinessNewsView({ news, paused }: { news: NewsItem[]; paused?: boolean }) {
   const stories = news.filter((n) => n.category === "business");
   const [showCommercial, setShowCommercial] = useState(false);
   const [storyIndex, setStoryIndex] = useState(0);
@@ -71,10 +69,10 @@ function BusinessNewsView({ news, debugMode, paused, hasBloomberg }: { news: New
   const shouldShowCommercial = stories.length === 0 || showCommercial;
   const strengthBadge = story ? getStrengthBadge(story) : null;
   if (shouldShowCommercial) return <div className="biz-news-view"><div className="biz-header"><span className="biz-logo">📊 MARKET WATCH</span><span className="biz-live">● LIVE</span></div><CommercialView paused={paused} /></div>;
-  return <div className="biz-news-view"><div className="biz-header"><span className="biz-logo">📊 MARKET WATCH</span><span className="biz-live">● LIVE</span></div><div className={`biz-banner sentiment-${story.sentiment}`}>{story.headline}{hasBloomberg && strengthBadge && <span className="impact-strength-badge">{strengthBadge}</span>}</div><div className="biz-body">{story.body}</div>{story.earnings && <div className="biz-earnings"><div className="earnings-title">QUARTERLY RESULTS</div><div className="earnings-grid"><div className="earnings-stat"><span className="earnings-label">Revenue</span><span className="earnings-value">{story.earnings.revenue}</span></div><div className="earnings-stat"><span className="earnings-label">Net Profit</span><span className="earnings-value">{story.earnings.profit}</span></div><div className="earnings-stat"><span className="earnings-label">Growth</span><span className="earnings-value">{story.earnings.growth}</span></div><div className="earnings-stat"><span className="earnings-label">Spending</span><span className="earnings-value">{story.earnings.spending}</span></div><div className="earnings-stat full-width"><span className="earnings-label">Guidance</span><span className="earnings-value">{story.earnings.guidance}</span></div></div></div>}{story.affectedStocks && <div className="biz-ticker-tag">${story.affectedStocks[0]}</div>}{debugMode && <DebugImpact item={story} />}</div>;
+  return <div className="biz-news-view"><div className="biz-header"><span className="biz-logo">📊 MARKET WATCH</span><span className="biz-live">● LIVE</span></div><div className={`biz-banner sentiment-${story.sentiment}`}>{story.headline}{strengthBadge && <span className="impact-strength-badge">{strengthBadge}</span>}</div><div className="biz-body">{story.body}</div>{story.earnings && <div className="biz-earnings"><div className="earnings-title">QUARTERLY RESULTS</div><div className="earnings-grid"><div className="earnings-stat"><span className="earnings-label">Revenue</span><span className="earnings-value">{story.earnings.revenue}</span></div><div className="earnings-stat"><span className="earnings-label">Net Profit</span><span className="earnings-value">{story.earnings.profit}</span></div><div className="earnings-stat"><span className="earnings-label">Growth</span><span className="earnings-value">{story.earnings.growth}</span></div><div className="earnings-stat"><span className="earnings-label">Spending</span><span className="earnings-value">{story.earnings.spending}</span></div><div className="earnings-stat full-width"><span className="earnings-label">Guidance</span><span className="earnings-value">{story.earnings.guidance}</span></div></div></div>}{story.affectedStocks && <div className="biz-ticker-tag">${story.affectedStocks[0]}</div>}<DebugImpact item={story} /></div>;
 }
 
-function GlobalNewsView({ news, debugMode, paused, hasBloomberg }: { news: NewsItem[]; debugMode?: boolean; paused?: boolean; hasBloomberg?: boolean }) {
+function GlobalNewsView({ news, paused }: { news: NewsItem[]; paused?: boolean }) {
   const headlines = news.filter((n) => n.category === "global");
   const [showCommercial, setShowCommercial] = useState(false);
   const [storyIndex, setStoryIndex] = useState(0);
@@ -89,7 +87,7 @@ function GlobalNewsView({ news, debugMode, paused, hasBloomberg }: { news: NewsI
   const latest = headlines[storyIndex % Math.max(headlines.length, 1)];
   const shouldShowCommercial = headlines.length === 0 || showCommercial;
   const strengthBadge = latest ? getStrengthBadge(latest) : null;
-  return <div className="global-news-view"><div className="global-header"><span className="global-logo">🌍 WORLD NEWS NETWORK</span><span className="global-live">● LIVE</span></div>{!shouldShowCommercial && latest ? <div className="global-main"><div className={`global-breaking sentiment-${latest.sentiment}`}>BREAKING NEWS</div><div className="global-headline">{latest.headline}{hasBloomberg && strengthBadge && <span className="impact-strength-badge">{strengthBadge}</span>}</div>{debugMode && <DebugImpact item={latest} />}</div> : <div className="global-main"><CommercialView paused={paused} /></div>}<div className="global-ticker-bar"><div className="global-ticker-content">{headlines.length > 0 ? headlines.map((h) => h.headline).join("  ///  ") : "Monitoring global events..."}</div></div></div>;
+  return <div className="global-news-view"><div className="global-header"><span className="global-logo">🌍 WORLD NEWS NETWORK</span><span className="global-live">● LIVE</span></div>{!shouldShowCommercial && latest ? <div className="global-main"><div className={`global-breaking sentiment-${latest.sentiment}`}>BREAKING NEWS</div><div className="global-headline">{latest.headline}{strengthBadge && <span className="impact-strength-badge">{strengthBadge}</span>}</div><DebugImpact item={latest} /></div> : <div className="global-main"><CommercialView paused={paused} /></div>}<div className="global-ticker-bar"><div className="global-ticker-content">{headlines.length > 0 ? headlines.map((h) => h.headline).join("  ///  ") : "Monitoring global events..."}</div></div></div>;
 }
 
 function formatUpvotes(n: number): string {
@@ -97,20 +95,20 @@ function formatUpvotes(n: number): string {
   return `${n}`;
 }
 
-function SocialFeedView({ news, debugMode }: { news: NewsItem[]; debugMode?: boolean }) {
+function SocialFeedView({ news }: { news: NewsItem[] }) {
   const now = Date.now();
   const posts = news.filter((n) => n.category === "social").sort((a, b) => {
     const aScore = (a.upvotes ?? 0) / Math.pow((now - a.timestamp) / 1000 / 60 + 2, 1.2);
     const bScore = (b.upvotes ?? 0) / Math.pow((now - b.timestamp) / 1000 / 60 + 2, 1.2);
     return bScore - aScore;
   });
-  return <div className="social-feed-view"><div className="social-header"><span className="social-logo">💬 r/WallStreetYOLOs</span><div className="social-tabs"><span className="social-tab active">🔥 Hot</span><span className="social-tab">🆕 New</span><span className="social-tab">📈 Rising</span></div></div><div className="social-post-list">{posts.length === 0 && <div className="social-empty">Nothing trending yet... check back soon</div>}{posts.map((post, index) => { const isViral = (post.upvotes ?? 0) > 500; const isMega = (post.upvotes ?? 0) > 2000; return <div key={post.id} className={`social-post-row ${isMega ? "mega-viral" : isViral ? "viral" : ""}`}><div className="social-rank">#{index + 1}</div><div className="social-vote-col"><span className="vote-arrow">▲</span><span className={`vote-count ${isViral ? "vote-hot" : ""}`}>{formatUpvotes(post.upvotes ?? 0)}</span><span className="vote-arrow dim">▼</span></div><div className="social-post-content"><div className="social-post-title">{post.headline}{post.affectedStocks && <span className="ticker-tag">${post.affectedStocks[0]}</span>}{isViral && <span className="viral-badge">{isMega ? "🔥 VIRAL" : "📈 Rising"}</span>}</div><div className="social-post-body">{post.body}</div><div className="social-post-meta"><span className="social-author">u/{post.author || "anonymous"}</span><span className={`social-flair sentiment-${post.sentiment}`}>{post.sentiment === "positive" ? "🚀 Bullish" : "🐻 Bearish"}</span><span className="social-comments">💬 {post.commentCount ?? 0}</span><span className="social-share">↗ Share</span><span className="social-awards">{(post.upvotes ?? 0) > 1000 && "🏆"}{(post.upvotes ?? 0) > 500 && "💎"}{(post.upvotes ?? 0) > 100 && "🥈"}</span></div>{debugMode && <DebugImpact item={post} />}</div></div>;})}</div></div>;
+  return <div className="social-feed-view"><div className="social-header"><span className="social-logo">💬 r/WallStreetYOLOs</span><div className="social-tabs"><span className="social-tab active">🔥 Hot</span><span className="social-tab">🆕 New</span><span className="social-tab">📈 Rising</span></div></div><div className="social-post-list">{posts.length === 0 && <div className="social-empty">Nothing trending yet... check back soon</div>}{posts.map((post, index) => { const isViral = (post.upvotes ?? 0) > 500; const isMega = (post.upvotes ?? 0) > 2000; return <div key={post.id} className={`social-post-row ${isMega ? "mega-viral" : isViral ? "viral" : ""}`}><div className="social-rank">#{index + 1}</div><div className="social-vote-col"><span className="vote-arrow">▲</span><span className={`vote-count ${isViral ? "vote-hot" : ""}`}>{formatUpvotes(post.upvotes ?? 0)}</span><span className="vote-arrow dim">▼</span></div><div className="social-post-content"><div className="social-post-title">{post.headline}{post.affectedStocks && <span className="ticker-tag">${post.affectedStocks[0]}</span>}{isViral && <span className="viral-badge">{isMega ? "🔥 VIRAL" : "📈 Rising"}</span>}</div><div className="social-post-body">{post.body}</div><div className="social-post-meta"><span className="social-author">u/{post.author || "anonymous"}</span><span className={`social-flair sentiment-${post.sentiment}`}>{post.sentiment === "positive" ? "🚀 Bullish" : "🐻 Bearish"}</span><span className="social-comments">💬 {post.commentCount ?? 0}</span><span className="social-share">↗ Share</span><span className="social-awards">{(post.upvotes ?? 0) > 1000 && "🏆"}{(post.upvotes ?? 0) > 500 && "💎"}{(post.upvotes ?? 0) > 100 && "🥈"}</span></div><DebugImpact item={post} /></div></div>;})}</div></div>;
 }
 
-export function NewsFeed({ news, category, debugMode, paused, hasBloomberg }: NewsFeedProps) {
-  if (category === "business") return <BusinessNewsView news={news} debugMode={debugMode} paused={paused} hasBloomberg={hasBloomberg} />;
-  if (category === "global") return <GlobalNewsView news={news} debugMode={debugMode} paused={paused} hasBloomberg={hasBloomberg} />;
-  return <SocialFeedView news={news} debugMode={debugMode} />;
+export function NewsFeed({ news, category, paused }: NewsFeedProps) {
+  if (category === "business") return <BusinessNewsView news={news} paused={paused} />;
+  if (category === "global") return <GlobalNewsView news={news} paused={paused} />;
+  return <SocialFeedView news={news} />;
 }
 
 interface InsiderFeedProps {
@@ -118,15 +116,14 @@ interface InsiderFeedProps {
   tip2?: InsiderTip | null;
   viewed: boolean;
   onView: () => void;
-  debugMode?: boolean;
 }
 
 function InsiderMessage({ tip }: { tip: InsiderTip }) {
   return <div className="insider-message-bubble"><div className="insider-message-header"><span className="insider-avatar">🕵️</span><span className="insider-sender">Anonymous Contact</span><span className="insider-encrypted">🔒 encrypted</span></div><div className="insider-message-body">{tip.tipText}</div><div className="insider-stock-tag"><span className={`insider-direction ${tip.direction}`}>{tip.direction === "up" ? "📈" : "📉"} ${tip.symbol}</span></div></div>;
 }
 
-export function InsiderFeed({ tip, tip2, viewed, onView, debugMode }: InsiderFeedProps) {
+export function InsiderFeed({ tip, tip2, viewed, onView }: InsiderFeedProps) {
   const tips = [tip, tip2].filter(Boolean) as InsiderTip[];
   if (tips.length === 0) return <div className="insider-feed-view"><div className="insider-header"><span className="insider-logo">🤫 INSIDER TIPS</span><span className="insider-warning">⚠️ CONFIDENTIAL</span></div><div className="insider-empty"><div className="insider-empty-icon">📱</div><div className="insider-empty-text">No tips today...</div><div className="insider-empty-sub">Check back tomorrow. Your contacts are working on something.</div></div></div>;
-  return <div className="insider-feed-view"><div className="insider-header"><span className="insider-logo">🤫 INSIDER TIPS</span><span className="insider-warning">⚠️ CONFIDENTIAL</span></div>{!viewed ? <div className="insider-tip-hidden"><div className="insider-envelope">📨</div><div className="insider-hidden-text">You have {tips.length} new insider tip{tips.length > 1 ? "s" : ""} from anonymous contacts.</div><div className="insider-hidden-sub">Viewing these tips may constitute insider trading. Any profits from these stocks after viewing may attract SEC attention.</div>{tips.map((entry) => <button key={entry.id} className="insider-reveal-btn" onClick={onView}>🔓 View Tip on ${entry.symbol}</button>)}</div> : <div className="insider-tip-container">{tips.map((entry) => <InsiderMessage key={entry.id} tip={entry} />)}<div className="insider-sec-warning">⚠️ You've viewed these tips. Trading on this information may attract SEC attention.</div>{debugMode && <div className="debug-impact active"><span className="debug-label">🔍 DEBUG</span><span className="debug-desc">{tips.map((t) => `${t.symbol}: 90% chance of strong ${t.direction === "up" ? "price SURGE ↑" : "price CRASH ↓"}`).join(" | ")}. SEC fine risk scales with profits on tipped names after viewing.</span></div>}</div>}</div>;
+  return <div className="insider-feed-view"><div className="insider-header"><span className="insider-logo">🤫 INSIDER TIPS</span><span className="insider-warning">⚠️ CONFIDENTIAL</span></div>{!viewed ? <div className="insider-tip-hidden"><div className="insider-envelope">📨</div><div className="insider-hidden-text">You have {tips.length} new insider tip{tips.length > 1 ? "s" : ""} from anonymous contacts.</div><div className="insider-hidden-sub">Viewing these tips may constitute insider trading. Any profits from these stocks after viewing may attract SEC attention.</div>{tips.map((entry) => <button key={entry.id} className="insider-reveal-btn" onClick={onView}>🔓 View Tip on ${entry.symbol}</button>)}</div> : <div className="insider-tip-container">{tips.map((entry) => <InsiderMessage key={entry.id} tip={entry} />)}<div className="insider-sec-warning">⚠️ You've viewed these tips. Trading on this information may attract SEC attention.</div><div className="debug-impact active"><span className="debug-label">🔍 DEBUG</span><span className="debug-desc">{tips.map((t) => `${t.symbol}: 90% chance of strong ${t.direction === "up" ? "price SURGE ↑" : "price CRASH ↓"}`).join(" | ")}. SEC fine risk scales with profits on tipped names after viewing.</span></div></div>}</div>;
 }

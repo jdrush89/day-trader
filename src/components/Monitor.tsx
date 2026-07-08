@@ -10,9 +10,7 @@ interface MonitorProps {
   isActive: boolean;
   totalMonitors: number;
   gameState: GameState;
-  debugMode: boolean;
   paused: boolean;
-  hasBloomberg?: boolean;
   showAnalystRating?: boolean;
   showDarkPool?: boolean;
   onChangeChannel: (monitorId: number, channel: MonitorChannel) => void;
@@ -28,7 +26,7 @@ const CHANNEL_LABELS: Record<MonitorChannel, string> = { business_news: "📊 Bi
 
 function getAnalystRating(symbol: string, stockTags: string[], news: NewsItem[]): "bullish" | "bearish" | "neutral" { let bullish = 0; let bearish = 0; for (const item of news) { if (!item.impact || item.impact.ticksRemaining <= 0 || item.impact.ticksRemaining > item.impact.duration) continue; for (const effect of item.impact.effects) { const matches = effect.symbol ? effect.symbol === symbol : effect.tag ? stockTags.includes(effect.tag) : false; if (!matches) continue; if (effect.direction === "up") bullish += 1; else bearish += 1; } } if (bullish > bearish) return "bullish"; if (bearish > bullish) return "bearish"; return "neutral"; }
 
-export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameState, debugMode, paused, hasBloomberg, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover }: MonitorProps) {
+export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameState, paused, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover }: MonitorProps) {
   const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
@@ -191,7 +189,7 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
                         <span>{order.shares.toLocaleString()} shr</span>
                       </div>
                     ))}
-                    {debugMode && (
+                    {(
                       <div className="debug-impact active" style={{ marginTop: 6 }}>
                         <span className="debug-label">🔍 DEBUG</span>
                         <span className="debug-desc">
@@ -228,10 +226,10 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
                 )}
               </div>
             )}
-            {monitor.channel === "business_news" && <NewsFeed news={gameState.news} category="business" debugMode={debugMode} paused={paused} hasBloomberg={hasBloomberg} />}
-            {monitor.channel === "global_news" && <NewsFeed news={gameState.news} category="global" debugMode={debugMode} paused={paused} hasBloomberg={hasBloomberg} />}
-            {monitor.channel === "social_media" && <NewsFeed news={gameState.news} category="social" debugMode={debugMode} paused={paused} />}
-            {monitor.channel === "insider" && <InsiderFeed tip={gameState.insiderTip} tip2={gameState.insiderTip2} viewed={gameState.insiderViewed} onView={onViewInsider} debugMode={debugMode} />}
+            {monitor.channel === "business_news" && <NewsFeed news={gameState.news} category="business" paused={paused} />}
+            {monitor.channel === "global_news" && <NewsFeed news={gameState.news} category="global" paused={paused} />}
+            {monitor.channel === "social_media" && <NewsFeed news={gameState.news} category="social" paused={paused} />}
+            {monitor.channel === "insider" && <InsiderFeed tip={gameState.insiderTip} tip2={gameState.insiderTip2} viewed={gameState.insiderViewed} onView={onViewInsider} />}
           </div>
         </div>
         <div className="monitor-controls">
