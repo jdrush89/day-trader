@@ -111,7 +111,7 @@ const BASE_MENU: MenuItem[] = [
     patience: 30,
     steps: [
       { type: "assemble", label: "Load blender", ingredients: [ingredient("Milk", "m", true), ingredient("Ice cream", "i", true), ingredient("Syrup", "s")] },
-      { type: "mix", label: "Blend smooth", target: 1200 },
+      { type: "mix", label: "Blend smooth", target: 5000 },
     ],
   },
   {
@@ -142,7 +142,7 @@ const BASE_MENU: MenuItem[] = [
     patience: 30,
     steps: [
       { type: "assemble", label: "Fill blender", ingredients: [ingredient("Banana", "b", true), ingredient("Strawberry", "s", true), ingredient("Yogurt", "y"), ingredient("Juice", "j")] },
-      { type: "mix", label: "Blend smoothie", target: 800 },
+      { type: "mix", label: "Blend smoothie", target: 4000 },
     ],
   },
 ];
@@ -187,7 +187,7 @@ const DRAFT_MENU: MenuItem[] = [
     basePay: 7,
     patience: 35,
     steps: [
-      { type: "mix", label: "Mix batter", target: 700 },
+      { type: "mix", label: "Mix batter", target: 3500 },
       holdStep("Pour batter", "p", 0.62, 0.82, 2.2),
       { type: "grill", label: "Cook and flip", duration: secondsToTicks(6), flipAt: secondsToTicks(3), flipWindow: DEFAULT_FLIP_WINDOW },
     ],
@@ -210,7 +210,7 @@ const DRAFT_MENU: MenuItem[] = [
     patience: 40,
     steps: [
       { type: "chop", label: "Prep ingredients", target: 6 },
-      { type: "mix", label: "Stir the pot", target: 650 },
+      { type: "mix", label: "Stir the pot", target: 3000 },
       holdStep("Simmer to finish", "s", 0.76, 0.9, 2.6),
     ],
   },
@@ -243,7 +243,7 @@ const DRAFT_MENU: MenuItem[] = [
     patience: 52,
     steps: [
       memorizeStep("Memorize topping callout", 4, 3),
-      { type: "mix", label: "Whisk broth", target: 900 },
+      { type: "mix", label: "Whisk broth", target: 4500 },
       { type: "assemble", label: "Build ramen bowl", ingredients: [ingredient("Noodles", "n", true), ingredient("Broth", "b", true), ingredient("Egg", "e"), ingredient("Scallion", "s"), ingredient("Pork", "p")] },
     ],
   },
@@ -266,7 +266,7 @@ const DRAFT_MENU: MenuItem[] = [
     steps: [
       memorizeStep("Memorize topping combo", 4, 3),
       { type: "assemble", label: "Build sundae", ingredients: [ingredient("Cup", "c", true), ingredient("Ice Cream", "i", true), ingredient("Fudge", "f"), ingredient("Cherry", "h"), ingredient("Nuts", "n")] },
-      { type: "mix", label: "Final swirl", target: 450 },
+      { type: "mix", label: "Final swirl", target: 2500 },
     ],
   },
   {
