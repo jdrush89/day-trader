@@ -2370,35 +2370,48 @@ body {
 .tutorial-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 9999;
-  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
+.tutorial-spotlight-svg {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+}
+
+.tutorial-spotlight-border {
+  animation: tutorial-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tutorial-pulse {
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.4; }
 }
 
 .tutorial-card {
   background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 2rem 2.5rem;
-  max-width: 520px;
-  width: 90%;
-  text-align: center;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  width: 380px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+  pointer-events: auto;
+  z-index: 10000;
 }
 
 .tutorial-progress {
   display: flex;
-  gap: 6px;
+  gap: 5px;
   justify-content: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .tutorial-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--border);
   transition: all 0.2s;
@@ -2413,22 +2426,29 @@ body {
   background: var(--green);
 }
 
-.tutorial-icon {
-  font-size: 3rem;
+.tutorial-card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
+}
+
+.tutorial-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
 }
 
 .tutorial-title {
   color: var(--text-bright);
-  font-size: 1.3rem;
-  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  margin: 0;
 }
 
 .tutorial-body {
   color: var(--text-dim);
-  font-size: 0.9rem;
-  line-height: 1.6;
-  margin: 0 0 1.5rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  margin: 0 0 1rem;
 }
 
 .tutorial-buttons {
@@ -2441,10 +2461,10 @@ body {
   background: none;
   border: 1px solid var(--border);
   color: var(--text-dim);
-  padding: 0.4rem 1rem;
+  padding: 0.35rem 0.8rem;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
 }
 
 .tutorial-skip:hover {
@@ -2454,17 +2474,17 @@ body {
 
 .tutorial-nav {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .tutorial-back {
   background: var(--bg-dark);
   border: 1px solid var(--border);
   color: var(--text-dim);
-  padding: 0.5rem 1.2rem;
-  border-radius: 8px;
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .tutorial-back:hover {
@@ -2476,10 +2496,10 @@ body {
   background: var(--accent);
   border: none;
   color: #000;
-  padding: 0.5rem 1.5rem;
-  border-radius: 8px;
+  padding: 0.4rem 1.2rem;
+  border-radius: 6px;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: bold;
 }
 
@@ -2488,8 +2508,9 @@ body {
 }
 
 .tutorial-counter {
-  margin-top: 1rem;
-  font-size: 0.7rem;
+  margin-top: 0.75rem;
+  font-size: 0.65rem;
   color: var(--text-dim);
   opacity: 0.5;
+  text-align: center;
 }

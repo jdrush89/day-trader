@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 interface TutorialStep {
   title: string;
   body: string;
   icon: string;
+  selector?: string; // CSS selector to highlight
+  position?: "bottom" | "top" | "left" | "right"; // tooltip position relative to element
 }
 
 const TRADING_STEPS: TutorialStep[] = [
@@ -15,52 +17,49 @@ const TRADING_STEPS: TutorialStep[] = [
   {
     icon: "🖥️",
     title: "Your Monitor",
-    body: "Your monitor is your window to the market. Use the number keys 1-5 to switch between channels. When you have multiple monitors, use Shift+Number to select which monitor to control.",
+    body: "This is your monitor — your window to the market. It shows different channels of information to help you make trading decisions.",
+    selector: ".monitor-bezel",
+    position: "right",
+  },
+  {
+    icon: "🎛️",
+    title: "Channel Buttons",
+    body: "Use these buttons (or press keys 1-5) to switch between channels: Stocks, Business News, Global News, Social Media, and Insider Tips.",
+    selector: ".monitor-controls",
+    position: "top",
   },
   {
     icon: "📊",
-    title: "Stock Ticker (Key: 1)",
-    body: "This is your main view. Browse available stocks, view price charts, and execute trades. Click a stock tab to view its chart, or use the search bar to filter by name or tag.",
-  },
-  {
-    icon: "📰",
-    title: "Business News (Key: 2)",
-    body: "Earnings reports, acquisitions, and company news appear here. Each story shows a debug panel with its market impact — which stocks or sectors are affected, how strong, and how long.",
-  },
-  {
-    icon: "🌍",
-    title: "Global News (Key: 3)",
-    body: "Trade wars, interest rates, and geopolitical events move entire sectors. Watch the debug info to see which tags (tech, energy, etc.) are being impacted.",
-  },
-  {
-    icon: "💬",
-    title: "Social Media (Key: 4)",
-    body: "r/WallStreetYOLOs — retail traders pump stocks here. Viral posts can cause big swings. The debug info shows exactly what impact each post has on the market.",
-  },
-  {
-    icon: "🤫",
-    title: "Insider Tips (Key: 5)",
-    body: "Anonymous contacts send insider tips. Viewing them gives you advance knowledge, but trading on them risks SEC fines! The debug info shows the direction and probability.",
+    title: "Stock Ticker",
+    body: "The Stocks channel shows price charts. Click a stock tab to view it, use the search bar to filter, and use the Buy/Sell buttons to trade.",
+    selector: ".monitor-content",
+    position: "right",
   },
   {
     icon: "💰",
-    title: "Buying & Selling",
-    body: "On the stock chart, use the Buy and Sell buttons to trade shares. You can also Short stocks (betting the price drops) and Cover to close short positions. The sidebar shows your portfolio and positions.",
+    title: "Trading Panel",
+    body: "Your portfolio, cash balance, and positions are shown here. This is your financial overview — watch your net worth grow!",
+    selector: ".sidebar",
+    position: "left",
   },
   {
     icon: "📋",
     title: "Orders Panel",
-    body: "Click the Orders tab on the right to place limit orders, stop orders, and trade options (calls and puts). These execute automatically when price conditions are met.",
+    body: "Click this tab to open the Orders panel. Place limit orders, stop orders, and trade options (calls and puts). These execute automatically when conditions are met.",
+    selector: ".orders-tab-strip",
+    position: "left",
+  },
+  {
+    icon: "⏱️",
+    title: "Time & Speed",
+    body: "The time bar shows how much of the trading day is left. Use the speed buttons (1x, 2x, 5x) to control how fast time passes. Press ESC to pause.",
+    selector: ".header-controls",
+    position: "bottom",
   },
   {
     icon: "🎯",
     title: "Milestones & Goal",
-    body: "Every 3 days, your net worth is checked against a milestone. The targets grow each period — start at $1,500 and increase from there. Miss a milestone and it's game over! On even days, you'll work at Shwendy's restaurant to earn extra cash.",
-  },
-  {
-    icon: "⏸️",
-    title: "Controls",
-    body: "Press ESC to pause. Use the speed controls (1x, 2x, 5x) to control how fast time moves. Good luck, trader!",
+    body: "Every 3 days, your net worth is checked against a milestone. The targets grow each period — start at $1,500 and increase from there. On even days, you'll work at Shwendy's restaurant to earn extra cash. Good luck, trader!",
   },
 ];
 
@@ -72,48 +71,27 @@ const RESTAURANT_STEPS: TutorialStep[] = [
   },
   {
     icon: "📋",
-    title: "Taking Orders",
-    body: "Orders appear in slots at the top. Press the slot number (1-5) to start working on that order, or click it. Each order has a patience timer — complete it before the customer leaves!",
+    title: "Order Queue",
+    body: "Orders appear in these slots. Press the slot number (1-5) or click to start working on an order. Each order has a patience timer — complete it before the customer leaves!",
+    selector: ".restaurant-queue",
+    position: "bottom",
   },
   {
     icon: "🔥",
-    title: "Prep Steps — Grilling & Frying",
-    body: "Some items need grilling or frying. A progress bar fills automatically. Watch for the green zone — press F to flip at the right time! Don't wait too long or the food will burn.",
-  },
-  {
-    icon: "🔪",
-    title: "Prep Steps — Chopping",
-    body: "Chopping requires pressing the left and right arrow keys in quick alternation. Keep going until the progress bar fills up!",
-  },
-  {
-    icon: "🥄",
-    title: "Prep Steps — Mixing",
-    body: "Mixing is done by moving your mouse in circles. You need to do multiple full rotations to complete the mix — keep swirling!",
-  },
-  {
-    icon: "🎵",
-    title: "Prep Steps — Rhythm, Hold & Memorize",
-    body: "Advanced recipes have special steps. Rhythm: press keys on the beat. Hold: hold a key and release in the green zone. Memorize: watch a sequence, then repeat it from memory.",
-  },
-  {
-    icon: "🍞",
-    title: "Assembling Ingredients",
-    body: "After prep, assemble the order by pressing the key for each ingredient. Press the correct key to add it, or press Space to skip to the next ingredient.",
+    title: "Active Work Area",
+    body: "This is where you prepare the active order. Steps include grilling (watch for the green flip zone!), chopping (alternate ← → arrows), mixing (swirl your mouse), and more.",
+    selector: ".restaurant-work-area",
+    position: "top",
   },
   {
     icon: "⚠️",
     title: "Order Modifications",
-    body: "Some customers want modifications — like \"No lettuce\" or \"No tomato\". Read the order ticket carefully! If you add an unwanted ingredient or skip a wanted one, the order will be marked incorrect and you won't get a tip.",
+    body: "Some customers want modifications — like \"No lettuce\". Read the order ticket carefully! If you add an unwanted ingredient or skip a wanted one, the order will be marked incorrect and you won't get a tip.",
   },
   {
     icon: "✅",
-    title: "Serving Orders",
-    body: "When an order is complete, press the slot number, press Enter, or click the order to serve it. Faster service = bigger tips!",
-  },
-  {
-    icon: "🔀",
-    title: "Multitasking",
-    body: "While prep is happening on one order, switch to another by pressing its number. Work on multiple orders at once to maximize your earnings! At the end of the shift, you'll pick a restaurant upgrade and a new menu item. Good luck, chef!",
+    title: "Serving & Multitasking",
+    body: "When an order is done, press its number, Enter, or click to serve. While one order preps automatically, switch to another to multitask! At shift end, you'll pick a kitchen upgrade and new menu item. Good luck, chef!",
   },
 ];
 
@@ -122,21 +100,143 @@ interface TutorialProps {
   onComplete: () => void;
 }
 
+interface SpotlightRect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
 export function Tutorial({ steps, onComplete }: TutorialProps) {
   const [stepIndex, setStepIndex] = useState(0);
+  const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const step = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
 
+  const measureElement = useCallback(() => {
+    if (!step.selector) {
+      setSpotlight(null);
+      return;
+    }
+    const el = document.querySelector(step.selector);
+    if (!el) {
+      setSpotlight(null);
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    const pad = 8;
+    setSpotlight({
+      top: rect.top - pad,
+      left: rect.left - pad,
+      width: rect.width + pad * 2,
+      height: rect.height + pad * 2,
+    });
+  }, [step.selector]);
+
+  useEffect(() => {
+    measureElement();
+    window.addEventListener("resize", measureElement);
+    return () => window.removeEventListener("resize", measureElement);
+  }, [measureElement]);
+
+  // Compute tooltip position
+  const getCardStyle = (): React.CSSProperties => {
+    if (!spotlight || !step.selector) {
+      return { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
+    }
+
+    const pos = step.position || "bottom";
+    const gap = 16;
+    const cardWidth = 380;
+
+    switch (pos) {
+      case "bottom":
+        return {
+          position: "fixed",
+          top: spotlight.top + spotlight.height + gap,
+          left: Math.max(16, Math.min(spotlight.left + spotlight.width / 2 - cardWidth / 2, window.innerWidth - cardWidth - 16)),
+          maxWidth: cardWidth,
+        };
+      case "top":
+        return {
+          position: "fixed",
+          bottom: window.innerHeight - spotlight.top + gap,
+          left: Math.max(16, Math.min(spotlight.left + spotlight.width / 2 - cardWidth / 2, window.innerWidth - cardWidth - 16)),
+          maxWidth: cardWidth,
+        };
+      case "left":
+        return {
+          position: "fixed",
+          top: Math.max(16, spotlight.top + spotlight.height / 2 - 100),
+          right: window.innerWidth - spotlight.left + gap,
+          maxWidth: cardWidth,
+        };
+      case "right":
+        return {
+          position: "fixed",
+          top: Math.max(16, spotlight.top + spotlight.height / 2 - 100),
+          left: spotlight.left + spotlight.width + gap,
+          maxWidth: cardWidth,
+        };
+    }
+  };
+
   return (
     <div className="tutorial-overlay">
-      <div className="tutorial-card">
+      {/* SVG overlay with cutout */}
+      <svg className="tutorial-spotlight-svg" width="100%" height="100%">
+        <defs>
+          <mask id="tutorial-mask">
+            <rect x="0" y="0" width="100%" height="100%" fill="white" />
+            {spotlight && (
+              <rect
+                x={spotlight.left}
+                y={spotlight.top}
+                width={spotlight.width}
+                height={spotlight.height}
+                rx="10"
+                ry="10"
+                fill="black"
+              />
+            )}
+          </mask>
+        </defs>
+        <rect
+          x="0"
+          y="0"
+          width="100%"
+          height="100%"
+          fill="rgba(0, 0, 0, 0.75)"
+          mask="url(#tutorial-mask)"
+        />
+        {spotlight && (
+          <rect
+            x={spotlight.left}
+            y={spotlight.top}
+            width={spotlight.width}
+            height={spotlight.height}
+            rx="10"
+            ry="10"
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="2"
+            className="tutorial-spotlight-border"
+          />
+        )}
+      </svg>
+
+      {/* Tooltip card */}
+      <div ref={cardRef} className="tutorial-card" style={getCardStyle()}>
         <div className="tutorial-progress">
           {steps.map((_, i) => (
             <div key={i} className={`tutorial-dot ${i === stepIndex ? "active" : i < stepIndex ? "done" : ""}`} />
           ))}
         </div>
-        <div className="tutorial-icon">{step.icon}</div>
-        <h2 className="tutorial-title">{step.title}</h2>
+        <div className="tutorial-card-header">
+          <span className="tutorial-icon">{step.icon}</span>
+          <h2 className="tutorial-title">{step.title}</h2>
+        </div>
         <p className="tutorial-body">{step.body}</p>
         <div className="tutorial-buttons">
           <button className="tutorial-skip" onClick={onComplete}>Skip Tutorial</button>
@@ -154,3 +254,4 @@ export function Tutorial({ steps, onComplete }: TutorialProps) {
 }
 
 export { TRADING_STEPS, RESTAURANT_STEPS };
+
