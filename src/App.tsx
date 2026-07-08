@@ -10,6 +10,7 @@ import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
 import { Restaurant } from "./components/Restaurant";
+import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS } from "./components/Tutorial";
 import titleScreen from "./assets/title-screen.png";
 
 function App() {
@@ -22,12 +23,14 @@ function App() {
   const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
   const [activeMonitorId, setActiveMonitorId] = useState(0);
+  const [showTradingTutorial, setShowTradingTutorial] = useState(true);
+  const [showRestaurantTutorial, setShowRestaurantTutorial] = useState(true);
 
   useEffect(() => {
-    if (gameState.gameOver || !gameState.marketOpen || paused) return;
+    if (gameState.gameOver || !gameState.marketOpen || paused || showTradingTutorial) return;
     const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
     return () => clearInterval(interval);
-  }, [gameState.marketOpen, gameState.gameOver, speed, paused]);
+  }, [gameState.marketOpen, gameState.gameOver, speed, paused, showTradingTutorial]);
 
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
@@ -191,6 +194,8 @@ function App() {
     setGameState(createInitialState());
     setRestaurantState(null);
     setShowTitle(true);
+    setShowTradingTutorial(true);
+    setShowRestaurantTutorial(true);
     setEodPhase("summary");
   }, []);
 
@@ -223,7 +228,15 @@ function App() {
 
   return (
     <div className="game-container">
-      {!isRestaurantShift && (
+     {showTradingTutorial && !isRestaurantShift && (
+       <Tutorial steps={TRADING_STEPS} onComplete={() => setShowTradingTutorial(false)} />
+     )}
+
+     {showRestaurantTutorial && isRestaurantShift && restaurantState && !gameState.gameOver && (
+       <Tutorial steps={RESTAURANT_STEPS} onComplete={() => setShowRestaurantTutorial(false)} />
+     )}
+
+     {!isRestaurantShift && (
         <header className="game-header">
           <h1>📈 Day Trader</h1>
           <div className="header-controls">
@@ -240,7 +253,7 @@ function App() {
         </header>
       )}
 
-      {paused && (
+      {paused && !showTradingTutorial && (
         <div className="pause-overlay">
           <div className="pause-menu">
             <h2>⏸ Paused</h2>
@@ -265,7 +278,7 @@ function App() {
       {isRestaurantShift && restaurantState && !gameState.gameOver ? (
         <Restaurant
           day={gameState.day}
-          paused={paused}
+          paused={paused || showRestaurantTutorial}
           state={restaurantState}
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
