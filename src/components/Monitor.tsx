@@ -191,7 +191,7 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
                     ))}
                     {(
                       <div className="debug-impact active" style={{ marginTop: 6 }}>
-                        <span className="debug-label">🔍 DEBUG</span>
+                        <span className="debug-label">🔍</span>
                         <span className="debug-desc">
                           Dark pool orders are intel only — they signal institutional sentiment but don't directly move prices. Use as a leading indicator for your own trades.
                           {" "}Net flow: {(() => {
