@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import type { MonitorChannel } from "../game/types";
 
 interface TutorialStep {
   title: string;
   body: string;
   icon: string;
-  selector?: string; // CSS selector to highlight
-  position?: "bottom" | "top" | "left" | "right"; // tooltip position relative to element
+  selector?: string;
+  position?: "bottom" | "top" | "left" | "right";
+  channel?: MonitorChannel; // Switch monitor to this channel on enter
 }
 
 const TRADING_STEPS: TutorialStep[] = [
@@ -20,20 +22,55 @@ const TRADING_STEPS: TutorialStep[] = [
     body: "This is your monitor — your window to the market. It shows different channels of information to help you make trading decisions.",
     selector: ".monitor-bezel",
     position: "right",
+    channel: "stock_ticker",
+  },
+  {
+    icon: "📊",
+    title: "Stock Ticker (Key: 1)",
+    body: "The Stocks channel shows live price charts. Click a stock tab to view it, use the search bar to filter by name or tag, and use the Buy/Sell/Short/Cover buttons to trade.",
+    selector: ".monitor-content",
+    position: "right",
+    channel: "stock_ticker",
+  },
+  {
+    icon: "📰",
+    title: "Business News (Key: 2)",
+    body: "Earnings reports, acquisitions, and company news appear here. Each story shows its market impact — which stocks are affected, how strong, and how long the effect lasts.",
+    selector: ".monitor-content",
+    position: "right",
+    channel: "business_news",
+  },
+  {
+    icon: "🌍",
+    title: "Global News (Key: 3)",
+    body: "Trade wars, interest rates, and geopolitical events move entire sectors. Watch the impact info to see which tags (tech, energy, etc.) are being affected.",
+    selector: ".monitor-content",
+    position: "right",
+    channel: "global_news",
+  },
+  {
+    icon: "💬",
+    title: "Social Media (Key: 4)",
+    body: "r/WallStreetYOLOs — retail traders pump stocks here. Viral posts can cause big swings. The impact info shows exactly what each post does to the market.",
+    selector: ".monitor-content",
+    position: "right",
+    channel: "social_media",
+  },
+  {
+    icon: "🤫",
+    title: "Insider Tips (Key: 5)",
+    body: "Anonymous contacts send insider tips. Viewing them gives you advance knowledge, but trading on them risks SEC fines! Use at your own risk.",
+    selector: ".monitor-content",
+    position: "right",
+    channel: "insider",
   },
   {
     icon: "🎛️",
     title: "Channel Buttons",
-    body: "Use these buttons (or press keys 1-5) to switch between channels: Stocks, Business News, Global News, Social Media, and Insider Tips.",
+    body: "Use these buttons at the bottom (or press keys 1-5) to switch between all five channels anytime.",
     selector: ".monitor-controls",
     position: "top",
-  },
-  {
-    icon: "📊",
-    title: "Stock Ticker",
-    body: "The Stocks channel shows price charts. Click a stock tab to view it, use the search bar to filter, and use the Buy/Sell buttons to trade.",
-    selector: ".monitor-content",
-    position: "right",
+    channel: "stock_ticker",
   },
   {
     icon: "💰",
@@ -41,6 +78,7 @@ const TRADING_STEPS: TutorialStep[] = [
     body: "Your portfolio, cash balance, and positions are shown here. This is your financial overview — watch your net worth grow!",
     selector: ".sidebar",
     position: "left",
+    channel: "stock_ticker",
   },
   {
     icon: "📋",
@@ -98,6 +136,7 @@ const RESTAURANT_STEPS: TutorialStep[] = [
 interface TutorialProps {
   steps: TutorialStep[];
   onComplete: () => void;
+  onStepChange?: (step: TutorialStep, index: number) => void;
 }
 
 interface SpotlightRect {
@@ -107,12 +146,17 @@ interface SpotlightRect {
   height: number;
 }
 
-export function Tutorial({ steps, onComplete }: TutorialProps) {
+export function Tutorial({ steps, onComplete, onStepChange }: TutorialProps) {
   const [stepIndex, setStepIndex] = useState(0);
   const [spotlight, setSpotlight] = useState<SpotlightRect | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
   const step = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
+
+  // Notify parent when step changes (including initial render)
+  useEffect(() => {
+    onStepChange?.(steps[stepIndex], stepIndex);
+  }, [stepIndex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const measureElement = useCallback(() => {
     if (!step.selector) {
@@ -134,13 +178,17 @@ export function Tutorial({ steps, onComplete }: TutorialProps) {
     });
   }, [step.selector]);
 
+  // Re-measure after a short delay to let channel switch render
   useEffect(() => {
     measureElement();
+    const timer = setTimeout(measureElement, 50);
     window.addEventListener("resize", measureElement);
-    return () => window.removeEventListener("resize", measureElement);
+    return () => {
+      window.removeEventListener("resize", measureElement);
+      clearTimeout(timer);
+    };
   }, [measureElement]);
 
-  // Compute tooltip position
   const getCardStyle = (): React.CSSProperties => {
     if (!spotlight || !step.selector) {
       return { position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)" };
@@ -184,7 +232,6 @@ export function Tutorial({ steps, onComplete }: TutorialProps) {
 
   return (
     <div className="tutorial-overlay">
-      {/* SVG overlay with cutout */}
       <svg className="tutorial-spotlight-svg" width="100%" height="100%">
         <defs>
           <mask id="tutorial-mask">
@@ -226,7 +273,6 @@ export function Tutorial({ steps, onComplete }: TutorialProps) {
         )}
       </svg>
 
-      {/* Tooltip card */}
       <div ref={cardRef} className="tutorial-card" style={getCardStyle()}>
         <div className="tutorial-progress">
           {steps.map((_, i) => (
@@ -254,4 +300,5 @@ export function Tutorial({ steps, onComplete }: TutorialProps) {
 }
 
 export { TRADING_STEPS, RESTAURANT_STEPS };
+export type { TutorialStep };
 

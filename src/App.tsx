@@ -10,7 +10,7 @@ import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
 import { Restaurant } from "./components/Restaurant";
-import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS } from "./components/Tutorial";
+import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
 import titleScreen from "./assets/title-screen.png";
 
 function App() {
@@ -115,6 +115,42 @@ function App() {
   }, []);
   const handleCloseOption = useCallback((optionId: string) => {
     setGameState((prev) => closeOption(prev, optionId));
+  }, []);
+
+  const handleTradingTutorialStep = useCallback((step: TutorialStep) => {
+    if (!step.channel) return;
+    // Switch the monitor channel to match the tutorial step
+    setGameState((prev) => {
+      let news = prev.news;
+      // Seed sample news if empty so the tutorial channels aren't blank
+      if (news.length === 0) {
+        const stock = prev.stocks[0];
+        news = [
+          {
+            id: "tutorial-biz", headline: `${stock.symbol} Posts Record Q3 Earnings`, body: `${stock.name} has exceeded analyst expectations with a 15% revenue increase.`,
+            category: "business", timestamp: Date.now(), affectedStocks: [stock.symbol], sentiment: "positive" as const,
+            earnings: { revenue: "$4.2B", profit: "$890M", growth: "+15%", spending: "$1.1B", guidance: "Strong" },
+            impact: { description: `${stock.symbol} earnings beat → stock likely to rise`, effects: [{ symbol: stock.symbol, direction: "up" as const, strength: "moderate" as const }], probability: 0.8, delay: 5, duration: 20, ticksRemaining: 25 },
+          },
+          {
+            id: "tutorial-global", headline: "Fed Signals Rate Cuts Amid Cooling Inflation", body: "",
+            category: "global", timestamp: Date.now(), sentiment: "positive" as const, affectedTags: ["finance", "banking"],
+            impact: { description: "Rate cuts bullish for finance sector", effects: [{ tag: "finance", direction: "up" as const, strength: "moderate" as const }], probability: 0.7, delay: 5, duration: 20, ticksRemaining: 25 },
+          },
+          {
+            id: "tutorial-social", headline: `$${stock.symbol} is about to MOON 🚀🚀🚀`, body: `I just YOLO'd my entire portfolio into ${stock.name}. This stock is going to the stratosphere. Trust me bro.`,
+            category: "social", timestamp: Date.now(), affectedStocks: [stock.symbol], sentiment: "positive" as const,
+            author: "DiamondHands420", upvotes: 847, commentCount: 156,
+            impact: { description: `Retail hype pumping ${stock.symbol}`, effects: [{ symbol: stock.symbol, direction: "up" as const, strength: "weak" as const }], probability: 0.5, delay: 0, duration: 15, ticksRemaining: 15 },
+          },
+        ];
+      }
+      return {
+        ...prev,
+        news,
+        monitors: prev.monitors.map((m, i) => i === 0 ? { ...m, channel: step.channel! } : m),
+      };
+    });
   }, []);
 
   const beginScheduledDay = useCallback((stateOverride?: GameState) => {
@@ -229,7 +265,15 @@ function App() {
   return (
     <div className="game-container">
      {showTradingTutorial && !isRestaurantShift && (
-       <Tutorial steps={TRADING_STEPS} onComplete={() => setShowTradingTutorial(false)} />
+       <Tutorial steps={TRADING_STEPS} onComplete={() => {
+         setShowTradingTutorial(false);
+         // Restore stock ticker and clear tutorial news
+         setGameState((prev) => ({
+           ...prev,
+           news: prev.news.filter((n) => !n.id.startsWith("tutorial-")),
+           monitors: prev.monitors.map((m, i) => i === 0 ? { ...m, channel: "stock_ticker" as MonitorChannel } : m),
+         }));
+       }} onStepChange={handleTradingTutorialStep} />
      )}
 
      {showRestaurantTutorial && isRestaurantShift && restaurantState && !gameState.gameOver && (
