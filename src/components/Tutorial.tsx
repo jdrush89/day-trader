@@ -7,7 +7,8 @@ interface TutorialStep {
   icon: string;
   selector?: string;
   position?: "bottom" | "top" | "left" | "right";
-  channel?: MonitorChannel; // Switch monitor to this channel on enter
+  channel?: MonitorChannel;
+  action?: string; // Custom action key handled by parent // Switch monitor to this channel on enter
 }
 
 const TRADING_STEPS: TutorialStep[] = [
@@ -83,9 +84,18 @@ const TRADING_STEPS: TutorialStep[] = [
   {
     icon: "📋",
     title: "Orders Panel",
-    body: "Click this tab to open the Orders panel. Place limit orders, stop orders, and trade options (calls and puts). These execute automatically when conditions are met.",
+    body: "This opens the Orders panel where you can place advanced orders that execute automatically.",
     selector: ".orders-tab-strip",
     position: "left",
+    action: "open-orders",
+  },
+  {
+    icon: "📝",
+    title: "Limit & Stop Orders",
+    body: "Set a Limit Order to buy/sell at a specific price, or a Stop Order to trigger when price hits a threshold. You can also trade Options — buy Calls if you think a stock will rise, or Puts if it will drop. Options use Black-Scholes pricing and trade in contracts of 100 shares.",
+    selector: ".orders-flyout",
+    position: "left",
+    action: "open-orders",
   },
   {
     icon: "⏱️",
