@@ -20,6 +20,7 @@ interface RestaurantProps {
   onFinish: (earnings: number) => void;
   milestoneTarget: number | null;
   milestoneDaysLeft: number;
+  netWorth: number;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -282,7 +283,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft }: RestaurantProps) {
+export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth }: RestaurantProps) {
   const activeOrder = useMemo(
     () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
     [state.activeOrderId, state.orderSlots],
@@ -377,6 +378,10 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
               <strong>${milestoneTarget.toLocaleString()}</strong>
             </div>
           )}
+          <div className="restaurant-stat-box">
+            <span>Net Worth</span>
+            <strong>${netWorth.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
+          </div>
           <div className="restaurant-stat-box">
             <span>Shift</span>
             <strong>{formatTime(state.shiftTimeRemaining)}</strong>
