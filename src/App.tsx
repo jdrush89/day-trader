@@ -25,21 +25,21 @@ function App() {
   const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
   const [activeMonitorId, setActiveMonitorId] = useState(0);
-  const [showTradingTutorial, setShowTradingTutorial] = useState(true);
-  const [showRestaurantTutorial, setShowRestaurantTutorial] = useState(true);
   const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
+  const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
 
   useEffect(() => {
-    if (gameState.gameOver || !gameState.marketOpen || paused || showTradingTutorial) return;
+    if (gameState.gameOver || !gameState.marketOpen || paused) return;
     const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
     return () => clearInterval(interval);
-  }, [gameState.marketOpen, gameState.gameOver, speed, paused, showTradingTutorial]);
+  }, [gameState.marketOpen, gameState.gameOver, speed, paused]);
 
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showTitle) {
+        if (titleTutorial) return;
         setShowTitle(false);
         return;
       }
@@ -80,7 +80,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMonitorId, restaurantState, showTitle]);
+  }, [activeMonitorId, restaurantState, showTitle, titleTutorial]);
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
@@ -246,8 +246,7 @@ function App() {
     setGameState(createInitialState());
     setRestaurantState(null);
     setShowTitle(true);
-    setShowTradingTutorial(true);
-    setShowRestaurantTutorial(true);
+    setTitleTutorial(null);
     setEodPhase("summary");
   }, []);
 
@@ -271,13 +270,48 @@ function App() {
     const handleResume = () => {
       if (savedGame) {
         setGameState(savedGame);
-        setShowTradingTutorial(false);
-        setShowRestaurantTutorial(false);
         setShowTitle(false);
-        // If the saved state was mid-day with market open, resume directly
-        // If market was closed, they'll see the EOD screen
       }
     };
+
+    if (titleTutorial === "trading") {
+      return (
+        <div className="game-container">
+          <Tutorial steps={TRADING_STEPS} onComplete={() => {
+            setTitleTutorial(null);
+            setOrdersOpen(false);
+            setGameState((prev) => ({
+              ...prev,
+              news: prev.news.filter((n) => !n.id.startsWith("tutorial-")),
+              monitors: prev.monitors.map((m, i) => i === 0 ? { ...m, channel: "stock_ticker" as MonitorChannel } : m),
+            }));
+          }} onStepChange={handleTradingTutorialStep} />
+        </div>
+      );
+    }
+
+    if (titleTutorial === "restaurant") {
+      return (
+        <div className="game-container">
+          <Tutorial steps={RESTAURANT_STEPS} onComplete={() => setTitleTutorial(null)} />
+        </div>
+      );
+    }
+
+    if (titleTutorial === "pick") {
+      return (
+        <div className="title-screen">
+          <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
+          <div className="title-screen-overlay">
+            <h2 className="tutorial-pick-title">📖 Choose a Tutorial</h2>
+            <button className="title-start-btn" onClick={() => setTitleTutorial("trading")}>📈 Day Trading</button>
+            <button className="title-start-btn" onClick={() => setTitleTutorial("restaurant")}>🍔 Shwendy's Kitchen</button>
+            <button className="title-start-btn title-back-btn" onClick={() => setTitleTutorial(null)}>← Back</button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="title-screen">
         <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
@@ -290,6 +324,7 @@ function App() {
           <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); setGameState(createInitialState()); setShowTitle(false); }}>
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
+          <button className="title-start-btn title-tutorial-btn" onClick={() => setTitleTutorial("pick")}>VIEW TUTORIAL</button>
           <p className="title-hint">Press any key to start</p>
         </div>
       </div>
@@ -316,23 +351,6 @@ function App() {
 
   return (
     <div className="game-container">
-     {showTradingTutorial && !isRestaurantShift && (
-       <Tutorial steps={TRADING_STEPS} onComplete={() => {
-         setShowTradingTutorial(false);
-         setOrdersOpen(false);
-         // Restore stock ticker and clear tutorial news
-         setGameState((prev) => ({
-           ...prev,
-           news: prev.news.filter((n) => !n.id.startsWith("tutorial-")),
-           monitors: prev.monitors.map((m, i) => i === 0 ? { ...m, channel: "stock_ticker" as MonitorChannel } : m),
-         }));
-       }} onStepChange={handleTradingTutorialStep} />
-     )}
-
-     {showRestaurantTutorial && isRestaurantShift && restaurantState && !gameState.gameOver && (
-       <Tutorial steps={RESTAURANT_STEPS} onComplete={() => setShowRestaurantTutorial(false)} />
-     )}
-
      {!isRestaurantShift && (
         <header className="game-header">
           <h1>📈 Day Trader</h1>
@@ -350,7 +368,7 @@ function App() {
         </header>
       )}
 
-      {paused && !showTradingTutorial && (
+      {paused && (
         <div className="pause-overlay">
           <div className="pause-menu">
             <h2>⏸ Paused</h2>
@@ -376,7 +394,7 @@ function App() {
       {isRestaurantShift && restaurantState && !gameState.gameOver ? (
         <Restaurant
           day={gameState.day}
-          paused={paused || showRestaurantTutorial}
+          paused={paused}
           state={restaurantState}
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
