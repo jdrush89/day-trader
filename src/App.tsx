@@ -30,10 +30,10 @@ function App() {
   const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
 
   useEffect(() => {
-    if (gameState.gameOver || !gameState.marketOpen || paused) return;
+    if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial) return;
     const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
     return () => clearInterval(interval);
-  }, [gameState.marketOpen, gameState.gameOver, speed, paused]);
+  }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial]);
 
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
@@ -311,27 +311,16 @@ function App() {
     };
 
     if (titleTutorial === "trading") {
-      return (
-        <div className="game-container">
-          <Tutorial steps={TRADING_STEPS} onComplete={() => {
-            setTitleTutorial(null);
-            setOrdersOpen(false);
-            setGameState((prev) => ({
-              ...prev,
-              news: prev.news.filter((n) => !n.id.startsWith("tutorial-")),
-              monitors: prev.monitors.map((m, i) => i === 0 ? { ...m, channel: "stock_ticker" as MonitorChannel } : m),
-            }));
-          }} onStepChange={handleTradingTutorialStep} />
-        </div>
-      );
+      // Start game UI so tutorial can highlight elements
+      setShowTitle(false);
+      return;
     }
 
     if (titleTutorial === "restaurant") {
-      return (
-        <div className="game-container">
-          <Tutorial steps={RESTAURANT_STEPS} onComplete={() => setTitleTutorial(null)} />
-        </div>
-      );
+      // Start restaurant UI so tutorial can highlight elements
+      setShowTitle(false);
+      setRestaurantState(createRestaurantState(gameState));
+      return;
     }
 
     if (titleTutorial === "pick") {
@@ -386,6 +375,27 @@ function App() {
 
   return (
     <div className="game-container">
+     {titleTutorial === "trading" && (
+       <Tutorial steps={TRADING_STEPS} onComplete={() => {
+         setTitleTutorial(null);
+         setOrdersOpen(false);
+         setShowTitle(true);
+         setGameState((prev) => ({
+           ...prev,
+           news: prev.news.filter((n) => !n.id.startsWith("tutorial-")),
+           monitors: prev.monitors.map((m, i) => i === 0 ? { ...m, channel: "stock_ticker" as MonitorChannel } : m),
+         }));
+       }} onStepChange={handleTradingTutorialStep} />
+     )}
+
+     {titleTutorial === "restaurant" && (
+       <Tutorial steps={RESTAURANT_STEPS} onComplete={() => {
+         setTitleTutorial(null);
+         setRestaurantState(null);
+         setShowTitle(true);
+       }} />
+     )}
+
      {!isRestaurantShift && (
         <header className="game-header">
           <h1>📈 Day Trader</h1>
@@ -429,7 +439,7 @@ function App() {
       {isRestaurantShift && restaurantState && !gameState.gameOver ? (
         <Restaurant
           day={gameState.day}
-          paused={paused}
+          paused={paused || titleTutorial === "restaurant"}
           state={restaurantState}
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
