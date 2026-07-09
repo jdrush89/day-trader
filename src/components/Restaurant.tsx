@@ -156,7 +156,7 @@ function renderStepInstruction(order: ActiveOrder) {
     return (
       <div className="restaurant-step-card mix-card">
         <div className="restaurant-step-title">{step.label}</div>
-        <div className="restaurant-step-copy">Swirl the mouse in circles!</div>
+        <div className="restaurant-step-copy">{step.label.toLowerCase().includes("toss") ? "Shake the mouse back and forth!" : "Swirl the mouse in circles!"}</div>
         <div className="mix-ring" style={{ "--mix-progress": `${progressPct}%` } as CSSProperties}>
           <div className="mix-ring-inner">{Math.round(progressPct)}%</div>
         </div>

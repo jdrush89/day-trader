@@ -102,6 +102,7 @@ const BASE_MENU: MenuItem[] = [
     steps: [
       { type: "chop", label: "Chop veggies", target: 8 },
       { type: "assemble", label: "Toss salad", ingredients: [ingredient("Lettuce", "l", true), ingredient("Tomato", "t"), ingredient("Cucumber", "c"), ingredient("Onion", "o"), ingredient("Dressing", "d", true)] },
+      { type: "mix", label: "Toss it all together", target: 6000 },
     ],
   },
   {
