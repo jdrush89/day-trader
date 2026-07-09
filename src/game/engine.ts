@@ -694,9 +694,21 @@ export function tick(state: GameState): GameState {
 
     const finalNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
     const completedDay = state.day; let gameOver = false; let goldenParachutes = postOptionsState.goldenParachutes;
-    if (completedDay % 3 === 0) { const milestoneNum = completedDay / 3; const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1); gameOver = finalNetWorth < requiredNetWorth; if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; } }
+    // Repay due loans at milestone
+    let loans = [...postOptionsState.loans];
+    if (completedDay > 1 && completedDay % 3 === 0) {
+      const dueLoans = loans.filter((l) => l.dueDay <= completedDay);
+      const dueTotal = dueLoans.reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0);
+      finalCash -= Math.round(dueTotal * 100) / 100;
+      loans = loans.filter((l) => l.dueDay > completedDay);
+      const milestoneNum = completedDay / 3;
+      const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1);
+      const adjustedNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
+      gameOver = adjustedNetWorth < requiredNetWorth;
+      if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; }
+    }
     const pendingOrders = hasUpgrade(postOptionsState, "limit_order_pro") ? postOptionsState.pendingOrders : [];
-    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck };
+    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck, loans };
     return gameOver ? endOfDayState : generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 

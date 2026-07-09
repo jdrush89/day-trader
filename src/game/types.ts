@@ -157,6 +157,7 @@ export interface GameState {
   insiderRealizedProfit: number;
   secFines: SECFine[];
   pendingSECCheck: { catchChance: number; fineAmount: number; symbol: string; profit: number } | null;
+  loans: { amount: number; dueDay: number; interestRate: number }[];
   pendingOrders: PendingOrder[];
   stockDraftOptions: Stock[];
   menuDraftOptions: MenuItem[];

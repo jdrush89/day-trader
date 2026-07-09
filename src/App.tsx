@@ -29,12 +29,13 @@ function App() {
   const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
   const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
   const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
+  const [showLoanOffer, setShowLoanOffer] = useState(false);
 
   useEffect(() => {
-    if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial) return;
+    if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial || showLoanOffer) return;
     const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
     return () => clearInterval(interval);
-  }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial]);
+  }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer]);
 
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
@@ -300,8 +301,13 @@ function App() {
     // After Shwendy's (or starting a new day), open the market
     setRestaurantState(null);
     setSpeed(1);
-    setGameState(openMarket(nextState));
+    const marketState = openMarket(nextState);
+    setGameState(marketState);
     setEodPhase("summary");
+    // Offer loan if player has negative cash
+    if (marketState.cash < 0) {
+      setShowLoanOffer(true);
+    }
   }, [gameState, restaurantState]);
 
   const handleNewDay = useCallback(() => {
@@ -384,6 +390,24 @@ function App() {
       }
       return { ...prev, pendingSECCheck: null };
     });
+  }, []);
+
+  const handleAcceptLoan = useCallback(() => {
+    setGameState((prev) => {
+      const loanAmount = Math.abs(prev.cash) + 500;
+      const nextMilestoneDay = Math.ceil(prev.day / 3) * 3;
+      const dueDay = nextMilestoneDay <= prev.day ? nextMilestoneDay + 3 : nextMilestoneDay;
+      return {
+        ...prev,
+        cash: Math.round((prev.cash + loanAmount) * 100) / 100,
+        loans: [...prev.loans, { amount: Math.round(loanAmount * 100) / 100, dueDay, interestRate: 0.5 }],
+      };
+    });
+    setShowLoanOffer(false);
+  }, []);
+
+  const handleDeclineLoan = useCallback(() => {
+    setShowLoanOffer(false);
   }, []);
 
   const handleRestart = useCallback(() => {
@@ -575,8 +599,8 @@ function App() {
             const optionsVal = getOptionsValue(gameState);
             const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability + optionsVal;
             const dailyPnL = currentNetWorth - gameState.dayStartNetWorth;
-            const completedDay = gameState.day - 1;
-            const milestone = completedDay % 3 === 0 ? getMilestone(completedDay) : null;
+            const completedDay = gameState.day;
+            const milestone = completedDay > 1 && completedDay % 3 === 0 ? getMilestone(completedDay) : null;
 
             return (
               <div className="end-of-day-overlay">
@@ -760,6 +784,27 @@ function App() {
           symbol={gameState.pendingSECCheck.symbol}
           onResult={handleSECWheelResult}
         />
+      )}
+
+      {showLoanOffer && (
+        <div className="end-of-day-overlay">
+          <div className="end-of-day">
+            <h2>🏦 Emergency Loan Available</h2>
+            <p style={{ marginBottom: "12px" }}>Your cash balance is <span className="danger">${gameState.cash.toFixed(2)}</span>. You can't trade without capital.</p>
+            <p style={{ marginBottom: "16px" }}>
+              A loan of <strong>${(Math.abs(gameState.cash) + 500).toFixed(2)}</strong> is available at <strong>50% interest</strong>, due at the next milestone (Day {(() => { const next = Math.ceil(gameState.day / 3) * 3; return next <= gameState.day ? next + 3 : next; })()}).
+            </p>
+            {gameState.loans.length > 0 && (
+              <p style={{ marginBottom: "12px", color: "var(--text-dim)" }}>
+                Outstanding loans: {gameState.loans.map((l, i) => <span key={i}>${l.amount.toFixed(2)} due Day {l.dueDay} </span>)}
+              </p>
+            )}
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+              <button className="pause-menu-btn" onClick={handleAcceptLoan}>💰 Take the Loan</button>
+              <button className="pause-menu-btn" onClick={handleDeclineLoan}>🚫 Decline</button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>
