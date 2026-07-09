@@ -76,6 +76,7 @@ export function createInitialState(): GameState {
     insiderSnapshotShorts: [],
     insiderRealizedProfit: 0,
     secFines: [],
+    pendingSECCheck: null,
     pendingOrders: [],
     stockDraftOptions: [],
     menuDraftOptions: [],

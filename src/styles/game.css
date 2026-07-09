@@ -2624,3 +2624,108 @@ body {
   opacity: 0.5;
   text-align: center;
 }
+
+/* SEC Wheel */
+.sec-wheel-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 150;
+}
+
+.sec-wheel-container {
+  background: var(--bg-panel);
+  border: 2px solid #c0392b;
+  border-radius: 16px;
+  padding: 32px 40px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  max-width: 420px;
+}
+
+.sec-wheel-container h2 {
+  color: #e74c3c;
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.sec-wheel-info {
+  color: var(--text);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.sec-wheel-canvas-wrap {
+  position: relative;
+  width: 300px;
+  height: 300px;
+}
+
+.sec-wheel-canvas-wrap canvas {
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(231, 76, 60, 0.3);
+}
+
+.sec-wheel-spin-btn {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 32px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.sec-wheel-spin-btn:hover {
+  transform: scale(1.05);
+}
+
+.sec-wheel-spinning {
+  color: var(--text-dim);
+  font-style: italic;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.sec-wheel-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+.sec-wheel-result.caught {
+  color: #e74c3c;
+}
+
+.sec-wheel-result.safe {
+  color: #27ae60;
+}
+
+.sec-wheel-result-icon {
+  font-size: 2rem;
+}
+
+.sec-wheel-ok-btn {
+  background: var(--bg-panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 24px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 0.15s;
+}
+
+.sec-wheel-ok-btn:hover {
+  background: var(--border);
+}

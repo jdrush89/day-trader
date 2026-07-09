@@ -10,6 +10,7 @@ import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
 import { Restaurant } from "./components/Restaurant";
+import { SecWheel } from "./components/SecWheel";
 import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
 import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
@@ -369,6 +370,22 @@ function App() {
     });
   }, []);
 
+  const handleSECWheelResult = useCallback((caught: boolean) => {
+    setGameState((prev) => {
+      if (!prev.pendingSECCheck) return prev;
+      const check = prev.pendingSECCheck;
+      if (caught) {
+        return {
+          ...prev,
+          cash: Math.round((prev.cash - check.fineAmount) * 100) / 100,
+          secFines: [...prev.secFines, { amount: check.fineAmount, symbol: check.symbol, profit: check.profit, day: prev.day }],
+          pendingSECCheck: null,
+        };
+      }
+      return { ...prev, pendingSECCheck: null };
+    });
+  }, []);
+
   const handleRestart = useCallback(() => {
     deleteSave();
     setGameState(createInitialState());
@@ -593,7 +610,7 @@ function App() {
                       {losers.map((s) => <div key={s.symbol} className="eod-mover-row"><span className="eod-symbol">{s.symbol}</span><span className="eod-price">${s.price.toFixed(2)}</span><span className="eod-change down">-${Math.abs(s.change).toFixed(2)} ({s.changePct.toFixed(1)}%)</span></div>)}
                     </div>
                   </div>
-                  {gameState.secFines.filter((f) => f.day === gameState.day - 1).map((fine, i) => (
+                  {gameState.secFines.filter((f) => f.day === gameState.day).map((fine, i) => (
                     <div key={i} className="sec-fine-alert">
                       <div className="sec-fine-header">🚨 SEC ENFORCEMENT ACTION 🚨</div>
                       <div className="sec-fine-body">
@@ -733,6 +750,16 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {gameState.pendingSECCheck && !gameState.marketOpen && (
+        <SecWheel
+          catchChance={gameState.pendingSECCheck.catchChance}
+          fineAmount={gameState.pendingSECCheck.fineAmount}
+          profit={gameState.pendingSECCheck.profit}
+          symbol={gameState.pendingSECCheck.symbol}
+          onResult={handleSECWheelResult}
+        />
       )}
 
     </div>

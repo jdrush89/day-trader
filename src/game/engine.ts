@@ -666,7 +666,8 @@ export function tick(state: GameState): GameState {
     const netWorthBeforeBonuses = cashBeforeBonuses + portfolioValue + shortCollateral - shortLiability + optionsValue;
     const diversification = heldTags.size > 0 ? netWorthBeforeBonuses * 0.02 * heldTags.size : 0;
     let finalCash = cashBeforeBonuses + dividends + interest + staking + diversification;
-    const dayFines = [];
+    const dayFines: { amount: number; symbol: string; profit: number; day: number }[] = [];
+    let pendingSECCheck: { catchChance: number; fineAmount: number; symbol: string; profit: number } | null = null;
 
     if (postOptionsState.insiderViewed && getViewedTipSymbols(postOptionsState).length > 0) {
       let totalInsiderProfit = postOptionsState.insiderRealizedProfit;
@@ -684,13 +685,10 @@ export function tick(state: GameState): GameState {
       }
       if (totalInsiderProfit > 0) {
         const catchChance = Math.min(0.95, totalInsiderProfit / 3500 + 0.1);
-        if (Math.random() < catchChance) {
-          let fineAmount = Math.round(totalInsiderProfit * (2 + Math.random()) * 100) / 100;
-          if (hasUpgrade(postOptionsState, "bail_out")) fineAmount *= 0.8;
-          fineAmount = Math.round(fineAmount * 100) / 100;
-          finalCash -= fineAmount;
-          dayFines.push({ amount: fineAmount, symbol: getViewedTipSymbols(postOptionsState).join("/"), profit: Math.round(totalInsiderProfit * 100) / 100, day: state.day });
-        }
+        let fineAmount = Math.round(totalInsiderProfit * (2 + Math.random()) * 100) / 100;
+        if (hasUpgrade(postOptionsState, "bail_out")) fineAmount *= 0.8;
+        fineAmount = Math.round(fineAmount * 100) / 100;
+        pendingSECCheck = { catchChance, fineAmount, symbol: getViewedTipSymbols(postOptionsState).join("/"), profit: Math.round(totalInsiderProfit * 100) / 100 };
       }
     }
 
@@ -698,7 +696,7 @@ export function tick(state: GameState): GameState {
     const completedDay = state.day; let gameOver = false; let goldenParachutes = postOptionsState.goldenParachutes;
     if (completedDay % 3 === 0) { const milestoneNum = completedDay / 3; const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1); gameOver = finalNetWorth < requiredNetWorth; if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; } }
     const pendingOrders = hasUpgrade(postOptionsState, "limit_order_pro") ? postOptionsState.pendingOrders : [];
-    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [] };
+    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck };
     return gameOver ? endOfDayState : generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 
