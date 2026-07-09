@@ -120,7 +120,7 @@ function renderStepInstruction(order: ActiveOrder) {
         </div>
         <div className={`cook-meter ${inBurnZone ? "burn-warning" : ""}`}>
           <div className="cook-meter-fill" style={{ width: `${Math.min(100, progressPct)}%` }} />
-          <div className="cook-meter-burn-zone" />
+          {step.flipAt != null && !order.flipped && <div className="cook-meter-burn-zone" />}
           {inBurnZone && <div className="cook-meter-burn-fill" style={{ width: `${((rawPct - 100) / 60) * 100}%` }} />}
           {flipZone && !order.flipped && (
             <div className={`cook-meter-flip-zone ${flipReady ? "active" : ""}`} style={{ left: `${Math.max(0, flipZone.left)}%`, width: `${flipZone.width}%` }} />
