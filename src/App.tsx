@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue } from "./game/engine";
-import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay } from "./game/restaurant-engine";
+import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, MENU } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
@@ -202,6 +202,90 @@ function App() {
     }
   }, []);
 
+  const handleRestaurantTutorialStep = useCallback((step: TutorialStep) => {
+    if (step.action === "setup-modification") {
+      setRestaurantState((prev) => {
+        if (!prev) return prev;
+        const burger = MENU.find((m) => m.name === "Classic Burger") ?? MENU[0];
+        const order = {
+          id: 9000,
+          menuItem: burger,
+          currentStepIndex: 0,
+          prepProgress: 0,
+          prepStarted: false,
+          flipped: false,
+          burnt: false,
+          chopCount: 0,
+          lastChopKey: null as "left" | "right" | null,
+          mixProgress: 0,
+          lastMousePos: null,
+          assembleIndex: 0,
+          rhythmHitIndex: 0,
+          rhythmHits: 0,
+          rhythmResults: [] as ("pending" | "hit" | "miss")[],
+          holdStartTick: null,
+          holdProgress: 0,
+          holdReleased: false,
+          memorizeSequence: [] as string[],
+          memorizeRevealed: false,
+          memorizeRevealTimer: 0,
+          memorizeInputIndex: 0,
+          startTime: Date.now(),
+          patienceRemaining: burger.patience,
+          completed: false,
+          served: false,
+          failed: false,
+          failedTimer: 0,
+          customizations: { 1: [true, false, true, true, true] } as Record<number, boolean[]>,
+          orderCorrect: true,
+        };
+        const slots = [...prev.orderSlots];
+        slots[0] = order;
+        return { ...prev, orderSlots: slots, activeOrderId: 9000 };
+      });
+    } else if (step.action === "setup-completed") {
+      setRestaurantState((prev) => {
+        if (!prev) return prev;
+        const burger = MENU.find((m) => m.name === "Classic Burger") ?? MENU[0];
+        const order = {
+          id: 9001,
+          menuItem: burger,
+          currentStepIndex: burger.steps.length,
+          prepProgress: 0,
+          prepStarted: false,
+          flipped: false,
+          burnt: false,
+          chopCount: 0,
+          lastChopKey: null as "left" | "right" | null,
+          mixProgress: 0,
+          lastMousePos: null,
+          assembleIndex: 0,
+          rhythmHitIndex: 0,
+          rhythmHits: 0,
+          rhythmResults: [] as ("pending" | "hit" | "miss")[],
+          holdStartTick: null,
+          holdProgress: 0,
+          holdReleased: false,
+          memorizeSequence: [] as string[],
+          memorizeRevealed: false,
+          memorizeRevealTimer: 0,
+          memorizeInputIndex: 0,
+          startTime: Date.now(),
+          patienceRemaining: burger.patience,
+          completed: true,
+          served: false,
+          failed: false,
+          failedTimer: 0,
+          customizations: {} as Record<number, boolean[]>,
+          orderCorrect: true,
+        };
+        const slots = [...prev.orderSlots];
+        slots[0] = order;
+        return { ...prev, orderSlots: slots, activeOrderId: 9001 };
+      });
+    }
+  }, []);
+
   const beginScheduledDay = useCallback((stateOverride?: GameState) => {
     const nextState = stateOverride ?? gameState;
     if (nextState.day % 2 === 0) {
@@ -392,7 +476,7 @@ function App() {
          setTitleTutorial(null);
          setRestaurantState(null);
          setShowTitle(true);
-       }} />
+       }} onStepChange={handleRestaurantTutorialStep} />
      )}
 
      {!isRestaurantShift && (

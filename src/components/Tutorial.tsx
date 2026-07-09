@@ -135,11 +135,17 @@ const RESTAURANT_STEPS: TutorialStep[] = [
     icon: "⚠️",
     title: "Order Modifications",
     body: "Some customers want modifications — like \"No lettuce\". Read the order ticket carefully! If you add an unwanted ingredient or skip a wanted one, the order will be marked incorrect and you won't get a tip.",
+    selector: ".order-slot:first-child",
+    position: "bottom",
+    action: "setup-modification",
   },
   {
     icon: "✅",
     title: "Serving & Multitasking",
     body: "When an order is done, press its number, Enter, or click to serve. While one order preps automatically, switch to another to multitask! At shift end, you'll pick a kitchen upgrade and new menu item. Good luck, chef!",
+    selector: ".order-slot:first-child",
+    position: "bottom",
+    action: "setup-completed",
   },
 ];
 
