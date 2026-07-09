@@ -132,10 +132,24 @@
 }
 
 .title-back-btn {
-  background: transparent !important;
+  background: rgba(30, 30, 40, 0.9) !important;
+  color: #ccc !important;
   border: 1px solid rgba(255, 255, 255, 0.2) !important;
   font-size: 0.85rem !important;
   margin-top: 8px !important;
+}
+
+.title-back-btn:hover {
+  background: rgba(50, 50, 65, 0.95) !important;
+  color: #fff !important;
+}
+
+.title-back-btn:focus {
+  background: #fff !important;
+  color: #000 !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 4px rgba(0, 255, 100, 0.5);
+  animation: none;
 }
 
 .tutorial-pick-title {

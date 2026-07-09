@@ -40,7 +40,7 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showTitle) {
-        if (titleTutorial) return;
+        if (titleTutorial && titleTutorial !== "pick") return;
         const buttons = Array.from(document.querySelectorAll('.title-menu-bottom .title-start-btn')) as HTMLButtonElement[];
         if (buttons.length === 0) return;
         e.preventDefault();
@@ -331,7 +331,7 @@ function App() {
             <h2 className="tutorial-pick-title">📖 Choose a Tutorial</h2>
             <button className="title-start-btn" onClick={() => setTitleTutorial("trading")}>📈 Day Trading</button>
             <button className="title-start-btn" onClick={() => setTitleTutorial("restaurant")}>🍔 Shwendy's Kitchen</button>
-            <button className="title-start-btn title-back-btn" onClick={() => setTitleTutorial(null)}>← Back</button>
+            <button className="title-start-btn title-back-btn" onClick={() => { setTitleTutorial(null); setMenuFocusIndex(-1); }}>← Back</button>
           </div>
         </div>
       );
@@ -349,7 +349,7 @@ function App() {
           <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); setGameState(createInitialState()); setShowTitle(false); }}>
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
-          <button className="title-start-btn title-tutorial-btn" onClick={() => setTitleTutorial("pick")}>VIEW TUTORIAL</button>
+          <button className="title-start-btn title-tutorial-btn" onClick={() => { setTitleTutorial("pick"); setMenuFocusIndex(-1); }}>VIEW TUTORIAL</button>
         </div>
       </div>
     );
