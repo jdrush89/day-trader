@@ -100,7 +100,7 @@ const TRADING_STEPS: TutorialStep[] = [
   {
     icon: "⏱️",
     title: "Time & Speed",
-    body: "The time bar shows how much of the trading day is left. Use the speed buttons (1x, 2x, 5x) to control how fast time passes. Press ESC to pause.",
+    body: "The time bar shows how much of the trading day is left. Use the speed buttons (1x, 2x, 5x, 10x) to control how fast time passes. Press ESC to pause.",
     selector: ".header-controls",
     position: "bottom",
   },
