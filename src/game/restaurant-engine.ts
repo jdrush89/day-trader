@@ -14,7 +14,7 @@ import { RESTAURANT_UPGRADE_POOL } from "./restaurant-upgrades";
 import { getNetWorth } from "./engine";
 
 const TICKS_PER_SECOND = 20;
-const SHIFT_DURATION_SECONDS = 180;
+const SHIFT_DURATION_SECONDS = 120;
 const ORDER_INTERVAL_MIN = 8;
 const ORDER_INTERVAL_MAX = 15;
 const DEFAULT_FLIP_WINDOW = Math.round(TICKS_PER_SECOND * 0.75);
