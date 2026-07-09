@@ -27,6 +27,7 @@ function App() {
   const [activeMonitorId, setActiveMonitorId] = useState(0);
   const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
   const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
+  const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
 
   useEffect(() => {
     if (gameState.gameOver || !gameState.marketOpen || paused) return;
@@ -40,11 +41,40 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showTitle) {
         if (titleTutorial) return;
-        // Focus first menu button on any key press
-        const firstBtn = document.querySelector('.title-screen-overlay .title-start-btn') as HTMLButtonElement;
-        if (firstBtn && document.activeElement !== firstBtn) {
-          firstBtn.focus();
+        const buttons = Array.from(document.querySelectorAll('.title-menu-bottom .title-start-btn')) as HTMLButtonElement[];
+        if (buttons.length === 0) return;
+        e.preventDefault();
+
+        if (e.key === "ArrowDown" || e.key === "Tab" || e.key === "ArrowRight") {
           e.preventDefault();
+          setMenuFocusIndex((prev) => {
+            const next = prev < 0 ? 0 : (prev + 1) % buttons.length;
+            buttons[next]?.focus();
+            return next;
+          });
+          return;
+        }
+
+        if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          setMenuFocusIndex((prev) => {
+            const next = prev <= 0 ? buttons.length - 1 : prev - 1;
+            buttons[next]?.focus();
+            return next;
+          });
+          return;
+        }
+
+        if (e.key === "Enter") {
+          const idx = menuFocusIndex >= 0 ? menuFocusIndex : 0;
+          buttons[idx]?.click();
+          return;
+        }
+
+        // Any other key: focus the first button
+        if (menuFocusIndex < 0) {
+          setMenuFocusIndex(0);
+          buttons[0]?.focus();
         }
         return;
       }
@@ -85,7 +115,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMonitorId, restaurantState, showTitle, titleTutorial]);
+  }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex]);
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
@@ -252,6 +282,7 @@ function App() {
     setRestaurantState(null);
     setShowTitle(true);
     setTitleTutorial(null);
+    setMenuFocusIndex(-1);
     setEodPhase("summary");
   }, []);
 
@@ -377,7 +408,7 @@ function App() {
           <div className="pause-menu">
             <h2>⏸ Paused</h2>
             <button className="pause-menu-btn resume" onClick={() => setPaused(false)}>Resume</button>
-            <button className="pause-menu-btn save-quit" onClick={() => { saveGame(gameState); setPaused(false); setRestaurantState(null); setShowTitle(true); }}>Save & Quit</button>
+            <button className="pause-menu-btn save-quit" onClick={() => { saveGame(gameState); setPaused(false); setRestaurantState(null); setShowTitle(true); setMenuFocusIndex(-1); }}>Save & Quit</button>
             <button className="pause-menu-btn restart" onClick={() => { setPaused(false); handleRestart(); }}>Start Over</button>
             <p className="pause-hint">Press ESC to resume</p>
           </div>

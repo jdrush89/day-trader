@@ -56,15 +56,22 @@
   animation: title-pulse 1.5s ease-in-out infinite;
 }
 
-.title-start-btn:hover,
-.title-start-btn:focus {
+.title-start-btn:hover {
   background: #fff;
   color: #000;
   outline: none;
 }
 
+.title-start-btn:focus {
+  background: #fff;
+  color: #000;
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(0, 255, 100, 0.5);
+  animation: none;
+}
+
 .title-start-btn:focus-visible {
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 0 4px rgba(0, 255, 100, 0.5);
 }
 
 .title-hint {
@@ -110,11 +117,18 @@
   font-size: 0.9rem !important;
 }
 
-.title-tutorial-btn:hover,
-.title-tutorial-btn:focus {
+.title-tutorial-btn:hover {
   background: rgba(50, 50, 65, 0.95) !important;
   color: #fff !important;
   border-color: rgba(255, 255, 255, 0.6) !important;
+}
+
+.title-tutorial-btn:focus {
+  background: #fff !important;
+  color: #000 !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 4px rgba(0, 255, 100, 0.5);
+  animation: none;
 }
 
 .title-back-btn {
