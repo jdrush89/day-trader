@@ -398,9 +398,12 @@ function initializeCurrentStep(order: ActiveOrder, upgrades: string[]): ActiveOr
   const step = getCurrentStep(order);
   if (!step) return order;
 
-  if (step.type === "assemble" && hasRestaurantUpgrade(upgrades, "speed_hands")) {
-    // Auto-add the first ingredient
-    return { ...order, assembleIndex: 1 };
+  if (step.type === "assemble") {
+    let startIndex = 0;
+    if (hasRestaurantUpgrade(upgrades, "speed_hands")) {
+      startIndex = 1;
+    }
+    return { ...order, assembleIndex: startIndex };
   }
 
   if (step.type === "rhythm") {
@@ -548,8 +551,18 @@ export function isStepComplete(order: ActiveOrder): boolean {
       return order.chopCount >= step.target;
     case "mix":
       return order.mixProgress >= step.target;
-    case "assemble":
-      return order.assembleIndex >= step.ingredients.length;
+    case "assemble": {
+      if (order.assembleIndex >= step.ingredients.length) return true;
+      // Also complete if all remaining ingredients are unwanted
+      const w = order.customizations[order.currentStepIndex];
+      if (w) {
+        for (let i = order.assembleIndex; i < step.ingredients.length; i++) {
+          if (w[i]) return false; // still a wanted ingredient left
+        }
+        return true;
+      }
+      return false;
+    }
     case "rhythm":
       return order.rhythmHitIndex >= step.hits.length;
     case "hold":
@@ -739,26 +752,29 @@ export function handleKeyPress(state: RestaurantState, key: string): RestaurantS
 
     const wanted = activeOrder.customizations[activeOrder.currentStepIndex];
 
-    // Press the ingredient's key to ADD it
-    if (normalizedKey === currentIngredient.key.toLowerCase()) {
-      const isWanted = !wanted || wanted[activeOrder.assembleIndex];
-      const newOrder = {
-        ...activeOrder,
-        assembleIndex: activeOrder.assembleIndex + 1,
-        // Adding an unwanted ingredient makes the order incorrect
-        orderCorrect: activeOrder.orderCorrect && isWanted,
-      };
-      return replaceOrder(state, maybeAdvance(newOrder, state.acquiredUpgrades));
+    // Find if the pressed key matches any ingredient from current position onward
+    let matchIndex = -1;
+    for (let i = activeOrder.assembleIndex; i < step.ingredients.length; i++) {
+      if (step.ingredients[i].key.toLowerCase() === normalizedKey) {
+        matchIndex = i;
+        break;
+      }
     }
 
-    // Press Space to SKIP the current ingredient (don't add it)
-    if (key === " ") {
-      const isWanted = !wanted || wanted[activeOrder.assembleIndex];
+    if (matchIndex >= 0) {
+      // Check correctness: any wanted ingredients before matchIndex were skipped (bad),
+      // and if the matched ingredient itself is unwanted, adding it is also bad
+      let correct = activeOrder.orderCorrect;
+      if (wanted) {
+        for (let i = activeOrder.assembleIndex; i < matchIndex; i++) {
+          if (wanted[i]) correct = false; // skipped a wanted ingredient
+        }
+        if (!wanted[matchIndex]) correct = false; // added an unwanted ingredient
+      }
       const newOrder = {
         ...activeOrder,
-        assembleIndex: activeOrder.assembleIndex + 1,
-        // Skipping a wanted ingredient makes the order incorrect
-        orderCorrect: activeOrder.orderCorrect && !isWanted,
+        assembleIndex: matchIndex + 1,
+        orderCorrect: correct,
       };
       return replaceOrder(state, maybeAdvance(newOrder, state.acquiredUpgrades));
     }
