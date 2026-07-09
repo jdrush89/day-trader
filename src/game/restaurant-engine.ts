@@ -18,7 +18,7 @@ const SHIFT_DURATION_SECONDS = 180;
 const ORDER_INTERVAL_MIN = 8;
 const ORDER_INTERVAL_MAX = 15;
 const DEFAULT_FLIP_WINDOW = Math.round(TICKS_PER_SECOND * 0.75);
-const DEFAULT_BURN_MULTIPLIER = 1.3;
+const DEFAULT_BURN_MULTIPLIER = 1.6;
 const MEMORIZE_KEYS = ["q", "w", "e", "r", "a", "s", "d", "f"];
 const BASE_MENU_NAMES = [
   "Classic Burger",
@@ -781,7 +781,7 @@ export function handleKeyPress(state: RestaurantState, key: string): RestaurantS
     return replaceOrder(state, { ...activeOrder, flipped: true });
   }
 
-  if ((step.type === "grill" || step.type === "fry") && normalizedKey === "enter") {
+  if ((step.type === "grill" || step.type === "fry") && (normalizedKey === "enter" || normalizedKey === "g")) {
     if (!isStepComplete(activeOrder)) return state;
     return replaceOrder(state, advanceStep(activeOrder, state.acquiredUpgrades));
   }

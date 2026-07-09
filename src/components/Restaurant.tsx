@@ -90,7 +90,7 @@ function renderStepInstruction(order: ActiveOrder) {
 
   if (step.type === "grill" || step.type === "fry") {
     const rawPct = (order.prepProgress / step.duration) * 100;
-    const progressPct = Math.min(130, rawPct);
+    const progressPct = Math.min(160, rawPct);
     const flipZone = step.type === "grill" && step.flipAt != null
       ? { left: ((step.flipAt - step.flipWindow) / step.duration) * 100, width: ((step.flipWindow * 2) / step.duration) * 100 }
       : null;
@@ -102,8 +102,8 @@ function renderStepInstruction(order: ActiveOrder) {
       order.prepProgress >= step.flipAt - step.flipWindow &&
       order.prepProgress <= step.flipAt + step.flipWindow;
     const readyToPlate = order.prepProgress >= step.duration;
-    const inBurnZone = rawPct > 100 && rawPct <= 130;
-    const burnTimeLeft = (step.duration * 1.3 - order.prepProgress) / 20;
+    const inBurnZone = rawPct > 100 && rawPct <= 160;
+    const burnTimeLeft = (step.duration * 1.6 - order.prepProgress) / 20;
     const pastFlipZone = step.type === "grill" && step.flipAt != null && !order.flipped && order.prepProgress > step.flipAt + step.flipWindow;
 
     return (
@@ -114,14 +114,14 @@ function renderStepInstruction(order: ActiveOrder) {
           {order.prepStarted && step.type === "grill" && !order.flipped && !flipReady && !pastFlipZone && !readyToPlate && "Watch the grill and flip on time."}
           {flipReady && "Press F now to flip!"}
           {order.burnt && "🔥 Burnt! This order is lost."}
-          {inBurnZone && !order.burnt && `⚠️ Remove NOW! Burns in ${burnTimeLeft.toFixed(1)}s`}
-          {readyToPlate && !inBurnZone && !order.burnt && "Press Enter to take it off the heat."}
+          {inBurnZone && !order.burnt && `⚠️ Remove NOW! Press G or Enter. Burns in ${burnTimeLeft.toFixed(1)}s`}
+          {readyToPlate && !inBurnZone && !order.burnt && "Done! Press G or Enter to remove."}
           {order.prepStarted && step.type === "fry" && !readyToPlate && "Keep an eye on the fryer."}
         </div>
         <div className={`cook-meter ${inBurnZone ? "burn-warning" : ""}`}>
           <div className="cook-meter-fill" style={{ width: `${Math.min(100, progressPct)}%` }} />
           <div className="cook-meter-burn-zone" />
-          {inBurnZone && <div className="cook-meter-burn-fill" style={{ width: `${((rawPct - 100) / 30) * 100}%` }} />}
+          {inBurnZone && <div className="cook-meter-burn-fill" style={{ width: `${((rawPct - 100) / 60) * 100}%` }} />}
           {flipZone && !order.flipped && (
             <div className={`cook-meter-flip-zone ${flipReady ? "active" : ""}`} style={{ left: `${Math.max(0, flipZone.left)}%`, width: `${flipZone.width}%` }} />
           )}
