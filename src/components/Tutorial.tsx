@@ -108,6 +108,8 @@ const TRADING_STEPS: TutorialStep[] = [
     icon: "🎯",
     title: "Milestones & Goal",
     body: "Every 3 days, your net worth is checked against a milestone. The targets grow each period — start at $1,500 and increase from there. On even days, you'll work at Shwendy's restaurant to earn extra cash. Good luck, trader!",
+    selector: ".milestone-stat",
+    position: "bottom",
   },
 ];
 
