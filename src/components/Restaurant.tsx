@@ -436,7 +436,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
                 {miniProgress && (
                   <div className={`slot-mini-meter ${miniProgress.type} ${miniProgress.burnZone ? "burn-zone" : ""}`}>
                     <div className="slot-mini-fill" style={{ width: `${Math.min(100, miniProgress.pct)}%` }} />
-                    {(miniProgress.type === "grill" || miniProgress.type === "fry") && <div className="slot-mini-danger" />}
+                    {(miniProgress.type === "grill" || miniProgress.type === "fry") && currentStep && 'flipAt' in currentStep && currentStep.flipAt != null && !order.flipped && <div className="slot-mini-danger" />}
                   </div>
                 )}
                 {!order.failed && (
