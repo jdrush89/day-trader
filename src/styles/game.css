@@ -1739,6 +1739,10 @@ body {
 }
 
 /* Overlays */
+.pause-overlay {
+  z-index: 200;
+}
+
 .pause-overlay,
 .game-over-overlay,
 .end-of-day-overlay {
