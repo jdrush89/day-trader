@@ -698,7 +698,7 @@ export function tick(state: GameState): GameState {
     const completedDay = state.day; let gameOver = false; let goldenParachutes = postOptionsState.goldenParachutes;
     if (completedDay % 3 === 0) { const milestoneNum = completedDay / 3; const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1); gameOver = finalNetWorth < requiredNetWorth; if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; } }
     const pendingOrders = hasUpgrade(postOptionsState, "limit_order_pro") ? postOptionsState.pendingOrders : [];
-    const endOfDayState: GameState = { ...postOptionsState, day: state.day + 1, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [] };
+    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [] };
     return gameOver ? endOfDayState : generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 
