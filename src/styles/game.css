@@ -1803,6 +1803,11 @@ body {
   margin-bottom: 8px;
 }
 
+.title-resume-btn:focus {
+  background: #fff !important;
+  color: #000 !important;
+}
+
 .pause-hint {
   margin-top: 8px;
   font-size: 0.65rem;
