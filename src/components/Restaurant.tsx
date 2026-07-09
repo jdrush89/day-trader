@@ -18,6 +18,8 @@ interface RestaurantProps {
   state: RestaurantState;
   setRestaurantState: Dispatch<SetStateAction<RestaurantState | null>>;
   onFinish: (earnings: number) => void;
+  milestoneTarget: number | null;
+  milestoneDaysLeft: number;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -280,7 +282,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish }: RestaurantProps) {
+export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft }: RestaurantProps) {
   const activeOrder = useMemo(
     () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
     [state.activeOrderId, state.orderSlots],
@@ -369,6 +371,12 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish }:
           <p>Day {day} — Shwendy's Shift</p>
         </div>
         <div className="restaurant-header-stats">
+          {milestoneTarget != null && (
+            <div className="restaurant-stat-box milestone-stat">
+              <span>Target (in {milestoneDaysLeft}d)</span>
+              <strong>${milestoneTarget.toLocaleString()}</strong>
+            </div>
+          )}
           <div className="restaurant-stat-box">
             <span>Shift</span>
             <strong>{formatTime(state.shiftTimeRemaining)}</strong>

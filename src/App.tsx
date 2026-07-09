@@ -526,6 +526,8 @@ function App() {
           state={restaurantState}
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
+          milestoneTarget={getMilestone(gameState.day)?.required ?? null}
+          milestoneDaysLeft={getMilestone(gameState.day) ? getMilestone(gameState.day)!.checkDay - gameState.day : 0}
         />
       ) : (
         <>
