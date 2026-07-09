@@ -11,6 +11,7 @@ import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
 import { Restaurant } from "./components/Restaurant";
 import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
+import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
@@ -83,6 +84,8 @@ function App() {
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
+    // Auto-save when market closes (end of trading day)
+    if (!gameState.marketOpen && !gameState.gameOver) saveGame(gameState);
   }, [gameState.marketOpen]);
 
   const handleChangeChannel = useCallback((monitorId: number, channel: MonitorChannel) => {
@@ -219,6 +222,7 @@ function App() {
     const nextState = finishRestaurantDay(gameState, earnings);
     setRestaurantState(null);
     setGameState(nextState);
+    saveGame(nextState);
     if (nextState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
     else if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
     else beginScheduledDay(nextState);
@@ -238,6 +242,7 @@ function App() {
   }, []);
 
   const handleRestart = useCallback(() => {
+    deleteSave();
     setGameState(createInitialState());
     setRestaurantState(null);
     setShowTitle(true);
@@ -262,11 +267,29 @@ function App() {
   const isRestaurantShift = restaurantState !== null;
 
   if (showTitle) {
+    const savedGame = loadGame();
+    const handleResume = () => {
+      if (savedGame) {
+        setGameState(savedGame);
+        setShowTradingTutorial(false);
+        setShowRestaurantTutorial(false);
+        setShowTitle(false);
+        // If the saved state was mid-day with market open, resume directly
+        // If market was closed, they'll see the EOD screen
+      }
+    };
     return (
       <div className="title-screen">
         <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
         <div className="title-screen-overlay">
-          <button className="title-start-btn" onClick={() => setShowTitle(false)}>START TRADING</button>
+          {savedGame && (
+            <button className="title-start-btn title-resume-btn" onClick={handleResume}>
+              RESUME (Day {savedGame.day})
+            </button>
+          )}
+          <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); setGameState(createInitialState()); setShowTitle(false); }}>
+            {savedGame ? "NEW GAME" : "START TRADING"}
+          </button>
           <p className="title-hint">Press any key to start</p>
         </div>
       </div>
@@ -332,6 +355,7 @@ function App() {
           <div className="pause-menu">
             <h2>⏸ Paused</h2>
             <button className="pause-menu-btn resume" onClick={() => setPaused(false)}>Resume</button>
+            <button className="pause-menu-btn save-quit" onClick={() => { saveGame(gameState); setPaused(false); setRestaurantState(null); setShowTitle(true); }}>Save & Quit</button>
             <button className="pause-menu-btn restart" onClick={() => { setPaused(false); handleRestart(); }}>Start Over</button>
             <p className="pause-hint">Press ESC to resume</p>
           </div>

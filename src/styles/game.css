@@ -1735,6 +1735,22 @@ body {
   color: var(--red);
 }
 
+.pause-menu-btn.save-quit {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.pause-menu-btn.save-quit:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.title-resume-btn {
+  background: var(--green) !important;
+  margin-bottom: 8px;
+}
+
 .pause-hint {
   margin-top: 8px;
   font-size: 0.65rem;
