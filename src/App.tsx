@@ -311,7 +311,8 @@ function App() {
     };
 
     if (titleTutorial === "trading") {
-      // Start game UI so tutorial can highlight elements
+      // Force market open so EOD overlay doesn't show during tutorial
+      setGameState((prev) => prev.marketOpen ? prev : { ...prev, marketOpen: true });
       setShowTitle(false);
       return;
     }
@@ -380,11 +381,9 @@ function App() {
          setTitleTutorial(null);
          setOrdersOpen(false);
          setShowTitle(true);
-         setGameState((prev) => ({
-           ...prev,
-           news: prev.news.filter((n) => !n.id.startsWith("tutorial-")),
-           monitors: prev.monitors.map((m, i) => i === 0 ? { ...m, channel: "stock_ticker" as MonitorChannel } : m),
-         }));
+         // Restore saved game state (tutorial may have modified it)
+         const saved = loadGame();
+         setGameState(saved ?? createInitialState());
        }} onStepChange={handleTradingTutorialStep} />
      )}
 
