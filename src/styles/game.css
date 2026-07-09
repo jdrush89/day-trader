@@ -38,6 +38,10 @@
   gap: 1rem;
 }
 
+.title-menu-bottom {
+  bottom: 5%;
+}
+
 .title-start-btn {
   font-family: "Courier New", monospace;
   font-size: 1.5rem;
@@ -52,9 +56,15 @@
   animation: title-pulse 1.5s ease-in-out infinite;
 }
 
-.title-start-btn:hover {
+.title-start-btn:hover,
+.title-start-btn:focus {
   background: #fff;
   color: #000;
+  outline: none;
+}
+
+.title-start-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6);
 }
 
 .title-hint {
@@ -94,12 +104,16 @@
 }
 
 .title-tutorial-btn {
-  background: transparent !important;
+  background: rgba(30, 30, 40, 0.9) !important;
+  color: #ccc !important;
   border: 1px solid rgba(255, 255, 255, 0.3) !important;
   font-size: 0.9rem !important;
 }
 
-.title-tutorial-btn:hover {
+.title-tutorial-btn:hover,
+.title-tutorial-btn:focus {
+  background: rgba(50, 50, 65, 0.95) !important;
+  color: #fff !important;
   border-color: rgba(255, 255, 255, 0.6) !important;
 }
 

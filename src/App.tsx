@@ -40,7 +40,12 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showTitle) {
         if (titleTutorial) return;
-        setShowTitle(false);
+        // Focus first menu button on any key press
+        const firstBtn = document.querySelector('.title-screen-overlay .title-start-btn') as HTMLButtonElement;
+        if (firstBtn && document.activeElement !== firstBtn) {
+          firstBtn.focus();
+          e.preventDefault();
+        }
         return;
       }
 
@@ -302,7 +307,7 @@ function App() {
       return (
         <div className="title-screen">
           <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
-          <div className="title-screen-overlay">
+          <div className="title-screen-overlay title-menu-bottom">
             <h2 className="tutorial-pick-title">📖 Choose a Tutorial</h2>
             <button className="title-start-btn" onClick={() => setTitleTutorial("trading")}>📈 Day Trading</button>
             <button className="title-start-btn" onClick={() => setTitleTutorial("restaurant")}>🍔 Shwendy's Kitchen</button>
@@ -315,7 +320,7 @@ function App() {
     return (
       <div className="title-screen">
         <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
-        <div className="title-screen-overlay">
+        <div className="title-screen-overlay title-menu-bottom">
           {savedGame && (
             <button className="title-start-btn title-resume-btn" onClick={handleResume}>
               RESUME (Day {savedGame.day})
@@ -325,7 +330,6 @@ function App() {
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
           <button className="title-start-btn title-tutorial-btn" onClick={() => setTitleTutorial("pick")}>VIEW TUTORIAL</button>
-          <p className="title-hint">Press any key to start</p>
         </div>
       </div>
     );
