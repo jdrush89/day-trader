@@ -332,7 +332,7 @@ function App() {
             <h2 className="tutorial-pick-title">📖 Choose a Tutorial</h2>
             <button className="title-start-btn" onClick={() => setTitleTutorial("trading")}>📈 Day Trading</button>
             <button className="title-start-btn" onClick={() => setTitleTutorial("restaurant")}>🍔 Shwendy's Kitchen</button>
-            <button className="title-start-btn title-back-btn" onClick={() => { setTitleTutorial(null); setMenuFocusIndex(-1); }}>← Back</button>
+            <button className="title-start-btn title-back-btn" onClick={() => { setTitleTutorial(null); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>← Back</button>
           </div>
         </div>
       );
@@ -350,7 +350,7 @@ function App() {
           <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); setGameState(createInitialState()); setShowTitle(false); }}>
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
-          <button className="title-start-btn title-tutorial-btn" onClick={() => { setTitleTutorial("pick"); setMenuFocusIndex(-1); }}>VIEW TUTORIAL</button>
+          <button className="title-start-btn title-tutorial-btn" onClick={() => { setTitleTutorial("pick"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>VIEW TUTORIAL</button>
         </div>
       </div>
     );
