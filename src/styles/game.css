@@ -1739,10 +1739,6 @@ body {
 }
 
 /* Overlays */
-.pause-overlay {
-  z-index: 200;
-}
-
 .pause-overlay,
 .game-over-overlay,
 .end-of-day-overlay {
@@ -1753,6 +1749,10 @@ body {
   justify-content: center;
   background: rgba(0, 0, 0, 0.8);
   z-index: 100;
+}
+
+.pause-overlay {
+  z-index: 200;
 }
 
 /* Pause Menu */

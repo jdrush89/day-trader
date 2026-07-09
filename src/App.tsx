@@ -491,6 +491,7 @@ function App() {
               <button className={speed === 1 ? "active" : ""} onClick={() => setSpeed(1)}>1x</button>
               <button className={speed === 2 ? "active" : ""} onClick={() => setSpeed(2)}>2x</button>
               <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>
+              <button className={speed === 10 ? "active" : ""} onClick={() => setSpeed(10)}>10x</button>
             </div>
           </div>
         </header>
