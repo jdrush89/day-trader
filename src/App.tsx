@@ -12,6 +12,7 @@ import { OrdersPanel } from "./components/OrdersPanel";
 import { Restaurant } from "./components/Restaurant";
 import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
 import titleScreen from "./assets/title-screen.png";
+import shwendysExterior from "./assets/shwendys-exterior.png";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -25,6 +26,7 @@ function App() {
   const [activeMonitorId, setActiveMonitorId] = useState(0);
   const [showTradingTutorial, setShowTradingTutorial] = useState(true);
   const [showRestaurantTutorial, setShowRestaurantTutorial] = useState(true);
+  const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
 
   useEffect(() => {
     if (gameState.gameOver || !gameState.marketOpen || paused || showTradingTutorial) return;
@@ -166,7 +168,7 @@ function App() {
     const nextState = stateOverride ?? gameState;
     if (nextState.day % 2 === 0) {
       setGameState(nextState);
-      setRestaurantState(createRestaurantState(nextState));
+      setShowTransition("restaurant");
       setEodPhase("summary");
       return;
     }
@@ -265,6 +267,24 @@ function App() {
         <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
         <div className="title-screen-overlay">
           <button className="title-start-btn" onClick={() => setShowTitle(false)}>START TRADING</button>
+          <p className="title-hint">Press any key to start</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (showTransition === "restaurant") {
+    const startShift = () => {
+      setShowTransition(null);
+      setRestaurantState(createRestaurantState(gameState));
+    };
+    return (
+      <div className="title-screen" onClick={startShift} onKeyDown={startShift} tabIndex={0} ref={(el) => el?.focus()}>
+        <img src={shwendysExterior} alt="Shwendy's Restaurant" className="title-screen-bg" />
+        <div className="title-screen-overlay transition-overlay">
+          <h1 className="transition-title">🍔 Shwendy's</h1>
+          <p className="transition-sub">Day {gameState.day} — Evening Shift</p>
+          <button className="title-start-btn" onClick={startShift}>START SHIFT</button>
           <p className="title-hint">Press any key to start</p>
         </div>
       </div>
