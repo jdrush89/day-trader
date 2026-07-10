@@ -106,6 +106,21 @@ function OrderForm({ gameState, onPlaceOrder }: { gameState: GameState; onPlaceO
          orderType === "limit" ? `Place Limit ${side.charAt(0).toUpperCase() + side.slice(1)}` :
          `Set Stop Loss (${side.charAt(0).toUpperCase() + side.slice(1)})`}
       </button>
+      {stock && parseInt(shares) > 0 && (() => {
+        const qty = parseInt(shares);
+        const unitPrice = orderType === "market" ? stock.price : orderType === "limit" ? (parseFloat(price) || 0) : (parseFloat(price) || 0);
+        const total = qty * unitPrice;
+        if (!unitPrice) return null;
+        const isBuying = side === "buy" || side === "short";
+        return (
+          <div className="order-cost-estimate">
+            <span>Est. {isBuying ? "cost" : "proceeds"}:</span>
+            <span className={`order-cost-value ${isBuying && total > gameState.cash ? "over-budget" : ""}`}>
+              ${total.toFixed(2)}
+            </span>
+          </div>
+        );
+      })()}
     </form>
   );
 }

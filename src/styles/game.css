@@ -1461,6 +1461,24 @@ body {
   filter: brightness(1.15);
 }
 
+.order-cost-estimate {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  padding: 3px 0;
+}
+
+.order-cost-value {
+  font-weight: bold;
+  color: var(--text);
+}
+
+.order-cost-value.over-budget {
+  color: var(--red);
+}
+
 .pending-orders h4 {
   font-size: 0.7rem;
   margin: 4px 0;
