@@ -2762,6 +2762,26 @@ body {
   background: var(--border);
 }
 
+/* Upgrade icons in header */
+.upgrade-icons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.upgrade-icon {
+  font-size: 1.1rem;
+  cursor: default;
+  padding: 2px;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.upgrade-icon:hover {
+  background: var(--bg-panel);
+}
+
 /* Options screen */
 .options-row {
   display: flex;

@@ -9,6 +9,7 @@ import {
   serveOrder,
 } from "../game/restaurant-engine";
 import { ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
+import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
 
 const TICK_MS = 50;
 
@@ -23,6 +24,7 @@ interface RestaurantProps {
   netWorth: number;
   speed: number;
   onSpeedChange: (speed: number) => void;
+  acquiredRestaurantUpgrades: string[];
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -285,7 +287,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange }: RestaurantProps) {
+export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades }: RestaurantProps) {
   const activeOrder = useMemo(
     () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
     [state.activeOrderId, state.orderSlots],
@@ -372,6 +374,20 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
         <div>
           <h1>🍔 SHWENDY'S</h1>
           <p>Day {day} — Shwendy's Shift</p>
+          {acquiredRestaurantUpgrades.length > 0 && (
+            <div className="upgrade-icons">
+              {[...new Set(acquiredRestaurantUpgrades)].map((id) => {
+                const card = RESTAURANT_UPGRADE_POOL.find((u) => u.id === id);
+                if (!card) return null;
+                const count = acquiredRestaurantUpgrades.filter((u) => u === id).length;
+                return (
+                  <span key={id} className="upgrade-icon" title={`${card.name}${count > 1 ? ` x${count}` : ""}: ${card.description}`}>
+                    {card.icon}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="restaurant-header-stats">
           {milestoneTarget != null && (

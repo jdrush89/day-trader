@@ -582,6 +582,20 @@ function App() {
      {!isRestaurantShift && (
         <header className="game-header">
           <h1>📈 Day Trader</h1>
+          {gameState.acquiredUpgrades.length > 0 && (
+            <div className="upgrade-icons">
+              {[...new Set(gameState.acquiredUpgrades)].map((id) => {
+                const card = UPGRADE_POOL.find((u) => u.id === id);
+                if (!card) return null;
+                const count = gameState.acquiredUpgrades.filter((u) => u === id).length;
+                return (
+                  <span key={id} className="upgrade-icon" title={`${card.name}${count > 1 ? ` x${count}` : ""}: ${card.description}`}>
+                    {card.icon}
+                  </span>
+                );
+              })}
+            </div>
+          )}
           <div className="header-controls">
             <div className="time-bar">
               <div className="time-fill" style={{ width: `${gameState.timeOfDay}%` }} />
@@ -652,6 +666,7 @@ function App() {
           netWorth={gameState.cash + gameState.portfolio.reduce((sum: number, pos) => { const s = gameState.stocks.find((st) => st.symbol === pos.symbol); return sum + (s ? s.price * pos.shares : 0); }, 0) + gameState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0) - gameState.shorts.reduce((sum: number, sp) => { const s = gameState.stocks.find((st) => st.symbol === sp.symbol); return sum + (s ? s.price * sp.shares : 0); }, 0) + getOptionsValue(gameState)}
           speed={speed}
           onSpeedChange={setSpeed}
+          acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
         />
       ) : (
         <>
