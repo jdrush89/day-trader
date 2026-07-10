@@ -2729,3 +2729,40 @@ body {
 .sec-wheel-ok-btn:hover {
   background: var(--border);
 }
+
+/* Options screen */
+.options-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 0;
+}
+
+.options-label {
+  font-size: 1rem;
+  font-weight: bold;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.options-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.options-slider {
+  flex: 1;
+  accent-color: var(--positive);
+  height: 6px;
+  cursor: pointer;
+}
+
+.options-value {
+  font-size: 0.9rem;
+  min-width: 40px;
+  text-align: right;
+  font-family: monospace;
+}

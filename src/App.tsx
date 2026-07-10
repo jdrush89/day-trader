@@ -21,6 +21,11 @@ function App() {
   const [gameState, setGameState] = useState<GameState>(createInitialState);
   const [speed, setSpeed] = useState<number>(1);
   const [paused, setPaused] = useState(false);
+  const [showOptions, setShowOptions] = useState<"title" | "pause" | null>(null);
+  const [textSize, setTextSize] = useState<number>(() => {
+    const saved = localStorage.getItem("rogue-day-trader-text-size");
+    return saved ? parseFloat(saved) : 100;
+  });
 
   const [ordersOpen, setOrdersOpen] = useState(false);
   const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
@@ -30,6 +35,11 @@ function App() {
   const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
   const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
   const [showLoanOffer, setShowLoanOffer] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${textSize}%`;
+    localStorage.setItem("rogue-day-trader-text-size", String(textSize));
+  }, [textSize]);
 
   useEffect(() => {
     if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial || showLoanOffer) return;
@@ -82,7 +92,12 @@ function App() {
       }
 
       if (e.key === "Escape") {
-        setPaused((p) => !p);
+        if (showOptions === "pause") {
+          setShowOptions(null);
+        } else {
+          setShowOptions(null);
+          setPaused((p) => !p);
+        }
         return;
       }
 
@@ -472,6 +487,25 @@ function App() {
       );
     }
 
+    if (showOptions === "title") {
+      return (
+        <div className="title-screen">
+          <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
+          <div className="title-screen-overlay title-menu-bottom">
+            <h2 className="tutorial-pick-title">⚙️ Options</h2>
+            <div className="options-row">
+              <label className="options-label">Text Size</label>
+              <div className="options-slider-wrap">
+                <input type="range" min="60" max="150" step="5" value={textSize} onChange={(e) => setTextSize(Number(e.target.value))} className="options-slider" />
+                <span className="options-value">{textSize}%</span>
+              </div>
+            </div>
+            <button className="title-start-btn title-back-btn" onClick={() => { setShowOptions(null); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>← Back</button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="title-screen">
         <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
@@ -485,6 +519,7 @@ function App() {
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setTitleTutorial("pick"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>VIEW TUTORIAL</button>
+          <button className="title-start-btn title-tutorial-btn" onClick={() => { setShowOptions("title"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>OPTIONS</button>
         </div>
       </div>
     );
@@ -550,13 +585,28 @@ function App() {
 
       {paused && (
         <div className="pause-overlay">
-          <div className="pause-menu">
-            <h2>⏸ Paused</h2>
-            <button className="pause-menu-btn resume" onClick={() => setPaused(false)}>Resume</button>
+          {showOptions === "pause" ? (
+            <div className="pause-menu">
+              <h2>⚙️ Options</h2>
+              <div className="options-row">
+                <label className="options-label">Text Size</label>
+                <div className="options-slider-wrap">
+                  <input type="range" min="60" max="150" step="5" value={textSize} onChange={(e) => setTextSize(Number(e.target.value))} className="options-slider" />
+                  <span className="options-value">{textSize}%</span>
+                </div>
+              </div>
+              <button className="pause-menu-btn" onClick={() => setShowOptions(null)}>← Back</button>
+            </div>
+          ) : (
+            <div className="pause-menu">
+              <h2>⏸ Paused</h2>
+              <button className="pause-menu-btn resume" onClick={() => { setShowOptions(null); setPaused(false); }}>Resume</button>
+              <button className="pause-menu-btn" onClick={() => setShowOptions("pause")}>Options</button>
             <button className="pause-menu-btn save-quit" onClick={() => { saveGame(gameState); setPaused(false); setRestaurantState(null); setShowTitle(true); setMenuFocusIndex(-1); }}>Save & Quit</button>
             <button className="pause-menu-btn restart" onClick={() => { setPaused(false); handleRestart(); }}>Start Over</button>
             <p className="pause-hint">Press ESC to resume</p>
           </div>
+          )}
         </div>
       )}
 
