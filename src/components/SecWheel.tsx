@@ -119,8 +119,10 @@ export function SecWheel({ catchChance, fineAmount, profit, symbol, onResult }: 
     const caught = Math.random() < catchChance;
 
     // Calculate target angle so pointer lands in the correct zone
-    // Pointer is at top (0 degrees). Wheel rotates clockwise.
+    // Pointer is at top (270° in canvas coords). Wheel rotates clockwise.
     // Safe zone is from 0 to safeDegrees, caught is safeDegrees to 360
+    // After rotation R, the wheel angle at the pointer is (270 - R) mod 360
+    // We want: (270 - finalRot) % 360 = landAngle => finalRot % 360 = (270 - landAngle + 360) % 360
     let targetZoneStart: number;
     let targetZoneEnd: number;
     if (caught) {
@@ -134,10 +136,7 @@ export function SecWheel({ catchChance, fineAmount, profit, symbol, onResult }: 
     // Random position within the zone
     const landAngle = targetZoneStart + Math.random() * (targetZoneEnd - targetZoneStart);
     // Spin multiple rotations + land at the angle
-    // The wheel rotates, so we need the final rotation to place landAngle at top (0)
-    // At rotation R, the angle at the pointer is (360 - R % 360)
-    // We want: (360 - finalRot % 360) = landAngle => finalRot % 360 = 360 - landAngle
-    const targetRot = (360 - landAngle) + 360 * (5 + Math.floor(Math.random() * 3));
+    const targetRot = ((270 - landAngle + 360) % 360) + 360 * (5 + Math.floor(Math.random() * 3));
 
     const startRot = rotation;
     const totalRot = targetRot - startRot;
