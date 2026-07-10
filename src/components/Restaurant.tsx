@@ -21,6 +21,8 @@ interface RestaurantProps {
   milestoneTarget: number | null;
   milestoneDaysLeft: number;
   netWorth: number;
+  speed: number;
+  onSpeedChange: (speed: number) => void;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -283,7 +285,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth }: RestaurantProps) {
+export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange }: RestaurantProps) {
   const activeOrder = useMemo(
     () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
     [state.activeOrderId, state.orderSlots],
@@ -292,10 +294,10 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
   useEffect(() => {
     if (paused || state.shiftOver) return;
     const interval = window.setInterval(() => {
-      setRestaurantState((prev) => (prev ? restaurantTick(prev, TICK_MS / 1000) : prev));
+      setRestaurantState((prev) => (prev ? restaurantTick(prev, (TICK_MS / 1000) * speed) : prev));
     }, TICK_MS);
     return () => window.clearInterval(interval);
-  }, [paused, setRestaurantState, state.shiftOver]);
+  }, [paused, setRestaurantState, state.shiftOver, speed]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -389,6 +391,12 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
           <div className="restaurant-stat-box">
             <span>Earnings</span>
             <strong>${state.totalEarnings.toFixed(2)}</strong>
+          </div>
+          <div className="speed-controls">
+            <button className={speed === 1 ? "active" : ""} onClick={() => onSpeedChange(1)}>1x</button>
+            <button className={speed === 2 ? "active" : ""} onClick={() => onSpeedChange(2)}>2x</button>
+            <button className={speed === 5 ? "active" : ""} onClick={() => onSpeedChange(5)}>5x</button>
+            <button className={speed === 10 ? "active" : ""} onClick={() => onSpeedChange(10)}>10x</button>
           </div>
         </div>
       </header>
