@@ -21,16 +21,6 @@ function OrderForm({ gameState, onPlaceOrder }: { gameState: GameState; onPlaceO
   const [price, setPrice] = useState("");
 
   const stock = gameState.stocks.find((s) => s.symbol === symbol);
-  const ownedPosition = gameState.portfolio.find((p) => p.symbol === symbol);
-  const ownedShares = ownedPosition?.shares ?? 0;
-  const shortPosition = gameState.shorts.find((p) => p.symbol === symbol);
-  const shortedShares = shortPosition?.shares ?? 0;
-
-  // Auto-convert sell→short if player owns none, cover→buy if no short position
-  const effectiveSide: OrderSide =
-    side === "sell" && ownedShares === 0 ? "short" :
-    side === "cover" && shortedShares === 0 ? "buy" :
-    side;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +28,11 @@ function OrderForm({ gameState, onPlaceOrder }: { gameState: GameState; onPlaceO
     if (!qty || qty <= 0) return;
     const p = parseFloat(price);
     if (orderType === "limit") {
-      onPlaceOrder(symbol, effectiveSide, qty, orderType, p, undefined);
+      onPlaceOrder(symbol, side, qty, orderType, p, undefined);
     } else if (orderType === "stop-loss") {
-      onPlaceOrder(symbol, effectiveSide, qty, orderType, undefined, p);
+      onPlaceOrder(symbol, side, qty, orderType, undefined, p);
     } else {
-      onPlaceOrder(symbol, effectiveSide, qty, orderType);
+      onPlaceOrder(symbol, side, qty, orderType);
     }
     setShares("");
     setPrice("");
@@ -111,17 +101,17 @@ function OrderForm({ gameState, onPlaceOrder }: { gameState: GameState; onPlaceO
           )}
         </div>
       )}
-      <button type="submit" className={`order-submit ${effectiveSide === "sell" || effectiveSide === "cover" ? "sell" : effectiveSide === "short" ? "short" : ""}`}>
-        {orderType === "market" ? `${effectiveSide.charAt(0).toUpperCase() + effectiveSide.slice(1)} at Market` :
-         orderType === "limit" ? `Place Limit ${effectiveSide.charAt(0).toUpperCase() + effectiveSide.slice(1)}` :
-         `Set Stop Loss (${effectiveSide.charAt(0).toUpperCase() + effectiveSide.slice(1)})`}
+      <button type="submit" className={`order-submit ${side === "sell" || side === "cover" ? "sell" : side === "short" ? "short" : ""}`}>
+        {orderType === "market" ? `${side.charAt(0).toUpperCase() + side.slice(1)} at Market` :
+         orderType === "limit" ? `Place Limit ${side.charAt(0).toUpperCase() + side.slice(1)}` :
+         `Set Stop Loss (${side.charAt(0).toUpperCase() + side.slice(1)})`}
       </button>
       {stock && parseInt(shares) > 0 && (() => {
         const qty = parseInt(shares);
         const unitPrice = orderType === "market" ? stock.price : orderType === "limit" ? (parseFloat(price) || 0) : (parseFloat(price) || 0);
         const total = qty * unitPrice;
         if (!unitPrice) return null;
-        const isBuying = effectiveSide === "buy" || effectiveSide === "short";
+        const isBuying = side === "buy" || side === "short";
         return (
           <div className="order-cost-estimate">
             <span>Est. {isBuying ? "cost" : "proceeds"}:</span>
