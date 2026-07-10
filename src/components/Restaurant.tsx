@@ -381,7 +381,7 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
                 if (!card) return null;
                 const count = acquiredRestaurantUpgrades.filter((u) => u === id).length;
                 return (
-                  <span key={id} className="upgrade-icon" title={`${card.name}${count > 1 ? ` x${count}` : ""}: ${card.description}`}>
+                  <span key={id} className="upgrade-icon" data-tooltip={`${card.name}${count > 1 ? ` x${count}` : ""}: ${card.description}`}>
                     {card.icon}
                   </span>
                 );
