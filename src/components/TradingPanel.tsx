@@ -30,7 +30,11 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTog
   const marginActive = buyingPower > gameState.cash + 0.01;
   const milestone = getMilestone(gameState.day);
   const daysUntilCheck = milestone ? milestone.checkDay - gameState.day : 0;
-  const onTrack = milestone ? netWorth >= milestone.required : true;
+  const loansDue = milestone
+    ? gameState.loans.filter((l) => l.dueDay <= milestone.checkDay).reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0)
+    : 0;
+  const effectiveTarget = milestone ? milestone.required + loansDue : 0;
+  const onTrack = milestone ? netWorth >= effectiveTarget : true;
   const handleAction = shortMode ? onShort : onBuy;
   const actionLabel = shortMode ? "Short" : "Buy";
   const showStopLoss = hasUpgrade(gameState, "stop_loss_ins");
@@ -52,7 +56,7 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTog
         <div className="stat"><span className="stat-label">Portfolio</span><span className="stat-value">${portfolioValue.toFixed(2)}</span></div>
         <div className="stat"><span className="stat-label">Net Worth</span><span className="stat-value">${netWorth.toFixed(2)}</span></div>
         <div className="stat"><span className="stat-label">Day</span><span className="stat-value">{gameState.day}</span></div>
-        {milestone && <div className="stat milestone-stat"><span className="stat-label">Target (in {daysUntilCheck}d)</span><span className={`stat-value ${onTrack ? "milestone-ok" : "danger"}`}>${milestone.required.toLocaleString()}</span></div>}
+        {milestone && <div className="stat milestone-stat"><span className="stat-label">Target (in {daysUntilCheck}d)</span><span className={`stat-value ${onTrack ? "milestone-ok" : "danger"}`}>${effectiveTarget.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span></div>}
       </div>
 
       {showStopLoss && (
