@@ -273,8 +273,10 @@ body {
 
 .sidebar {
   width: 280px;
+  max-width: 35vw;
   border-left: 1px solid var(--border);
   overflow-y: auto;
+  overflow-x: hidden;
   flex-shrink: 0;
 }
 
@@ -291,6 +293,7 @@ body {
 
 .orders-flyout.open {
   width: 280px;
+  max-width: 35vw;
 }
 
 .orders-flyout-header {
@@ -1394,10 +1397,12 @@ body {
   display: flex;
   gap: 4px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .order-select {
-  flex: 1;
+  flex: 1 1 45%;
+  min-width: 100px;
   padding: 4px 6px;
   font-size: 0.65rem;
   font-family: inherit;
@@ -1408,7 +1413,8 @@ body {
 }
 
 .order-input {
-  flex: 1;
+  flex: 1 1 45%;
+  min-width: 80px;
   padding: 4px 6px;
   font-size: 0.65rem;
   font-family: inherit;
@@ -1416,7 +1422,6 @@ body {
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 3px;
-  min-width: 0;
 }
 
 .order-price-input {
@@ -1556,7 +1561,8 @@ body {
 
 /* Options form */
 .option-field {
-  flex: 1;
+  flex: 1 1 45%;
+  min-width: 100px;
   display: flex;
   flex-direction: column;
   gap: 2px;
