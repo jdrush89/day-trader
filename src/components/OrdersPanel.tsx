@@ -61,7 +61,7 @@ function OrderForm({ gameState, onPlaceOrder }: { gameState: GameState; onPlaceO
       <div className="order-form-row">
         <select value={symbol} onChange={(e) => setSymbol(e.target.value)} className="order-select">
           {gameState.stocks.map((s) => (
-            <option key={s.symbol} value={s.symbol}>{s.symbol} — ${s.price.toFixed(2)}</option>
+            <option key={s.symbol} value={s.symbol}>{s.symbol}</option>
           ))}
         </select>
         <select value={orderType} onChange={(e) => setOrderType(e.target.value as OrderType)} className="order-select">
@@ -188,7 +188,7 @@ function OptionsForm({ gameState, onBuyOption, onSellOption }: {
       <div className="order-form-row">
         <select value={symbol} onChange={(e) => setSymbol(e.target.value)} className="order-select">
           {gameState.stocks.map((s) => (
-            <option key={s.symbol} value={s.symbol}>{s.symbol} — ${s.price.toFixed(2)}</option>
+            <option key={s.symbol} value={s.symbol}>{s.symbol}</option>
           ))}
         </select>
         <select value={optionType} onChange={(e) => setOptionType(e.target.value as "call" | "put")} className="order-select">
