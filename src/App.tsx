@@ -328,7 +328,7 @@ function App() {
       if (marketState.cash < 0) {
         // Emergency loan: fixed high rate
         const amount = Math.abs(marketState.cash) + 500;
-        setShowLoanOffer({ amount: Math.round(amount * 100) / 100, interestRate: 0.5, dueDay, isEmergency: true });
+        setShowLoanOffer({ amount: Math.round(amount * 100) / 100, interestRate: 0.35, dueDay, isEmergency: true });
       } else {
         // Normal loan: random 20-100% of milestone target, random 5-30% interest
         const milestoneTarget = milestone?.required ?? 2000;
