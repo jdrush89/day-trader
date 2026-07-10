@@ -34,7 +34,7 @@ function App() {
   const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
   const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
   const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
-  const [showLoanOffer, setShowLoanOffer] = useState(false);
+  const [showLoanOffer, setShowLoanOffer] = useState<{ amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null>(null);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -319,9 +319,24 @@ function App() {
     const marketState = openMarket(nextState);
     setGameState(marketState);
     setEodPhase("summary");
-    // Offer loan if player has negative cash
-    if (marketState.cash < 0) {
-      setShowLoanOffer(true);
+    // Always offer a loan after day 1
+    if (marketState.day > 1) {
+      const milestone = getMilestone(marketState.day);
+      const nextMilestoneDay = milestone?.checkDay ?? marketState.day + 3;
+      const dueDay = nextMilestoneDay <= marketState.day ? nextMilestoneDay + 3 : nextMilestoneDay;
+
+      if (marketState.cash < 0) {
+        // Emergency loan: fixed high rate
+        const amount = Math.abs(marketState.cash) + 500;
+        setShowLoanOffer({ amount: Math.round(amount * 100) / 100, interestRate: 0.5, dueDay, isEmergency: true });
+      } else {
+        // Normal loan: random 20-100% of milestone target, random 5-30% interest
+        const milestoneTarget = milestone?.required ?? 2000;
+        const pct = 0.2 + Math.random() * 0.8;
+        const amount = Math.round(milestoneTarget * pct);
+        const interestRate = Math.round((0.05 + Math.random() * 0.25) * 100) / 100;
+        setShowLoanOffer({ amount, interestRate, dueDay, isEmergency: false });
+      }
     }
   }, [gameState, restaurantState]);
 
@@ -409,20 +424,19 @@ function App() {
 
   const handleAcceptLoan = useCallback(() => {
     setGameState((prev) => {
-      const loanAmount = Math.abs(prev.cash) + 500;
-      const nextMilestoneDay = Math.ceil(prev.day / 3) * 3;
-      const dueDay = nextMilestoneDay <= prev.day ? nextMilestoneDay + 3 : nextMilestoneDay;
+      if (!showLoanOffer) return prev;
+      const { amount, interestRate, dueDay } = showLoanOffer;
       return {
         ...prev,
-        cash: Math.round((prev.cash + loanAmount) * 100) / 100,
-        loans: [...prev.loans, { amount: Math.round(loanAmount * 100) / 100, dueDay, interestRate: 0.5 }],
+        cash: Math.round((prev.cash + amount) * 100) / 100,
+        loans: [...prev.loans, { amount: Math.round(amount * 100) / 100, dueDay, interestRate }],
       };
     });
-    setShowLoanOffer(false);
-  }, []);
+    setShowLoanOffer(null);
+  }, [showLoanOffer]);
 
   const handleDeclineLoan = useCallback(() => {
-    setShowLoanOffer(false);
+    setShowLoanOffer(null);
   }, []);
 
   const handleRestart = useCallback(() => {
@@ -842,10 +856,12 @@ function App() {
       {showLoanOffer && (
         <div className="end-of-day-overlay">
           <div className="end-of-day">
-            <h2>🏦 Emergency Loan Available</h2>
-            <p style={{ marginBottom: "12px" }}>Your cash balance is <span className="danger">${gameState.cash.toFixed(2)}</span>. You can't trade without capital.</p>
+            <h2>{showLoanOffer.isEmergency ? "🏦 Emergency Loan Available" : "🏦 Loan Available"}</h2>
+            {showLoanOffer.isEmergency && (
+              <p style={{ marginBottom: "12px" }}>Your cash balance is <span className="danger">${gameState.cash.toFixed(2)}</span>. You can't trade without capital.</p>
+            )}
             <p style={{ marginBottom: "16px" }}>
-              A loan of <strong>${(Math.abs(gameState.cash) + 500).toFixed(2)}</strong> is available at <strong>50% interest</strong>, due at the next milestone (Day {(() => { const next = Math.ceil(gameState.day / 3) * 3; return next <= gameState.day ? next + 3 : next; })()}).
+              A loan of <strong>${showLoanOffer.amount.toFixed(2)}</strong> is available at <strong>{Math.round(showLoanOffer.interestRate * 100)}% interest</strong> (repay <strong>${(showLoanOffer.amount * (1 + showLoanOffer.interestRate)).toFixed(2)}</strong>), due at the next milestone (Day {showLoanOffer.dueDay}).
             </p>
             {gameState.loans.length > 0 && (
               <p style={{ marginBottom: "12px", color: "var(--text-dim)" }}>
