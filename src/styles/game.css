@@ -2806,6 +2806,50 @@ body {
   opacity: 1;
 }
 
+/* Boss day */
+.boss-toggle-btn {
+  padding: 4px 10px;
+  font-size: 0.7rem;
+  font-family: inherit;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.boss-toggle-btn kbd {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  padding: 1px 4px;
+  font-size: 0.6rem;
+  margin-left: 4px;
+}
+
+.boss-toggle-btn:hover {
+  filter: brightness(1.15);
+}
+
+.boss-stats {
+  display: flex;
+  gap: 8px;
+  font-size: 0.7rem;
+}
+
+.boss-stat {
+  padding: 2px 6px;
+  background: var(--bg-dark);
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+
+.boss-stat.danger {
+  color: var(--red);
+  border-color: var(--red);
+}
+
 /* Options screen */
 .options-row {
   display: flex;

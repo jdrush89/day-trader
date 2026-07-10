@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue } from "./game/engine";
-import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, MENU } from "./game/restaurant-engine";
+import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
@@ -35,6 +35,9 @@ function App() {
   const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
   const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
   const [showLoanOffer, setShowLoanOffer] = useState<{ amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null>(null);
+  const [bossDay, setBossDay] = useState(false);
+  const [bossView, setBossView] = useState<"trading" | "restaurant">("trading");
+  const [bossResult, setBossResult] = useState<{ passed: boolean; tradingProfit: number; missedOrders: number; requiredProfit: number; maxMissed: number } | null>(null);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -46,6 +49,15 @@ function App() {
     const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
     return () => clearInterval(interval);
   }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer]);
+
+  // Boss day: tick restaurant alongside trading
+  useEffect(() => {
+    if (!bossDay || !restaurantState || paused || !gameState.marketOpen || restaurantState.shiftOver) return;
+    const interval = setInterval(() => {
+      setRestaurantState((prev) => prev ? restaurantTick(prev, 0.05 * speed) : prev);
+    }, 50);
+    return () => clearInterval(interval);
+  }, [bossDay, restaurantState, paused, gameState.marketOpen, speed]);
 
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
@@ -101,8 +113,15 @@ function App() {
         return;
       }
 
+      // Boss day: toggle between trading and restaurant views
+      if (e.key === "/" && bossDay) {
+        e.preventDefault();
+        setBossView((v) => v === "trading" ? "restaurant" : "trading");
+        return;
+      }
 
-      if (restaurantState) return;
+      if (restaurantState && !bossDay) return;
+      if (bossDay && bossView === "restaurant") return;
 
       // Shift+number selects which monitor is active
       if (e.shiftKey && /^[1-3]$/.test(e.key)) {
@@ -132,7 +151,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex]);
+  }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex, bossDay, bossView]);
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
@@ -305,6 +324,45 @@ function App() {
 
   const beginScheduledDay = useCallback((stateOverride?: GameState) => {
     const nextState = stateOverride ?? gameState;
+
+    // Boss day: when market closes, day is done (restaurant was running alongside)
+    if (bossDay && !nextState.marketOpen) {
+      const earnings = restaurantState?.totalEarnings ?? 0;
+      const missedOrders = restaurantState?.failedOrders ?? 0;
+      const finalState = finishRestaurantDay(nextState, earnings);
+
+      // Difficulty scales with milestone number (boss day follows milestone day)
+      const milestoneNum = Math.floor((finalState.day - 1) / 3);
+      const requiredProfit = 300 + (milestoneNum - 1) * 100;
+      const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
+
+      // Calculate trading profit for the day
+      const portfolioValue = finalState.portfolio.reduce((sum: number, pos) => {
+        const s = finalState.stocks.find((st) => st.symbol === pos.symbol);
+        return sum + (s ? s.price * pos.shares : 0);
+      }, 0);
+      const shortLiability = finalState.shorts.reduce((sum: number, pos) => {
+        const s = finalState.stocks.find((st) => st.symbol === pos.symbol);
+        return sum + (s ? s.price * pos.shares : 0);
+      }, 0);
+      const shortCollateral = finalState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0);
+      const optionsVal = getOptionsValue(finalState);
+      const currentNetWorth = finalState.cash + portfolioValue + shortCollateral - shortLiability + optionsVal;
+      const tradingProfit = currentNetWorth - finalState.dayStartNetWorth;
+
+      const passed = tradingProfit >= requiredProfit && missedOrders <= maxMissed;
+      setBossResult({ passed, tradingProfit, missedOrders, requiredProfit, maxMissed });
+
+      setGameState(finalState);
+      setRestaurantState(null);
+      setBossDay(false);
+      setEodPhase("summary");
+      saveGame(finalState);
+      if (finalState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
+      else if (finalState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
+      return;
+    }
+
     // After trading (market just closed), go to Shwendy's
     if (!nextState.marketOpen && restaurantState === null) {
       setGameState(nextState);
@@ -319,6 +377,17 @@ function App() {
     const marketState = openMarket(nextState);
     setGameState(marketState);
     setEodPhase("summary");
+
+    // Check if this is a boss day (day after a milestone)
+    const isBossDay = marketState.day > 3 && (marketState.day - 1) % 3 === 0;
+    setBossDay(isBossDay);
+    setBossView("trading");
+    if (isBossDay) {
+      const rs = createRestaurantState(marketState);
+      // Boss day: restaurant runs until market closes, not on its own timer
+      setRestaurantState({ ...rs, shiftTimeRemaining: 9999 });
+    }
+
     // Always offer a loan after day 1
     if (marketState.day > 1) {
       const milestone = getMilestone(marketState.day);
@@ -338,7 +407,7 @@ function App() {
         setShowLoanOffer({ amount, interestRate, dueDay, isEmergency: false });
       }
     }
-  }, [gameState, restaurantState]);
+  }, [gameState, restaurantState, bossDay]);
 
   const handleNewDay = useCallback(() => {
     if (gameState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
@@ -443,6 +512,8 @@ function App() {
     deleteSave();
     setGameState(createInitialState());
     setRestaurantState(null);
+    setBossDay(false);
+    setBossResult(null);
     setShowTitle(true);
     setTitleTutorial(null);
     setMenuFocusIndex(-1);
@@ -462,7 +533,7 @@ function App() {
 
   const showAnalystRating = hasUpgrade(gameState, "analyst_ratings");
   const showDarkPool = hasUpgrade(gameState, "dark_pool");
-  const isRestaurantShift = restaurantState !== null;
+  const isRestaurantShift = restaurantState !== null && !bossDay;
 
   if (showTitle) {
     const savedGame = loadGame();
@@ -581,7 +652,7 @@ function App() {
 
      {!isRestaurantShift && (
         <header className="game-header">
-          <h1>📈 Day Trader</h1>
+          <h1>{bossDay ? "⚠️ BOSS DAY: Day Shift!" : "📈 Day Trader"}</h1>
           {gameState.acquiredUpgrades.length > 0 && (
             <div className="upgrade-icons">
               {[...new Set(gameState.acquiredUpgrades)].map((id) => {
@@ -607,6 +678,16 @@ function App() {
               <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>
               <button className={speed === 10 ? "active" : ""} onClick={() => setSpeed(10)}>10x</button>
             </div>
+            {bossDay && restaurantState && (
+              <button className="boss-toggle-btn" onClick={() => setBossView((v) => v === "trading" ? "restaurant" : "trading")}>
+                {bossView === "trading" ? "🍔 Kitchen" : "📈 Trading"} <kbd>/</kbd>
+              </button>
+            )}
+            {bossDay && restaurantState && (
+              <div className="boss-stats">
+                <span className={`boss-stat ${restaurantState.failedOrders >= 5 ? "danger" : ""}`}>❌ {restaurantState.failedOrders}/5</span>
+              </div>
+            )}
           </div>
         </header>
       )}
@@ -731,7 +812,16 @@ function App() {
                       </div>
                     </div>
                   ))}
-                  <button onClick={handleNewDay}>Continue →</button>
+                  {bossResult && (
+                    <div className={`milestone-check ${bossResult.passed ? "passed" : "failed"}`}>
+                      <div className="milestone-header">{bossResult.passed ? "✅ Boss Stage Cleared!" : "❌ Boss Stage Failed!"}</div>
+                      <div className="milestone-body">
+                        Trading profit: <span className={bossResult.tradingProfit >= bossResult.requiredProfit ? "up" : "danger"}>${bossResult.tradingProfit.toFixed(2)}</span> (need ${bossResult.requiredProfit})
+                        <br />Missed orders: <span className={bossResult.missedOrders <= bossResult.maxMissed ? "up" : "danger"}>{bossResult.missedOrders}</span> (max {bossResult.maxMissed})
+                      </div>
+                    </div>
+                  )}
+                  <button onClick={() => { setBossResult(null); handleNewDay(); }}>Continue →</button>
                 </div>
               </div>
             );
@@ -781,6 +871,21 @@ function App() {
             </div>
           )}
 
+          {bossDay && restaurantState && bossView === "restaurant" ? (
+            <Restaurant
+              day={gameState.day}
+              paused={paused}
+              state={restaurantState}
+              setRestaurantState={setRestaurantState}
+              onFinish={() => {}}
+              milestoneTarget={null}
+              milestoneDaysLeft={0}
+              netWorth={0}
+              speed={speed}
+              onSpeedChange={setSpeed}
+              acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
+            />
+          ) : (
           <div className="main-layout">
             <div className="monitors-area">
               {gameState.monitors.map((monitor, idx) => (
@@ -816,6 +921,7 @@ function App() {
               </div>
             </aside>
           </div>
+          )}
         </>
       )}
 

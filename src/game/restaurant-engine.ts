@@ -681,6 +681,7 @@ export function createRestaurantState(state: GameState): RestaurantState {
     orderSlots: Array.from({ length: hasRestaurantUpgrade(state, "sixth_slot") ? 6 : 5 }, () => null),
     activeOrderId: null,
     completedOrders: 0,
+    failedOrders: 0,
     totalEarnings: 0,
     totalTips: 0,
     shiftTimeRemaining: SHIFT_DURATION_SECONDS + restaurantUpgradeCount(state, "longer_shift") * 30,
@@ -701,10 +702,11 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
   const shiftTimeRemaining = Math.max(0, state.shiftTimeRemaining - dt);
   const shiftOver = shiftTimeRemaining <= 0;
   let failureOccurred = false;
+  let newFailures = 0;
   const orderSlots = state.orderSlots.map((slot) => {
     if (!slot) return null;
     const updated = updateOrderTick(slot, dt, state.acquiredUpgrades);
-    if (!slot.failed && updated.failed) failureOccurred = true;
+    if (!slot.failed && updated.failed) { failureOccurred = true; newFailures++; }
     if (updated.failed && updated.failedTimer <= 0) return null;
     return updated;
   });
@@ -722,6 +724,7 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
     shiftOver,
     nextOrderTimer: Math.max(0, state.nextOrderTimer - dt),
     comboStreak: failureOccurred ? 0 : state.comboStreak,
+    failedOrders: state.failedOrders + newFailures,
   };
 
   if (!shiftOver && hasEmptySlot && nextState.nextOrderTimer <= 0) nextState = spawnOrder(nextState);

@@ -110,6 +110,7 @@ export interface RestaurantState {
   orderSlots: (ActiveOrder | null)[];
   activeOrderId: number | null;
   completedOrders: number;
+  failedOrders: number;
   totalEarnings: number;
   totalTips: number;
   shiftTimeRemaining: number;
