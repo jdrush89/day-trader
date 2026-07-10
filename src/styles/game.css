@@ -1359,10 +1359,12 @@ body {
   padding: 4px 0;
   font-size: 0.7rem;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 
-.pos-symbol { font-weight: bold; width: 45px; }
-.pos-shares { color: var(--text-dim); flex: 1; }
+.pos-symbol { font-weight: bold; min-width: 40px; }
+.pos-shares { color: var(--text-dim); flex: 1; min-width: 60px; }
+.pos-pnl { min-width: 50px; }
 .pos-pnl.up { color: var(--green); }
 .pos-pnl.down { color: var(--red); }
 
@@ -1375,6 +1377,7 @@ body {
   border-radius: 3px;
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
 }
 
 .sell-btn:hover {
@@ -1404,12 +1407,16 @@ body {
   flex: 1 1 45%;
   min-width: 100px;
   padding: 4px 6px;
+  padding-right: 20px;
   font-size: 0.65rem;
   font-family: inherit;
   background: var(--bg-panel);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 3px;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .order-input {
@@ -1689,6 +1696,7 @@ body {
   display: flex;
   gap: 4px;
   align-items: stretch;
+  flex-wrap: wrap;
 }
 
 .pin-btn {
