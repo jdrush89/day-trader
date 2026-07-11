@@ -2,13 +2,29 @@ import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, Pendi
 import { STOCK_POOL, StockCandidate } from "./stock-pool";
 import { UPGRADE_POOL } from "./upgrades";
 
-// Milestone: every 3 days, player must reach this net worth or lose
-// Day 3: $1500, Day 6: $2500, Day 9: $4000, etc.
+// Milestone schedule: day 3, 7, 11, 15... (every 3 trading days, boss days don't count)
+// Boss day schedule: day 4, 8, 12, 16... (day after each milestone)
+export function isMilestoneDay(day: number): boolean {
+  return day === 3 || (day > 3 && (day - 3) % 4 === 0);
+}
+
+export function isBossDayCheck(day: number): boolean {
+  return day >= 4 && day % 4 === 0;
+}
+
 export function getMilestone(day: number): { checkDay: number; required: number } | null {
-  const nextCheck = Math.ceil(day / 3) * 3;
-  const milestoneNum = nextCheck / 3;
+  // Find the next milestone check day for the given day
+  let milestoneNum: number;
+  let checkDay: number;
+  if (day <= 3) {
+    milestoneNum = 1;
+    checkDay = 3;
+  } else {
+    milestoneNum = Math.ceil((day - 3) / 4) + 1;
+    checkDay = 3 + (milestoneNum - 1) * 4;
+  }
   return {
-    checkDay: nextCheck,
+    checkDay,
     required: 1000 + 250 * milestoneNum * (milestoneNum + 1),
   };
 }
@@ -697,12 +713,12 @@ export function tick(state: GameState): GameState {
     // Milestone payment: deduct milestone amount + loan repayments from cash
     let loans = [...postOptionsState.loans];
     let milestonePayment: GameState["milestonePayment"] = null;
-    if (completedDay > 1 && completedDay % 3 === 0) {
+    if (isMilestoneDay(completedDay)) {
       const dueLoans = loans.filter((l) => l.dueDay <= completedDay);
       const dueTotal = dueLoans.reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0);
       loans = loans.filter((l) => l.dueDay > completedDay);
-      const milestoneNum = completedDay / 3;
-      const milestoneAmount = 1000 + 250 * milestoneNum * (milestoneNum + 1);
+      const milestone = getMilestone(completedDay)!;
+      const milestoneAmount = milestone.required;
       const totalPayment = milestoneAmount + dueTotal;
       const adjustedNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
       gameOver = adjustedNetWorth < totalPayment;

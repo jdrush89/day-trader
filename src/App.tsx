@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck } from "./game/engine";
 import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
@@ -360,7 +360,7 @@ function App() {
       const finalState = finishRestaurantDay(nextState, 0);
 
       // Difficulty scales with milestone number (boss day follows milestone day)
-      const milestoneNum = Math.floor((finalState.day - 1) / 3);
+      const milestoneNum = nextState.day / 4;
       const requiredProfit = 300 + (milestoneNum - 1) * 100;
       const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
 
@@ -406,8 +406,8 @@ function App() {
     setGameState(marketState);
     setEodPhase("summary");
 
-    // Check if this is a boss day (day after a milestone)
-    const isBossDay = marketState.day > 3 && (marketState.day - 1) % 3 === 0;
+    // Check if this is a boss day
+    const isBossDay = isBossDayCheck(marketState.day);
     setBossDay(isBossDay);
     setBossView("trading");
     if (isBossDay) {
@@ -739,6 +739,24 @@ function App() {
               gameState={gameState}
               setGameState={(updater) => setGameState(updater)}
               onClose={() => setShowDebug(false)}
+              onSkipToDay={(day, cash) => {
+                const updated = { ...gameState, day, cash, marketOpen: false, loans: [], milestonePayment: null };
+                const marketState = openMarket(updated);
+                setGameState(marketState);
+                const isBoss = isBossDayCheck(day);
+                setBossDay(isBoss);
+                setBossView("trading");
+                if (isBoss) {
+                  lastBossEarningsRef.current = 0;
+                  const rs = createRestaurantState(marketState);
+                  setRestaurantState({ ...rs, shiftTimeRemaining: 9999 });
+                } else {
+                  setRestaurantState(null);
+                }
+                setShowDebug(false);
+                setPaused(false);
+                setEodPhase("summary");
+              }}
             />
           ) : showOptions === "pause" ? (
             <div className="pause-menu">

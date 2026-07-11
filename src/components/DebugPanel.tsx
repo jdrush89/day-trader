@@ -4,12 +4,13 @@ import { UPGRADE_POOL } from "../game/upgrades";
 import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
 import { STOCK_POOL, StockCandidate } from "../game/stock-pool";
 import { MENU_POOL } from "../game/restaurant-engine";
-import { openMarket } from "../game/engine";
+import { openMarket, isBossDayCheck } from "../game/engine";
 
 interface DebugPanelProps {
   gameState: GameState;
   setGameState: (updater: (prev: GameState) => GameState) => void;
   onClose: () => void;
+  onSkipToDay?: (day: number, cash: number) => void;
 }
 
 function generateStockFromCandidate(candidate: StockCandidate, day: number) {
@@ -34,16 +35,20 @@ function generateStockFromCandidate(candidate: StockCandidate, day: number) {
   };
 }
 
-export function DebugPanel({ gameState, setGameState, onClose }: DebugPanelProps) {
+export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: DebugPanelProps) {
   const [skipDay, setSkipDay] = useState(gameState.day + 1);
   const [skipCash, setSkipCash] = useState(gameState.cash);
   const [tab, setTab] = useState<"skip" | "upgrades" | "stocks" | "recipes">("skip");
 
   const handleSkipToDay = () => {
-    setGameState((prev) => {
-      const updated = { ...prev, day: skipDay, cash: skipCash, marketOpen: false, loans: [] };
-      return openMarket(updated);
-    });
+    if (onSkipToDay) {
+      onSkipToDay(skipDay, skipCash);
+    } else {
+      setGameState((prev) => {
+        const updated = { ...prev, day: skipDay, cash: skipCash, marketOpen: false, loans: [] };
+        return openMarket(updated);
+      });
+    }
     onClose();
   };
 
@@ -124,6 +129,9 @@ export function DebugPanel({ gameState, setGameState, onClose }: DebugPanelProps
             <label>Cash Amount:</label>
             <input type="number" step={100} value={skipCash} onChange={(e) => setSkipCash(Number(e.target.value))} />
           </div>
+          <p className="debug-hint">
+            Day {skipDay}: {isBossDayCheck(skipDay) ? "⚠️ Boss Day (trading + kitchen)" : "📈 Trading Day"}
+          </p>
           <button className="debug-apply-btn" onClick={handleSkipToDay}>Apply & Resume</button>
         </div>
       )}

@@ -3027,3 +3027,9 @@ body {
   from { opacity: 0.8; }
   to { opacity: 1; }
 }
+
+.debug-hint {
+  margin: 0.25rem 0;
+  font-size: 0.85rem;
+  color: #aaa;
+}
