@@ -40,6 +40,7 @@ function App() {
   const [bossView, setBossView] = useState<"trading" | "restaurant">("trading");
   const [bossResult, setBossResult] = useState<{ passed: boolean; tradingProfit: number; missedOrders: number; requiredProfit: number; maxMissed: number } | null>(null);
   const [showDebug, setShowDebug] = useState(false);
+  const [debugFF, setDebugFF] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -131,6 +132,12 @@ function App() {
       // Debug menu toggle
       if (e.key === "n" && paused && !showDebug) {
         setShowDebug(true);
+        return;
+      }
+
+      // Debug fast-forward toggle (while not paused)
+      if (e.key === "n" && !paused && (gameState.marketOpen || (restaurantState && !restaurantState.shiftOver))) {
+        setDebugFF(true);
         return;
       }
 
@@ -699,6 +706,17 @@ function App() {
               <button className={speed === 2 ? "active" : ""} onClick={() => setSpeed(2)}>2x</button>
               <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>
               <button className={speed === 10 ? "active" : ""} onClick={() => setSpeed(10)}>10x</button>
+              {debugFF && <button className="debug-ff-btn" onClick={() => {
+                setGameState((prev) => {
+                  let state = prev;
+                  let safety = 200;
+                  while (state.marketOpen && safety-- > 0) {
+                    state = tick(state);
+                  }
+                  return state;
+                });
+                setDebugFF(false);
+              }}>⏭</button>}
             </div>
             {bossDay && restaurantState && (
               <button className="boss-toggle-btn" onClick={() => setBossView((v) => v === "trading" ? "restaurant" : "trading")}>
@@ -776,6 +794,11 @@ function App() {
           speed={speed}
           onSpeedChange={setSpeed}
           acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
+          debugFF={debugFF}
+          onDebugFF={() => {
+            setRestaurantState((prev) => prev ? { ...prev, shiftTimeRemaining: 0, shiftOver: true } : prev);
+            setDebugFF(false);
+          }}
         />
       ) : (
         <>
@@ -920,6 +943,18 @@ function App() {
               speed={speed}
               onSpeedChange={setSpeed}
               acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
+              debugFF={debugFF}
+              onDebugFF={() => {
+                setGameState((prev) => {
+                  let state = prev;
+                  let safety = 200;
+                  while (state.marketOpen && safety-- > 0) {
+                    state = tick(state);
+                  }
+                  return state;
+                });
+                setDebugFF(false);
+              }}
             />
           ) : (
           <div className="main-layout">
