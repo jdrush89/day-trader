@@ -31,10 +31,18 @@ export interface NetworkCallbacks {
   onError: (error: string) => void;
 }
 
-// PeerJS config with STUN servers and diagnostic logging
+// PeerJS config - use our own signaling server
+const PEER_SERVER_HOST = "rogue-daytrader-signaling.onrender.com";
+const PEER_SERVER_PORT = 443;
+const PEER_SERVER_PATH = "/";
+const PEER_SERVER_SECURE = true;
+
 const PEER_CONFIG = {
+  host: PEER_SERVER_HOST,
+  port: PEER_SERVER_PORT,
+  path: PEER_SERVER_PATH,
+  secure: PEER_SERVER_SECURE,
   debug: 2,
-  secure: true,
   config: {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
