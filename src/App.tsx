@@ -20,6 +20,8 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
+const GAME_VERSION = "0.0.1";
+
 function App() {
   const [showTitle, setShowTitle] = useState(true);
   const [gameState, setGameState] = useState<GameState>(createInitialState);
@@ -811,6 +813,7 @@ function App() {
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setShowMultiplayerLobby(true); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>MULTIPLAYER</button>
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setShowOptions("title"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>OPTIONS</button>
         </div>
+        <div className="title-version">v{GAME_VERSION}</div>
       </div>
     );
   }

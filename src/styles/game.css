@@ -3471,3 +3471,13 @@ body {
   80% { opacity: 1; }
   100% { opacity: 0; }
 }
+
+/* Version number on title screen */
+.title-version {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+}
