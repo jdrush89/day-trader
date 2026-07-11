@@ -80,6 +80,8 @@ export function useMultiplayer(
 
   const hostRef = useRef<MultiplayerHost | null>(null);
   const peerRef = useRef<MultiplayerPeer | null>(null);
+  const appCallbacksRef = useRef(appCallbacks);
+  appCallbacksRef.current = appCallbacks;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -145,8 +147,8 @@ export function useMultiplayer(
 
     const peer = new MultiplayerPeer({
       onStateSync: (sync: GameSync) => {
-        // Apply state directly to App via callback (avoids useEffect indirection)
-        appCallbacks.onPeerStateSync(sync);
+        // Use ref to always call the latest callback (avoids stale closure)
+        appCallbacksRef.current.onPeerStateSync(sync);
         // Still update multiplayer state for players/feed
         setState((s) => ({
           ...s,

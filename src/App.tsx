@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.11";
+const GAME_VERSION = "0.0.12";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -80,6 +80,7 @@ function App() {
       onSelectStock: (monitorId, symbol) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, selectedStock: symbol } : m) })),
       onPeerStateSync: (sync) => {
         // Apply synced game state directly, preserving local monitors
+        console.log("[Peer Sync] Applying state, day:", sync.gameState.day, "time:", sync.gameState.timeOfDay, "cash:", sync.gameState.cash);
         setGameState((prev) => ({ ...sync.gameState, monitors: prev.monitors }));
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
         setEodPhase(sync.eodPhase as any);
