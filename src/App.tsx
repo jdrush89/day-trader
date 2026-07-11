@@ -39,6 +39,7 @@ function App() {
   const [bossDay, setBossDay] = useState(false);
   const [bossView, setBossView] = useState<"trading" | "restaurant">("trading");
   const [bossResult, setBossResult] = useState<{ passed: boolean; tradingProfit: number; missedOrders: number; requiredProfit: number; maxMissed: number } | null>(null);
+  const [showBossIntro, setShowBossIntro] = useState<{ requiredProfit: number; maxMissed: number } | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [debugFF, setDebugFF] = useState(false);
 
@@ -48,15 +49,15 @@ function App() {
   }, [textSize]);
 
   useEffect(() => {
-    if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial || showLoanOffer) return;
+    if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial || showLoanOffer || showBossIntro) return;
     const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
     return () => clearInterval(interval);
-  }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer]);
+  }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer, showBossIntro]);
 
   // Boss day: tick restaurant alongside trading
   const lastBossEarningsRef = useRef(0);
   useEffect(() => {
-    if (!bossDay || !restaurantState || paused || !gameState.marketOpen || restaurantState.shiftOver) return;
+    if (!bossDay || !restaurantState || paused || !gameState.marketOpen || restaurantState.shiftOver || showBossIntro) return;
     const interval = setInterval(() => {
       setRestaurantState((prev) => {
         if (!prev) return prev;
@@ -71,7 +72,7 @@ function App() {
       });
     }, 50);
     return () => clearInterval(interval);
-  }, [bossDay, restaurantState, paused, gameState.marketOpen, speed]);
+  }, [bossDay, restaurantState, paused, gameState.marketOpen, speed, showBossIntro]);
 
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
@@ -381,18 +382,24 @@ function App() {
       const passed = tradingProfit >= requiredProfit && missedOrders <= maxMissed;
       setBossResult({ passed, tradingProfit, missedOrders, requiredProfit, maxMissed });
 
-      setGameState(finalState);
+      // Boss day failure = game over
+      const gameOverState = passed ? finalState : { ...finalState, gameOver: true };
+      setGameState(gameOverState);
       setRestaurantState(null);
       setBossDay(false);
       setEodPhase("summary");
-      saveGame(finalState);
-      if (finalState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
-      else if (finalState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
+      saveGame(gameOverState);
+      if (passed && gameOverState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
+      else if (passed && gameOverState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
       return;
     }
 
-    // After trading (market just closed), go to Shwendy's
-    if (!nextState.marketOpen && restaurantState === null) {
+    // After boss day EOD (day already incremented by finishRestaurantDay), skip restaurant
+    // The marker is: marketOpen is false, restaurantState is null, and the previous day was a boss day
+    const prevDayWasBoss = isBossDayCheck(nextState.day - 1);
+
+    // After trading (market just closed), go to Shwendy's (but not after boss day)
+    if (!nextState.marketOpen && restaurantState === null && !prevDayWasBoss) {
       setGameState(nextState);
       setShowTransition("restaurant");
       setEodPhase("summary");
@@ -413,8 +420,11 @@ function App() {
     if (isBossDay) {
       lastBossEarningsRef.current = 0;
       const rs = createRestaurantState(marketState);
-      // Boss day: restaurant runs until market closes, not on its own timer
       setRestaurantState({ ...rs, shiftTimeRemaining: 9999 });
+      const milestoneNum = marketState.day / 4;
+      const requiredProfit = 300 + (milestoneNum - 1) * 100;
+      const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
+      setShowBossIntro({ requiredProfit, maxMissed });
     }
 
     // Offer a loan after day 1, but not on boss days
@@ -723,11 +733,18 @@ function App() {
                 {bossView === "trading" ? "🍔 Kitchen" : "📈 Trading"} <kbd>/</kbd>
               </button>
             )}
-            {bossDay && restaurantState && (
-              <div className="boss-stats">
-                <span className={`boss-stat ${restaurantState.failedOrders >= 5 ? "danger" : ""}`}>❌ {restaurantState.failedOrders}/5</span>
-              </div>
-            )}
+            {bossDay && restaurantState && (() => {
+              const milestoneNum = gameState.day / 4;
+              const requiredProfit = 300 + (milestoneNum - 1) * 100;
+              const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
+              const currentProfit = (gameState.cash + gameState.portfolio.reduce((sum: number, pos) => { const s = gameState.stocks.find((st) => st.symbol === pos.symbol); return sum + (s ? s.price * pos.shares : 0); }, 0) + gameState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0) - gameState.shorts.reduce((sum: number, sp) => { const s = gameState.stocks.find((st) => st.symbol === sp.symbol); return sum + (s ? s.price * sp.shares : 0); }, 0) + getOptionsValue(gameState)) - gameState.dayStartNetWorth;
+              return (
+                <div className="boss-stats">
+                  <span className={`boss-stat ${currentProfit >= requiredProfit ? "ok" : ""}`}>💰 ${currentProfit.toFixed(0)}/${requiredProfit}</span>
+                  <span className={`boss-stat ${restaurantState.failedOrders >= maxMissed ? "danger" : ""}`}>❌ {restaurantState.failedOrders}/{maxMissed}</span>
+                </div>
+              );
+            })()}
           </div>
         </header>
       )}
@@ -750,6 +767,10 @@ function App() {
                   lastBossEarningsRef.current = 0;
                   const rs = createRestaurantState(marketState);
                   setRestaurantState({ ...rs, shiftTimeRemaining: 9999 });
+                  const milestoneNum = day / 4;
+                  const requiredProfit = 300 + (milestoneNum - 1) * 100;
+                  const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
+                  setShowBossIntro({ requiredProfit, maxMissed });
                 } else {
                   setRestaurantState(null);
                 }
@@ -1087,6 +1108,27 @@ function App() {
               <button className="pause-menu-btn" onClick={handleAcceptLoan}>💰 Take the Loan</button>
               <button className="pause-menu-btn" onClick={handleDeclineLoan}>🚫 Decline</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showBossIntro && (
+        <div className="end-of-day-overlay">
+          <div className="end-of-day boss-intro">
+            <h2>⚠️ BOSS DAY: Day Shift!</h2>
+            <p className="boss-intro-desc">Your boss scheduled you for the day shift. You need to handle kitchen orders AND make money trading at the same time!</p>
+            <div className="boss-intro-reqs">
+              <div className="boss-intro-req">
+                <span className="boss-intro-icon">💰</span>
+                <span>Make at least <strong>${showBossIntro.requiredProfit}</strong> trading profit</span>
+              </div>
+              <div className="boss-intro-req">
+                <span className="boss-intro-icon">❌</span>
+                <span>Miss no more than <strong>{showBossIntro.maxMissed}</strong> kitchen orders</span>
+              </div>
+            </div>
+            <p className="boss-intro-tip">Press <kbd>/</kbd> to switch between Trading and Kitchen</p>
+            <button className="pause-menu-btn resume" onClick={() => setShowBossIntro(null)}>Let's Go! →</button>
           </div>
         </div>
       )}
