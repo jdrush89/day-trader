@@ -1172,6 +1172,9 @@ function App() {
 
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "upgrades" && (
             <div className="end-of-day-overlay">
+              {isPeer ? (
+                <div className="upgrade-draft"><h2>⏳ Waiting for host...</h2><p className="upgrade-draft-sub">Host is choosing an upgrade</p></div>
+              ) : (
               <div className="upgrade-draft">
                 <h2>⬆️ Choose an Upgrade</h2>
                 <p className="upgrade-draft-sub">Pick one upgrade to keep for the rest of the run</p>
@@ -1192,11 +1195,15 @@ function App() {
                   })}
                 </div>
               </div>
+              )}
             </div>
           )}
 
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "stocks" && (
             <div className="end-of-day-overlay">
+              {isPeer ? (
+                <div className="stock-draft"><h2>⏳ Waiting for host...</h2><p className="stock-draft-sub">Host is choosing a new stock</p></div>
+              ) : (
               <div className="stock-draft">
                 <h2>📊 New Stock Available</h2>
                 <p className="stock-draft-sub">Choose a company to add to the market for Day {gameState.day}</p>
@@ -1211,6 +1218,7 @@ function App() {
                   ))}
                 </div>
               </div>
+              )}
             </div>
           )}
 
@@ -1291,6 +1299,9 @@ function App() {
 
       {!gameState.marketOpen && !gameState.gameOver && eodPhase === "restaurant-upgrades" && (
         <div className="end-of-day-overlay">
+          {isPeer ? (
+            <div className="upgrade-draft"><h2>⏳ Waiting for host...</h2><p className="upgrade-draft-sub">Host is choosing a restaurant upgrade</p></div>
+          ) : (
           <div className="upgrade-draft">
             <h2>🍽️ Choose a Restaurant Upgrade</h2>
             <p className="upgrade-draft-sub">Pick one kitchen upgrade for every future Shwendy's shift</p>
@@ -1311,11 +1322,15 @@ function App() {
               })}
             </div>
           </div>
+          )}
         </div>
       )}
 
       {!gameState.marketOpen && !gameState.gameOver && eodPhase === "menu-draft" && (
         <div className="end-of-day-overlay">
+          {isPeer ? (
+            <div className="stock-draft"><h2>⏳ Waiting for host...</h2><p className="stock-draft-sub">Host is choosing a menu item</p></div>
+          ) : (
           <div className="stock-draft">
             <h2>🧾 Add a New Menu Item</h2>
             <p className="stock-draft-sub">Choose one recipe to add to Shwendy's permanent menu for Day {gameState.day}</p>
@@ -1330,6 +1345,7 @@ function App() {
               ))}
             </div>
           </div>
+          )}
         </div>
       )}
 
