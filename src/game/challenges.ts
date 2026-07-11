@@ -341,21 +341,21 @@ export function selectDailyChallenges(
   const challenges: ActiveChallenge[] = [];
 
   if (isBossDay) {
-    // Boss day: 2 trading + 2 restaurant
-    const trading = shuffle(TRADING_CHALLENGES).slice(0, 2);
-    const restaurant = shuffle(RESTAURANT_CHALLENGES).slice(0, 2);
+    // Boss day: 1 trading + 1 restaurant
+    const trading = shuffle(TRADING_CHALLENGES).slice(0, 1);
+    const restaurant = shuffle(RESTAURANT_CHALLENGES).slice(0, 1);
     for (const c of [...trading, ...restaurant]) {
       challenges.push({ id: c.id, completed: false });
     }
   } else if (isRestaurantDay) {
-    // Restaurant day: 3 restaurant challenges
-    const restaurant = shuffle(RESTAURANT_CHALLENGES).slice(0, 3);
+    // Restaurant day: 1 restaurant challenge
+    const restaurant = shuffle(RESTAURANT_CHALLENGES).slice(0, 1);
     for (const c of restaurant) {
       challenges.push({ id: c.id, completed: false });
     }
   } else {
-    // Trading day: 3 trading challenges
-    const trading = shuffle(TRADING_CHALLENGES).slice(0, 3);
+    // Trading day: 1 trading challenge
+    const trading = shuffle(TRADING_CHALLENGES).slice(0, 1);
     for (const c of trading) {
       challenges.push({ id: c.id, completed: false });
     }
