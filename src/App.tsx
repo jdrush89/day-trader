@@ -550,6 +550,7 @@ function App() {
     const challengedState = { ...nextState, activeChallenges: evaluated, tickets: nextState.tickets + earned };
     setGameState(challengedState);
     saveGame(challengedState);
+    setRestaurantState(null);
     // Show challenge results before restaurant upgrades
     setEodPhase("challenges");
   }, [beginScheduledDay, gameState, restaurantState]);
