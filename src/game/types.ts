@@ -147,6 +147,7 @@ export interface GameState {
   marketOpen: boolean;
   gameOver: boolean;
   totalProfit: number;
+  milestonePayment: { milestoneAmount: number; loanRepayment: number; total: number } | null;
   dayStartNetWorth: number;
   insiderTip: InsiderTip | null;
   insiderTip2: InsiderTip | null;

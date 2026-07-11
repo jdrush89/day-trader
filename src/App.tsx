@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue } from "./game/engine";
@@ -51,10 +51,21 @@ function App() {
   }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer]);
 
   // Boss day: tick restaurant alongside trading
+  const lastBossEarningsRef = useRef(0);
   useEffect(() => {
     if (!bossDay || !restaurantState || paused || !gameState.marketOpen || restaurantState.shiftOver) return;
     const interval = setInterval(() => {
-      setRestaurantState((prev) => prev ? restaurantTick(prev, 0.05 * speed) : prev);
+      setRestaurantState((prev) => {
+        if (!prev) return prev;
+        const next = restaurantTick(prev, 0.05 * speed);
+        // Sync restaurant earnings to cash in real-time during boss day
+        const earningsDelta = next.totalEarnings - lastBossEarningsRef.current;
+        if (earningsDelta > 0) {
+          lastBossEarningsRef.current = next.totalEarnings;
+          setGameState((gs) => ({ ...gs, cash: Math.round((gs.cash + earningsDelta) * 100) / 100 }));
+        }
+        return next;
+      });
     }, 50);
     return () => clearInterval(interval);
   }, [bossDay, restaurantState, paused, gameState.marketOpen, speed]);
@@ -327,9 +338,9 @@ function App() {
 
     // Boss day: when market closes, day is done (restaurant was running alongside)
     if (bossDay && !nextState.marketOpen) {
-      const earnings = restaurantState?.totalEarnings ?? 0;
       const missedOrders = restaurantState?.failedOrders ?? 0;
-      const finalState = finishRestaurantDay(nextState, earnings);
+      // Earnings already added to cash in real-time, pass 0
+      const finalState = finishRestaurantDay(nextState, 0);
 
       // Difficulty scales with milestone number (boss day follows milestone day)
       const milestoneNum = Math.floor((finalState.day - 1) / 3);
@@ -383,13 +394,14 @@ function App() {
     setBossDay(isBossDay);
     setBossView("trading");
     if (isBossDay) {
+      lastBossEarningsRef.current = 0;
       const rs = createRestaurantState(marketState);
       // Boss day: restaurant runs until market closes, not on its own timer
       setRestaurantState({ ...rs, shiftTimeRemaining: 9999 });
     }
 
-    // Always offer a loan after day 1
-    if (marketState.day > 1) {
+    // Offer a loan after day 1, but not on boss days
+    if (marketState.day > 1 && !isBossDay) {
       const milestone = getMilestone(marketState.day);
       const nextMilestoneDay = milestone?.checkDay ?? marketState.day + 3;
       const dueDay = nextMilestoneDay <= marketState.day ? nextMilestoneDay + 3 : nextMilestoneDay;
@@ -413,7 +425,7 @@ function App() {
     if (gameState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
     else if (gameState.stockDraftOptions.length > 0) setEodPhase("stocks");
     else beginScheduledDay();
-  }, [beginScheduledDay, gameState.stockDraftOptions.length, gameState.upgradeDraftOptions.length]);
+  }, [beginScheduledDay, gameState]);
 
   const restaurantUpgradeCount = useCallback(
     (upgradeId: string) => gameState.acquiredRestaurantUpgrades.filter((id) => id === upgradeId).length,
@@ -768,7 +780,6 @@ function App() {
             const currentNetWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability + optionsVal;
             const dailyPnL = currentNetWorth - gameState.dayStartNetWorth;
             const completedDay = gameState.day;
-            const milestone = completedDay > 1 && completedDay % 3 === 0 ? getMilestone(completedDay) : null;
 
             return (
               <div className="end-of-day-overlay">
@@ -784,12 +795,21 @@ function App() {
                     <div className="eod-stat-row"><span>Portfolio value</span><span>${portfolioValue.toFixed(2)}</span></div>
                     {gameState.goldenParachutes > 0 && <div className="eod-stat-row"><span>Golden Parachutes</span><span>{gameState.goldenParachutes}</span></div>}
                   </div>
-                  {milestone && (
-                    <div className={`milestone-check ${currentNetWorth >= milestone.required ? "passed" : "failed"}`}>
-                      <div className="milestone-header">{currentNetWorth >= milestone.required ? "✅ Milestone Passed!" : "❌ Milestone Failed!"}</div>
-                      <div className="milestone-body">Required: ${milestone.required.toLocaleString()} — Your net worth: ${currentNetWorth.toFixed(2)}</div>
-                    </div>
-                  )}
+                  {gameState.milestonePayment && (() => {
+                    const { milestoneAmount, loanRepayment, total } = gameState.milestonePayment;
+                    const passed = !gameState.gameOver;
+                    return (
+                      <div className={`milestone-check ${passed ? "passed" : "failed"}`}>
+                        <div className="milestone-header">{passed ? "✅ Milestone Passed!" : "❌ Milestone Failed!"}</div>
+                        <div className="milestone-body">
+                          Milestone payment: ${milestoneAmount.toLocaleString()}
+                          {loanRepayment > 0 && <><br />Loan repayment: ${loanRepayment.toFixed(2)}</>}
+                          <br /><strong>Total deducted: ${total.toFixed(2)}</strong>
+                          <br />Cash remaining: <span className={gameState.cash >= 0 ? "up" : "danger"}>${gameState.cash.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <div className="eod-movers">
                     <div className="eod-column">
                       <h3 className="eod-winners-title">📈 Winners</h3>

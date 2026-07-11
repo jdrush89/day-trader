@@ -67,6 +67,7 @@ export function createInitialState(): GameState {
     marketOpen: true,
     gameOver: false,
     totalProfit: 0,
+    milestonePayment: null,
     dayStartNetWorth: 1000,
     insiderTip: null,
     insiderTip2: null,

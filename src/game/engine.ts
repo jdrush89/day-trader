@@ -694,21 +694,26 @@ export function tick(state: GameState): GameState {
 
     const finalNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
     const completedDay = state.day; let gameOver = false; let goldenParachutes = postOptionsState.goldenParachutes;
-    // Repay due loans at milestone
+    // Milestone payment: deduct milestone amount + loan repayments from cash
     let loans = [...postOptionsState.loans];
+    let milestonePayment: GameState["milestonePayment"] = null;
     if (completedDay > 1 && completedDay % 3 === 0) {
       const dueLoans = loans.filter((l) => l.dueDay <= completedDay);
       const dueTotal = dueLoans.reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0);
-      finalCash -= Math.round(dueTotal * 100) / 100;
       loans = loans.filter((l) => l.dueDay > completedDay);
       const milestoneNum = completedDay / 3;
-      const requiredNetWorth = 1000 + 250 * milestoneNum * (milestoneNum + 1);
+      const milestoneAmount = 1000 + 250 * milestoneNum * (milestoneNum + 1);
+      const totalPayment = milestoneAmount + dueTotal;
       const adjustedNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
-      gameOver = adjustedNetWorth < requiredNetWorth;
+      gameOver = adjustedNetWorth < totalPayment;
       if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; }
+      milestonePayment = { milestoneAmount, loanRepayment: Math.round(dueTotal * 100) / 100, total: Math.round(totalPayment * 100) / 100 };
+      if (!gameOver) {
+        finalCash -= Math.round(totalPayment * 100) / 100;
+      }
     }
     const pendingOrders = hasUpgrade(postOptionsState, "limit_order_pro") ? postOptionsState.pendingOrders : [];
-    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck, loans };
+    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck, loans, milestonePayment };
     return gameOver ? endOfDayState : generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 
@@ -803,7 +808,7 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
 
 export function openMarket(state: GameState): GameState {
   const netWorth = getNetWorth(state);
-  return { ...state, marketOpen: true, restaurantEarnings: 0, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [] };
+  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [] };
 }
 
 export function acquireUpgrade(state: GameState, upgradeId: string): GameState {
