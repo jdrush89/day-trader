@@ -41,6 +41,7 @@ export class MultiplayerHost {
   private actionFeed: ActionFeedItem[] = [];
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private _roomCode: string;
+  private _hostPlayer: Player | null = null;
 
   constructor(callbacks: HostCallbacks) {
     this.callbacks = callbacks;
@@ -56,8 +57,16 @@ export class MultiplayerHost {
   }
 
   get roomCode() { return this._roomCode; }
-  get playerList() { return Array.from(this.players.values()); }
+  get playerList() {
+    const list = Array.from(this.players.values());
+    if (this._hostPlayer) list.unshift(this._hostPlayer);
+    return list;
+  }
   get feed() { return this.actionFeed; }
+
+  setHostPlayer(player: Player): void {
+    this._hostPlayer = player;
+  }
 
   async start(): Promise<string> {
     await this.network.hostRoom(this._roomCode);

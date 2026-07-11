@@ -124,6 +124,7 @@ export function useMultiplayer(
 
     try {
       const roomCode = await host.start();
+      host.setHostPlayer(localPlayer);
       hostRef.current = host;
       setState((s) => ({
         ...s,

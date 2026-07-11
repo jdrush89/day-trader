@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.8";
+const GAME_VERSION = "0.0.9";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -711,8 +711,8 @@ function App() {
   const showDarkPool = hasUpgrade(gameState, "dark_pool");
   const isRestaurantShift = restaurantState !== null && !bossDay;
 
-  // Multiplayer lobby overlay
-  if (showMultiplayerLobby) {
+  // Multiplayer lobby overlay — but close it when game starts for peers
+  if (showMultiplayerLobby && !(isPeer && mpState.gameStarted)) {
     return (
       <MultiplayerLobby
         onHost={(name) => mpActions.hostGame(name)}
@@ -736,9 +736,10 @@ function App() {
     );
   }
 
-  // Peer: when host starts the game, close title
+  // Peer: when host starts the game, close title and lobby
   if (isPeer && mpState.gameStarted && showTitle) {
     setShowTitle(false);
+    setShowMultiplayerLobby(false);
   }
 
   if (showTitle) {
