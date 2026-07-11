@@ -31,14 +31,17 @@ export interface NetworkCallbacks {
   onError: (error: string) => void;
 }
 
-// PeerJS config - use default cloud server with explicit settings
+// PeerJS config with STUN servers and diagnostic logging
 const PEER_CONFIG = {
-  debug: 1, // minimal logging
+  debug: 2,
+  secure: true,
   config: {
     iceServers: [
       { urls: "stun:stun.l.google.com:19302" },
       { urls: "stun:stun1.l.google.com:19302" },
       { urls: "stun:stun2.l.google.com:19302" },
+      { urls: "stun:stun3.l.google.com:19302" },
+      { urls: "stun:stun4.l.google.com:19302" },
     ],
   },
 };
@@ -124,7 +127,7 @@ export class NetworkManager {
       this.peer.on("open", (peerId) => {
         this._peerId = peerId;
         console.log("[MP Peer] Got ID:", peerId, "— connecting to host:", hostId);
-        const conn = this.peer!.connect(hostId, { reliable: true, serialization: "json" });
+        const conn = this.peer!.connect(hostId, { reliable: true });
 
         const onOpen = () => {
           clearTimeout(timeout);
@@ -214,6 +217,20 @@ export class NetworkManager {
       this.callbacks.onPeerDisconnected(conn.peer);
     });
 
+    // Log ICE connection state changes for debugging
+    const pc = (conn as any).peerConnection as RTCPeerConnection | undefined;
+    if (pc) {
+      pc.oniceconnectionstatechange = () => {
+        console.log("[MP] ICE state:", pc.iceConnectionState, "for", conn.peer);
+      };
+      pc.onicecandidate = (e) => {
+        console.log("[MP] ICE candidate:", e.candidate?.type ?? "null", e.candidate?.address ?? "");
+      };
+      console.log("[MP] Initial ICE state:", pc.iceConnectionState);
+    } else {
+      console.log("[MP] No peerConnection yet on conn — will check on open");
+    }
+
     // Handle open — may already be open by the time we attach this listener
     const handleOpen = () => {
       console.log("[MP] Connection opened with", conn.peer);
@@ -226,6 +243,14 @@ export class NetworkManager {
     } else {
       conn.on("open", handleOpen);
     }
+
+    // Log the connection's underlying state after a short delay
+    setTimeout(() => {
+      const pcLate = (conn as any).peerConnection as RTCPeerConnection | undefined;
+      if (pcLate) {
+        console.log("[MP] Delayed ICE state:", pcLate.iceConnectionState, "signaling:", pcLate.signalingState, "conn.open:", conn.open);
+      }
+    }, 3000);
   }
 
   private setStatus(status: ConnectionStatus): void {
