@@ -38,6 +38,7 @@ export class NetworkManager {
   private _peerId: string;
   private _isHost = false;
   private _roomCode: string | null = null; // eslint-disable-line
+  private _onFirstPeerConnected: (() => void) | null = null;
 
   constructor(callbacks: NetworkCallbacks) {
     this.callbacks = callbacks;
@@ -98,12 +99,22 @@ export class NetworkManager {
         if (msg.type === "room_joined") {
           clearTimeout(timeout);
           console.log("[MP Peer] Joined room:", roomCode, "existing peers:", msg.peers);
-          this.setStatus("connected");
           // Initiate WebRTC connections to all existing peers
           for (const existingPeerId of msg.peers) {
             this.createPeerConnection(existingPeerId, true);
           }
-          resolve();
+          // Don't resolve yet — wait for first WebRTC peer to connect
+          this._onFirstPeerConnected = () => {
+            clearTimeout(timeout);
+            this.setStatus("connected");
+            resolve();
+          };
+          // If no peers exist, resolve immediately (host waiting for joiners)
+          if (msg.peers.length === 0) {
+            clearTimeout(timeout);
+            this.setStatus("connected");
+            resolve();
+          }
         } else if (msg.type === "error") {
           clearTimeout(timeout);
           reject(new Error(msg.message));
@@ -252,11 +263,17 @@ export class NetworkManager {
     peer.on("connect", () => {
       console.log("[MP] WebRTC connected to", remotePeerId);
       this.callbacks.onPeerConnected(remotePeerId);
+      if (this._onFirstPeerConnected) {
+        this._onFirstPeerConnected();
+        this._onFirstPeerConnected = null;
+      }
     });
 
-    peer.on("data", (data: Uint8Array) => {
+    peer.on("data", (data: any) => {
       try {
-        const message = JSON.parse(new TextDecoder().decode(data)) as NetworkMessage;
+        // simple-peer-light sends strings directly, not Uint8Array
+        const str = typeof data === "string" ? data : new TextDecoder().decode(data);
+        const message = JSON.parse(str) as NetworkMessage;
         this.callbacks.onMessage(remotePeerId, message);
       } catch (e) {
         console.error("[MP] Failed to parse message from", remotePeerId, e);
