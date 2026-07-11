@@ -83,6 +83,22 @@ export function useMultiplayer(
   const appCallbacksRef = useRef(appCallbacks);
   appCallbacksRef.current = appCallbacks;
 
+  // Refs for getters so the host always reads latest state (avoids stale closures)
+  const getGameStateRef = useRef(getGameState);
+  getGameStateRef.current = getGameState;
+  const getRestaurantStateRef = useRef(getRestaurantState);
+  getRestaurantStateRef.current = getRestaurantState;
+  const getEodPhaseRef = useRef(getEodPhase);
+  getEodPhaseRef.current = getEodPhase;
+  const getPausedRef = useRef(getPaused);
+  getPausedRef.current = getPaused;
+  const getSpeedRef = useRef(getSpeed);
+  getSpeedRef.current = getSpeed;
+  const getBossDayRef = useRef(getBossDay);
+  getBossDayRef.current = getBossDay;
+  const getBossViewRef = useRef(getBossView);
+  getBossViewRef.current = getBossView;
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -97,32 +113,32 @@ export function useMultiplayer(
     const localPlayer: Player = { id: "host", name: playerName, color: getPlayerColor(0) };
 
     const host = new MultiplayerHost({
-      getGameState,
+      getGameState: () => getGameStateRef.current(),
       setGameState,
-      getRestaurantState,
+      getRestaurantState: () => getRestaurantStateRef.current(),
       setRestaurantState,
-      getEodPhase,
-      getPaused,
-      getSpeed,
-      getBossDay,
-      getBossView,
+      getEodPhase: () => getEodPhaseRef.current(),
+      getPaused: () => getPausedRef.current(),
+      getSpeed: () => getSpeedRef.current(),
+      getBossDay: () => getBossDayRef.current(),
+      getBossView: () => getBossViewRef.current(),
       onPlayerJoined: (player) => {
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },
       onPlayerLeft: (playerId) => {
         setState((s) => ({ ...s, players: s.players.filter((p) => p.id !== playerId) }));
       },
-      onViewInsider: appCallbacks.onViewInsider,
-      onAcceptLoan: appCallbacks.onAcceptLoan,
-      onDeclineLoan: appCallbacks.onDeclineLoan,
-      onSetSpeed: appCallbacks.onSetSpeed,
-      onTogglePause: appCallbacks.onTogglePause,
-      onChooseUpgrade: appCallbacks.onChooseUpgrade,
-      onChooseStock: appCallbacks.onChooseStock,
-      onChooseRestaurantUpgrade: appCallbacks.onChooseRestaurantUpgrade,
-      onChooseMenuItem: appCallbacks.onChooseMenuItem,
-      onChangeChannel: appCallbacks.onChangeChannel,
-      onSelectStock: appCallbacks.onSelectStock,
+      onViewInsider: () => appCallbacksRef.current.onViewInsider(),
+      onAcceptLoan: () => appCallbacksRef.current.onAcceptLoan(),
+      onDeclineLoan: () => appCallbacksRef.current.onDeclineLoan(),
+      onSetSpeed: (speed) => appCallbacksRef.current.onSetSpeed(speed),
+      onTogglePause: () => appCallbacksRef.current.onTogglePause(),
+      onChooseUpgrade: (id) => appCallbacksRef.current.onChooseUpgrade(id),
+      onChooseStock: (symbol) => appCallbacksRef.current.onChooseStock(symbol),
+      onChooseRestaurantUpgrade: (id) => appCallbacksRef.current.onChooseRestaurantUpgrade(id),
+      onChooseMenuItem: (name) => appCallbacksRef.current.onChooseMenuItem(name),
+      onChangeChannel: (monitorId, channel) => appCallbacksRef.current.onChangeChannel(monitorId, channel),
+      onSelectStock: (monitorId, symbol) => appCallbacksRef.current.onSelectStock(monitorId, symbol),
     });
 
     try {
@@ -140,7 +156,7 @@ export function useMultiplayer(
     } catch (err: any) {
       setState((s) => ({ ...s, connecting: false, error: err.message }));
     }
-  }, [getGameState, setGameState, getRestaurantState, setRestaurantState, getEodPhase, getPaused, getSpeed, getBossDay, getBossView, appCallbacks]);
+  }, [setGameState, setRestaurantState]);
 
   const joinGame = useCallback(async (roomCode: string, playerName: string) => {
     setState((s) => ({ ...s, connecting: true, error: null }));
