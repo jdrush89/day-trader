@@ -57,6 +57,7 @@ export function useMultiplayer(
     onChooseMenuItem: (name: string) => void;
     onChangeChannel: (monitorId: number, channel: string) => void;
     onSelectStock: (monitorId: number, symbol: string) => void;
+    onPeerStateSync: (sync: GameSync) => void;
   },
 ): [MultiplayerState, MultiplayerActions] {
   const [state, setState] = useState<MultiplayerState>({
@@ -144,15 +145,11 @@ export function useMultiplayer(
 
     const peer = new MultiplayerPeer({
       onStateSync: (sync: GameSync) => {
+        // Apply state directly to App via callback (avoids useEffect indirection)
+        appCallbacks.onPeerStateSync(sync);
+        // Still update multiplayer state for players/feed
         setState((s) => ({
           ...s,
-          syncedGameState: sync.gameState,
-          syncedRestaurantState: sync.restaurantState,
-          syncedEodPhase: sync.eodPhase,
-          syncedPaused: sync.paused,
-          syncedSpeed: sync.speed,
-          syncedBossDay: sync.bossDay,
-          syncedBossView: sync.bossView,
           players: sync.players,
           actionFeed: sync.recentActions,
         }));

@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.10";
+const GAME_VERSION = "0.0.11";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -78,6 +78,16 @@ function App() {
       onChooseMenuItem: (name) => { setGameState(draftMenuItem(gameState, name)); setEodPhase("summary"); },
       onChangeChannel: (monitorId, channel) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, channel: channel as MonitorChannel } : m) })),
       onSelectStock: (monitorId, symbol) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, selectedStock: symbol } : m) })),
+      onPeerStateSync: (sync) => {
+        // Apply synced game state directly, preserving local monitors
+        setGameState((prev) => ({ ...sync.gameState, monitors: prev.monitors }));
+        if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
+        setEodPhase(sync.eodPhase as any);
+        setPaused(sync.paused);
+        setSpeed(sync.speed);
+        setBossDay(sync.bossDay);
+        setBossView(sync.bossView as any);
+      },
     },
   );
   const isMultiplayer = mpState.role !== "none";
@@ -87,24 +97,6 @@ function App() {
     document.documentElement.style.fontSize = `${textSize}%`;
     localStorage.setItem("rogue-day-trader-text-size", String(textSize));
   }, [textSize]);
-
-  // Peer: apply synced state from host (preserve local-only fields like monitors)
-  useEffect(() => {
-    if (!isPeer) return;
-    if (mpState.syncedGameState) {
-      setGameState((prev) => ({
-        ...mpState.syncedGameState!,
-        // Preserve peer's local monitor views
-        monitors: prev.monitors,
-      }));
-    }
-    if (mpState.syncedRestaurantState !== undefined) setRestaurantState(mpState.syncedRestaurantState);
-    if (mpState.syncedEodPhase !== null) setEodPhase(mpState.syncedEodPhase as any);
-    if (mpState.syncedPaused !== null) setPaused(mpState.syncedPaused);
-    if (mpState.syncedSpeed !== null) setSpeed(mpState.syncedSpeed);
-    if (mpState.syncedBossDay !== null) setBossDay(mpState.syncedBossDay);
-    if (mpState.syncedBossView !== null) setBossView(mpState.syncedBossView as any);
-  }, [isPeer, mpState.syncedGameState, mpState.syncedRestaurantState, mpState.syncedEodPhase, mpState.syncedPaused, mpState.syncedSpeed, mpState.syncedBossDay, mpState.syncedBossView]);
 
   useEffect(() => {
     if (isPeer) return; // Peers don't tick - host sends state
