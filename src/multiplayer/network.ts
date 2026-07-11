@@ -125,14 +125,23 @@ export class NetworkManager {
         this._peerId = peerId;
         console.log("[MP Peer] Got ID:", peerId, "— connecting to host:", hostId);
         const conn = this.peer!.connect(hostId, { reliable: true, serialization: "json" });
-        this.setupConnection(conn);
 
-        conn.on("open", () => {
+        const onOpen = () => {
           clearTimeout(timeout);
           console.log("[MP Peer] Connected to host!");
           this.setStatus("connected");
           resolve();
-        });
+        };
+
+        // Setup data/close/error handlers and register connection
+        this.setupConnection(conn);
+
+        // Resolve once open (may already be open after setupConnection)
+        if (conn.open) {
+          onOpen();
+        } else {
+          conn.on("open", onOpen);
+        }
 
         conn.on("error", (err) => {
           clearTimeout(timeout);
@@ -188,12 +197,6 @@ export class NetworkManager {
   }
 
   private setupConnection(conn: DataConnection): void {
-    conn.on("open", () => {
-      console.log("[MP] Connection opened with", conn.peer);
-      this.connections.set(conn.peer, conn);
-      this.callbacks.onPeerConnected(conn.peer);
-    });
-
     conn.on("data", (data) => {
       this.callbacks.onMessage(conn.peer, data as NetworkMessage);
     });
@@ -210,6 +213,19 @@ export class NetworkManager {
       this.connections.delete(conn.peer);
       this.callbacks.onPeerDisconnected(conn.peer);
     });
+
+    // Handle open — may already be open by the time we attach this listener
+    const handleOpen = () => {
+      console.log("[MP] Connection opened with", conn.peer);
+      this.connections.set(conn.peer, conn);
+      this.callbacks.onPeerConnected(conn.peer);
+    };
+
+    if (conn.open) {
+      handleOpen();
+    } else {
+      conn.on("open", handleOpen);
+    }
   }
 
   private setStatus(status: ConnectionStatus): void {
