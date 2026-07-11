@@ -1,4 +1,4 @@
-import SimplePeer from "simple-peer";
+import Peer from "simple-peer-light";
 import type { NetworkMessage } from "./types";
 
 const SIGNALING_URL = "wss://rogue-daytrader-signaling.onrender.com";
@@ -32,7 +32,7 @@ export interface NetworkCallbacks {
 
 export class NetworkManager {
   private ws: WebSocket | null = null;
-  private peers: Map<string, SimplePeer.Instance> = new Map();
+  private peers: Map<string, Peer> = new Map();
   private callbacks: NetworkCallbacks;
   private _status: ConnectionStatus = "disconnected";
   private _peerId: string;
@@ -226,7 +226,7 @@ export class NetworkManager {
   private createPeerConnection(remotePeerId: string, initiator: boolean): void {
     console.log("[MP] Creating peer connection to", remotePeerId, initiator ? "(initiator)" : "(receiver)");
 
-    const peer = new SimplePeer({
+    const peer = new Peer({
       initiator,
       trickle: true,
       config: {
@@ -238,7 +238,7 @@ export class NetworkManager {
       },
     });
 
-    peer.on("signal", (signalData) => {
+    peer.on("signal", (signalData: any) => {
       // Send signaling data to remote peer via WebSocket relay
       console.log("[MP] Sending signal to", remotePeerId, signalData.type || "candidate");
       this.ws?.send(JSON.stringify({
@@ -269,7 +269,7 @@ export class NetworkManager {
       this.callbacks.onPeerDisconnected(remotePeerId);
     });
 
-    peer.on("error", (err) => {
+    peer.on("error", (err: any) => {
       console.error("[MP] Peer error with", remotePeerId, err.message);
       this.peers.delete(remotePeerId);
       this.callbacks.onPeerDisconnected(remotePeerId);
@@ -278,7 +278,7 @@ export class NetworkManager {
     this.peers.set(remotePeerId, peer);
   }
 
-  private handleSignal(fromPeerId: string, signalData: SimplePeer.SignalData): void {
+  private handleSignal(fromPeerId: string, signalData: any): void {
     let peer = this.peers.get(fromPeerId);
 
     if (!peer) {
