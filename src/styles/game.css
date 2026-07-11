@@ -3237,6 +3237,7 @@ body {
   border-radius: 8px;
   cursor: pointer;
   text-align: left;
+  color: #eee;
   transition: border-color 0.2s, background 0.2s;
 }
 .mp-mode-btn:hover {
