@@ -384,7 +384,7 @@ function App() {
       setBossResult({ passed, tradingProfit, missedOrders, requiredProfit, maxMissed });
 
       // Boss day failure = game over
-      const gameOverState = passed ? finalState : { ...finalState, gameOver: true };
+      const gameOverState = passed ? finalState : { ...finalState, day: nextState.day, gameOver: true };
       setGameState(gameOverState);
       setRestaurantState(null);
       setBossDay(false);
