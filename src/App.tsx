@@ -7,6 +7,8 @@ import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
 import { selectDailyChallenges, evaluateChallenges, getTicketsEarned, ALL_CHALLENGES } from "./game/challenges";
+import { useMultiplayer } from "./multiplayer";
+import { MultiplayerLobby } from "./components/MultiplayerLobby";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
@@ -44,6 +46,39 @@ function App() {
   const [skipNextRestaurant, setSkipNextRestaurant] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugFF, setDebugFF] = useState(false);
+  const [showMultiplayerLobby, setShowMultiplayerLobby] = useState(false);
+
+  // Multiplayer hook
+  const [mpState, mpActions] = useMultiplayer(
+    () => gameState,
+    (updater) => setGameState(updater),
+    () => restaurantState,
+    () => eodPhase,
+    () => paused,
+    () => speed,
+    () => bossDay,
+    () => bossView,
+    {
+      onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
+      onAcceptLoan: () => {
+        if (showLoanOffer) {
+          setGameState((prev) => ({ ...prev, cash: prev.cash + showLoanOffer.amount, loans: [...prev.loans, { amount: showLoanOffer.amount, dueDay: showLoanOffer.dueDay, interestRate: showLoanOffer.interestRate }] }));
+          setShowLoanOffer(null);
+        }
+      },
+      onDeclineLoan: () => setShowLoanOffer(null),
+      onSetSpeed: setSpeed,
+      onTogglePause: () => setPaused((p) => !p),
+      onChooseUpgrade: (id) => { const nextState = acquireUpgrade(gameState, id); if (nextState.stockDraftOptions.length > 0) { setGameState(nextState); setEodPhase("stocks"); } else { setGameState(nextState); setEodPhase("summary"); } },
+      onChooseStock: (symbol) => { setGameState(draftStock(gameState, symbol)); setEodPhase("summary"); },
+      onChooseRestaurantUpgrade: (id) => { const nextState = acquireRestaurantUpgrade(gameState, id); setGameState(nextState); if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft"); else setEodPhase("summary"); },
+      onChooseMenuItem: (name) => { setGameState(draftMenuItem(gameState, name)); setEodPhase("summary"); },
+      onChangeChannel: (monitorId, channel) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, channel: channel as MonitorChannel } : m) })),
+      onSelectStock: (monitorId, symbol) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, selectedStock: symbol } : m) })),
+    },
+  );
+  const isMultiplayer = mpState.role !== "none";
+  const isPeer = mpState.role === "peer";
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -628,6 +663,36 @@ function App() {
   const showDarkPool = hasUpgrade(gameState, "dark_pool");
   const isRestaurantShift = restaurantState !== null && !bossDay;
 
+  // Multiplayer lobby overlay
+  if (showMultiplayerLobby) {
+    return (
+      <MultiplayerLobby
+        onHost={(name) => mpActions.hostGame(name)}
+        onJoin={(code, name) => mpActions.joinGame(code, name)}
+        onCancel={() => {
+          mpActions.disconnect();
+          setShowMultiplayerLobby(false);
+        }}
+        connecting={mpState.connecting}
+        error={mpState.error}
+        roomCode={mpState.roomCode}
+        players={mpState.players}
+        isHost={mpState.role === "host"}
+        onStart={() => {
+          mpActions.startGame();
+          setShowMultiplayerLobby(false);
+          setShowTitle(false);
+          setGameState(createInitialState());
+        }}
+      />
+    );
+  }
+
+  // Peer: when host starts the game, close title
+  if (isPeer && mpState.gameStarted && showTitle) {
+    setShowTitle(false);
+  }
+
   if (showTitle) {
     const savedGame = loadGame();
     const handleResume = () => {
@@ -697,6 +762,7 @@ function App() {
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setTitleTutorial("pick"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>VIEW TUTORIAL</button>
+          <button className="title-start-btn title-tutorial-btn" onClick={() => { setShowMultiplayerLobby(true); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>MULTIPLAYER</button>
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setShowOptions("title"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>OPTIONS</button>
         </div>
       </div>
@@ -1264,6 +1330,27 @@ function App() {
             <p className="boss-intro-tip">Press <kbd>/</kbd> to switch between Trading and Kitchen</p>
             <button className="pause-menu-btn resume" onClick={() => setShowBossIntro(null)}>Let's Go! →</button>
           </div>
+        </div>
+      )}
+
+      {/* Multiplayer action feed */}
+      {isMultiplayer && mpState.actionFeed.length > 0 && (
+        <div className="mp-feed">
+          {mpState.actionFeed.slice(0, 5).map((item, i) => (
+            <div key={`${item.timestamp}-${i}`} className="mp-feed-item">
+              <span className="mp-feed-name" style={{ color: mpState.players.find((p) => p.id === item.playerId)?.color ?? "#ccc" }}>{item.playerName}</span>
+              {item.description.replace(item.playerName + " ", "")}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Multiplayer player indicators in header */}
+      {isMultiplayer && mpState.players.length > 1 && (
+        <div className="mp-player-indicators" style={{ position: "fixed", top: 8, right: 12, zIndex: 100, display: "flex", gap: 4, alignItems: "center" }}>
+          {mpState.players.map((p) => (
+            <span key={p.id} className="mp-player-pip" style={{ backgroundColor: p.color, width: 10, height: 10, borderRadius: "50%", display: "inline-block" }} title={p.name} />
+          ))}
         </div>
       )}
 
