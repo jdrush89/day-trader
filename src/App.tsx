@@ -449,10 +449,15 @@ function App() {
   }, [gameState, restaurantState, bossDay]);
 
   const handleNewDay = useCallback(() => {
+    // On boss day, skip upgrades/stocks — go straight to boss day evaluation
+    if (bossDay) {
+      beginScheduledDay();
+      return;
+    }
     if (gameState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
     else if (gameState.stockDraftOptions.length > 0) setEodPhase("stocks");
     else beginScheduledDay();
-  }, [beginScheduledDay, gameState]);
+  }, [beginScheduledDay, gameState, bossDay]);
 
   const restaurantUpgradeCount = useCallback(
     (upgradeId: string) => gameState.acquiredRestaurantUpgrades.filter((id) => id === upgradeId).length,
