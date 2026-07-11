@@ -70,7 +70,9 @@ export type HostMessage =
   | { type: "game_start" }
   | { type: "join_accepted"; player: Player; players: Player[]; roomCode: string }
   | { type: "join_rejected"; reason: string }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "eod_waiting"; waitingFor: string[] }  // players who haven't chosen yet
+  | { type: "eod_all_ready" };  // all players have made their choice, proceeding
 
 // Union of all messages
 export type NetworkMessage = PeerAction | HostMessage;

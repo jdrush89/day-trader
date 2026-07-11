@@ -32,6 +32,9 @@ export interface HostCallbacks {
   onChooseMenuItem: (name: string) => void;
   onChangeChannel: (monitorId: number, channel: string) => void;
   onSelectStock: (monitorId: number, symbol: string) => void;
+  // EOD gate callbacks: called when ALL players have made their choice
+  onAllUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
+  onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
 }
 
 export class MultiplayerHost {
@@ -42,6 +45,11 @@ export class MultiplayerHost {
   private syncTimer: ReturnType<typeof setInterval> | null = null;
   private _roomCode: string;
   private _hostPlayer: Player | null = null;
+
+  // EOD gate tracking
+  private upgradeChoices: Map<string, string> = new Map(); // playerId → upgradeId
+  private stockChoices: Map<string, string> = new Map(); // playerId → symbol
+  private _eodWaitingFor: string[] = []; // player names still choosing
 
   constructor(callbacks: HostCallbacks) {
     this.callbacks = callbacks;
@@ -63,9 +71,50 @@ export class MultiplayerHost {
     return list;
   }
   get feed() { return this.actionFeed; }
+  get eodWaitingFor() { return this._eodWaitingFor; }
 
   setHostPlayer(player: Player): void {
     this._hostPlayer = player;
+  }
+
+  // Called when EOD upgrade phase starts — resets tracking
+  resetEodGate(phase: "upgrades" | "stocks"): void {
+    if (phase === "upgrades") this.upgradeChoices.clear();
+    else this.stockChoices.clear();
+    this._eodWaitingFor = this.playerList.map((p) => p.name);
+  }
+
+  // Host player submits their own EOD choice
+  submitHostChoice(phase: "upgrades" | "stocks", choice: string): void {
+    if (!this._hostPlayer) return;
+    if (phase === "upgrades") {
+      this.upgradeChoices.set(this._hostPlayer.id, choice);
+      this.checkEodGate("upgrades");
+    } else {
+      this.stockChoices.set(this._hostPlayer.id, choice);
+      this.checkEodGate("stocks");
+    }
+  }
+
+  private checkEodGate(phase: "upgrades" | "stocks"): void {
+    const choices = phase === "upgrades" ? this.upgradeChoices : this.stockChoices;
+    const allPlayers = this.playerList;
+    const remaining = allPlayers.filter((p) => !choices.has(p.id));
+    this._eodWaitingFor = remaining.map((p) => p.name);
+
+    // Broadcast waiting status
+    this.network.broadcast({ type: "eod_waiting", waitingFor: this._eodWaitingFor });
+
+    if (remaining.length === 0) {
+      // All players have chosen — execute the gate callback
+      const choiceList = Array.from(choices.entries()).map(([playerId, value]) => ({ playerId, ...(phase === "upgrades" ? { upgradeId: value } : { symbol: value }) }));
+      if (phase === "upgrades") {
+        this.callbacks.onAllUpgradesChosen(choiceList.map((c) => ({ playerId: c.playerId, upgradeId: (c as any).upgradeId })));
+      } else {
+        this.callbacks.onAllStocksChosen(choiceList.map((c) => ({ playerId: c.playerId, symbol: (c as any).symbol })));
+      }
+      this.network.broadcast({ type: "eod_all_ready" });
+    }
   }
 
   async start(): Promise<string> {
@@ -207,10 +256,16 @@ export class MultiplayerHost {
         this.callbacks.onTogglePause();
         break;
       case "choose_upgrade":
-        this.callbacks.onChooseUpgrade(action.upgradeId);
+        // EOD gate: track the choice, don't apply immediately
+        this.upgradeChoices.set(player.id, action.upgradeId);
+        this.addFeedItem(player.id, player.name, `${player.name} chose an upgrade`);
+        this.checkEodGate("upgrades");
         break;
       case "choose_stock":
-        this.callbacks.onChooseStock(action.symbol);
+        // EOD gate: track the choice, don't apply immediately
+        this.stockChoices.set(player.id, action.symbol);
+        this.addFeedItem(player.id, player.name, `${player.name} chose ${action.symbol}`);
+        this.checkEodGate("stocks");
         break;
       case "choose_restaurant_upgrade":
         this.callbacks.onChooseRestaurantUpgrade(action.upgradeId);

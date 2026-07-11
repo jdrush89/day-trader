@@ -12,6 +12,8 @@ export interface PeerCallbacks {
   onJoinRejected: (reason: string) => void;
   onDisconnected: () => void;
   onError: (error: string) => void;
+  onEodWaiting: (waitingFor: string[]) => void;
+  onEodAllReady: () => void;
 }
 
 export class MultiplayerPeer {
@@ -162,6 +164,12 @@ export class MultiplayerPeer {
         break;
       case "join_rejected":
         this.callbacks.onJoinRejected((msg as any).reason);
+        break;
+      case "eod_waiting":
+        this.callbacks.onEodWaiting((msg as any).waitingFor);
+        break;
+      case "eod_all_ready":
+        this.callbacks.onEodAllReady();
         break;
       case "error":
         this.callbacks.onError(msg.message);

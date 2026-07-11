@@ -17,6 +17,8 @@ export interface MultiplayerState {
   connecting: boolean;
   error: string | null;
   gameStarted: boolean;
+  // EOD gate
+  eodWaitingFor: string[]; // player names still choosing (empty = not waiting)
   // Synced state (peer only)
   syncedGameState: GameState | null;
   syncedRestaurantState: RestaurantState | null;
@@ -33,6 +35,9 @@ export interface MultiplayerActions {
   startGame: () => void;
   disconnect: () => void;
   sendAction: (action: PeerAction) => void;
+  // EOD gate controls (host only)
+  resetEodGate: (phase: "upgrades" | "stocks") => void;
+  submitHostChoice: (phase: "upgrades" | "stocks", choice: string) => void;
 }
 
 export function useMultiplayer(
@@ -58,6 +63,8 @@ export function useMultiplayer(
     onChangeChannel: (monitorId: number, channel: string) => void;
     onSelectStock: (monitorId: number, symbol: string) => void;
     onPeerStateSync: (sync: GameSync) => void;
+    onAllUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
+    onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
   },
 ): [MultiplayerState, MultiplayerActions] {
   const [state, setState] = useState<MultiplayerState>({
@@ -69,6 +76,7 @@ export function useMultiplayer(
     connecting: false,
     error: null,
     gameStarted: false,
+    eodWaitingFor: [],
     syncedGameState: null,
     syncedRestaurantState: null,
     syncedEodPhase: null,
@@ -139,6 +147,18 @@ export function useMultiplayer(
       onChooseMenuItem: (name) => appCallbacksRef.current.onChooseMenuItem(name),
       onChangeChannel: (monitorId, channel) => appCallbacksRef.current.onChangeChannel(monitorId, channel),
       onSelectStock: (monitorId, symbol) => appCallbacksRef.current.onSelectStock(monitorId, symbol),
+      onAllUpgradesChosen: (choices) => {
+        appCallbacksRef.current.onAllUpgradesChosen(choices);
+        setState((s) => ({ ...s, eodWaitingFor: [] }));
+        // Auto-reset for stocks phase if it follows
+        setTimeout(() => {
+          if (host) host.resetEodGate("stocks");
+        }, 50);
+      },
+      onAllStocksChosen: (choices) => {
+        appCallbacksRef.current.onAllStocksChosen(choices);
+        setState((s) => ({ ...s, eodWaitingFor: [] }));
+      },
     });
 
     try {
@@ -209,6 +229,12 @@ export function useMultiplayer(
       onError: (err) => {
         setState((s) => ({ ...s, error: err, connecting: false }));
       },
+      onEodWaiting: (waitingFor) => {
+        setState((s) => ({ ...s, eodWaitingFor: waitingFor }));
+      },
+      onEodAllReady: () => {
+        setState((s) => ({ ...s, eodWaitingFor: [] }));
+      },
     });
 
     try {
@@ -242,6 +268,7 @@ export function useMultiplayer(
       connecting: false,
       error: null,
       gameStarted: false,
+      eodWaitingFor: [],
       syncedGameState: null,
       syncedRestaurantState: null,
       syncedEodPhase: null,
@@ -258,5 +285,19 @@ export function useMultiplayer(
     }
   }, []);
 
-  return [state, { hostGame, joinGame, startGame, disconnect, sendAction }];
+  const resetEodGate = useCallback((phase: "upgrades" | "stocks") => {
+    if (hostRef.current) {
+      hostRef.current.resetEodGate(phase);
+      setState((s) => ({ ...s, eodWaitingFor: hostRef.current!.eodWaitingFor }));
+    }
+  }, []);
+
+  const submitHostChoice = useCallback((phase: "upgrades" | "stocks", choice: string) => {
+    if (hostRef.current) {
+      hostRef.current.submitHostChoice(phase, choice);
+      setState((s) => ({ ...s, eodWaitingFor: hostRef.current!.eodWaitingFor }));
+    }
+  }, []);
+
+  return [state, { hostGame, joinGame, startGame, disconnect, sendAction, resetEodGate, submitHostChoice }];
 }

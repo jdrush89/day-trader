@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.13";
+const GAME_VERSION = "0.0.14";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -49,6 +49,8 @@ function App() {
   const [showDebug, setShowDebug] = useState(false);
   const [debugFF, setDebugFF] = useState(false);
   const [showMultiplayerLobby, setShowMultiplayerLobby] = useState(false);
+  const [eodChoiceMade, setEodChoiceMade] = useState(false); // local player submitted their EOD choice
+  const beginScheduledDayRef = useRef<(state?: GameState) => void>(() => {});
 
   // Multiplayer hook
   const [mpState, mpActions] = useMultiplayer(
@@ -80,14 +82,48 @@ function App() {
       onSelectStock: (monitorId, symbol) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, selectedStock: symbol } : m) })),
       onPeerStateSync: (sync) => {
         // Apply synced game state directly, preserving local monitors
-        console.log("[Peer Sync] Applying state, day:", sync.gameState.day, "time:", sync.gameState.timeOfDay, "cash:", sync.gameState.cash);
         setGameState((prev) => ({ ...sync.gameState, monitors: prev.monitors }));
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
-        setEodPhase(sync.eodPhase as any);
+        setEodPhase((prev) => {
+          if (prev !== sync.eodPhase) setEodChoiceMade(false); // reset when phase changes
+          return sync.eodPhase as any;
+        });
         setPaused(sync.paused);
         setSpeed(sync.speed);
         setBossDay(sync.bossDay);
         setBossView(sync.bossView as any);
+      },
+      onAllUpgradesChosen: (choices) => {
+        let hasStocks = false;
+        setGameState((prev) => {
+          let state = prev;
+          for (const { upgradeId } of choices) {
+            state = acquireUpgrade(state, upgradeId);
+          }
+          hasStocks = state.stockDraftOptions.length > 0;
+          if (!hasStocks) {
+            setTimeout(() => beginScheduledDayRef.current(state), 0);
+          }
+          return state;
+        });
+        if (hasStocks) {
+          setTimeout(() => {
+            setEodPhase("stocks");
+            setEodChoiceMade(false);
+          }, 0);
+        }
+      },
+      onAllStocksChosen: (choices) => {
+        setGameState((prev) => {
+          let state = prev;
+          for (const { symbol } of choices) {
+            state = draftStock(state, symbol);
+          }
+          // Trigger next day via the ref
+          setTimeout(() => beginScheduledDayRef.current(state), 0);
+          return state;
+        });
+        setEodChoiceMade(false);
       },
     },
   );
@@ -549,6 +585,7 @@ function App() {
       }
     }
   }, [gameState, restaurantState, bossDay]);
+  beginScheduledDayRef.current = beginScheduledDay;
 
   const handleNewDay = useCallback(() => {
     // On boss day, skip upgrades/stocks — go straight to boss day evaluation
@@ -574,15 +611,21 @@ function App() {
 
   const handleChallengesContinue = useCallback(() => {
     // After challenges, proceed to upgrades/stocks/restaurant-upgrades/menu-draft or next day
-    if (gameState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
-    else if (gameState.stockDraftOptions.length > 0) setEodPhase("stocks");
-    else if (gameState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
+    if (gameState.upgradeDraftOptions.length > 0) {
+      setEodPhase("upgrades");
+      setEodChoiceMade(false);
+      if (isMultiplayer) mpActions.resetEodGate("upgrades");
+    } else if (gameState.stockDraftOptions.length > 0) {
+      setEodPhase("stocks");
+      setEodChoiceMade(false);
+      if (isMultiplayer) mpActions.resetEodGate("stocks");
+    } else if (gameState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
     else if (gameState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
     else {
       setRestaurantState(null);
       beginScheduledDay();
     }
-  }, [beginScheduledDay, gameState]);
+  }, [beginScheduledDay, gameState, isMultiplayer, mpActions]);
 
   const restaurantUpgradeCount = useCallback(
     (upgradeId: string) => gameState.acquiredRestaurantUpgrades.filter((id) => id === upgradeId).length,
@@ -590,6 +633,15 @@ function App() {
   );
 
   const handleAcquireUpgrade = useCallback((upgradeId: string) => {
+    if (isMultiplayer) {
+      if (isPeer) {
+        mpActions.sendAction({ type: "choose_upgrade", upgradeId });
+      } else {
+        mpActions.submitHostChoice("upgrades", upgradeId);
+      }
+      setEodChoiceMade(true);
+      return;
+    }
     const nextState = acquireUpgrade(gameState, upgradeId);
     if (nextState.stockDraftOptions.length > 0) {
       setGameState(nextState);
@@ -598,11 +650,20 @@ function App() {
     }
 
     beginScheduledDay(nextState);
-  }, [beginScheduledDay, gameState]);
+  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
 
   const handleDraftStock = useCallback((symbol: string) => {
+    if (isMultiplayer) {
+      if (isPeer) {
+        mpActions.sendAction({ type: "choose_stock", symbol });
+      } else {
+        mpActions.submitHostChoice("stocks", symbol);
+      }
+      setEodChoiceMade(true);
+      return;
+    }
     beginScheduledDay(draftStock(gameState, symbol));
-  }, [beginScheduledDay, gameState]);
+  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
 
   const handleAcquireRestaurantUpgrade = useCallback((upgradeId: string) => {
     const nextState = acquireRestaurantUpgrade(gameState, upgradeId);
@@ -1175,8 +1236,15 @@ function App() {
 
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "upgrades" && (
             <div className="end-of-day-overlay">
-              {isPeer ? (
-                <div className="upgrade-draft"><h2>⏳ Waiting for host...</h2><p className="upgrade-draft-sub">Host is choosing an upgrade</p></div>
+              {isMultiplayer && eodChoiceMade ? (
+                <div className="upgrade-draft">
+                  <h2>⏳ Waiting for other players...</h2>
+                  <p className="upgrade-draft-sub">
+                    {mpState.eodWaitingFor.length > 0
+                      ? `Still choosing: ${mpState.eodWaitingFor.join(", ")}`
+                      : "Processing..."}
+                  </p>
+                </div>
               ) : (
               <div className="upgrade-draft">
                 <h2>⬆️ Choose an Upgrade</h2>
@@ -1204,8 +1272,15 @@ function App() {
 
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "stocks" && (
             <div className="end-of-day-overlay">
-              {isPeer ? (
-                <div className="stock-draft"><h2>⏳ Waiting for host...</h2><p className="stock-draft-sub">Host is choosing a new stock</p></div>
+              {isMultiplayer && eodChoiceMade ? (
+                <div className="stock-draft">
+                  <h2>⏳ Waiting for other players...</h2>
+                  <p className="stock-draft-sub">
+                    {mpState.eodWaitingFor.length > 0
+                      ? `Still choosing: ${mpState.eodWaitingFor.join(", ")}`
+                      : "Processing..."}
+                  </p>
+                </div>
               ) : (
               <div className="stock-draft">
                 <h2>📊 New Stock Available</h2>
