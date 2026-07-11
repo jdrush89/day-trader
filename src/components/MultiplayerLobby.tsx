@@ -27,6 +27,7 @@ export function MultiplayerLobby({
   const [mode, setMode] = useState<"pick" | "host" | "join">("pick");
   const [playerName, setPlayerName] = useState("");
   const [joinCode, setJoinCode] = useState("");
+  const [copied, setCopied] = useState(false);
 
   if (roomCode) {
     // In lobby — show players and room code
@@ -39,9 +40,13 @@ export function MultiplayerLobby({
             <span className="mp-room-value">{roomCode}</span>
             <button
               className="mp-copy-btn"
-              onClick={() => navigator.clipboard.writeText(roomCode)}
+              onClick={() => {
+                navigator.clipboard.writeText(roomCode);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
             >
-              📋 Copy
+              {copied ? "✅ Copied!" : "📋 Copy"}
             </button>
           </div>
           <div className="mp-players">
