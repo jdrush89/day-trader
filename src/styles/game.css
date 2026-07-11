@@ -3074,3 +3074,15 @@ body {
 .boss-stat.ok {
   color: #4f8;
 }
+
+/* Boss day restaurant height fix */
+.boss-restaurant-wrap .restaurant-screen {
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+.boss-restaurant-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}

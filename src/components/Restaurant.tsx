@@ -27,6 +27,7 @@ interface RestaurantProps {
   acquiredRestaurantUpgrades: string[];
   debugFF?: boolean;
   onDebugFF?: () => void;
+  isBossDay?: boolean;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -289,7 +290,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF }: RestaurantProps) {
+export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay }: RestaurantProps) {
   const activeOrder = useMemo(
     () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
     [state.activeOrderId, state.orderSlots],
@@ -410,13 +411,15 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
             <span>Earnings</span>
             <strong>${state.totalEarnings.toFixed(2)}</strong>
           </div>
-          <div className="speed-controls">
-            <button className={speed === 1 ? "active" : ""} onClick={() => onSpeedChange(1)}>1x</button>
-            <button className={speed === 2 ? "active" : ""} onClick={() => onSpeedChange(2)}>2x</button>
-            <button className={speed === 5 ? "active" : ""} onClick={() => onSpeedChange(5)}>5x</button>
-            <button className={speed === 10 ? "active" : ""} onClick={() => onSpeedChange(10)}>10x</button>
-            {debugFF && onDebugFF && <button className="debug-ff-btn" onClick={onDebugFF}>⏭</button>}
-          </div>
+          {!isBossDay && (
+            <div className="speed-controls">
+              <button className={speed === 1 ? "active" : ""} onClick={() => onSpeedChange(1)}>1x</button>
+              <button className={speed === 2 ? "active" : ""} onClick={() => onSpeedChange(2)}>2x</button>
+              <button className={speed === 5 ? "active" : ""} onClick={() => onSpeedChange(5)}>5x</button>
+              <button className={speed === 10 ? "active" : ""} onClick={() => onSpeedChange(10)}>10x</button>
+              {debugFF && onDebugFF && <button className="debug-ff-btn" onClick={onDebugFF}>⏭</button>}
+            </div>
+          )}
         </div>
       </header>
 

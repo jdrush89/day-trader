@@ -40,6 +40,7 @@ function App() {
   const [bossView, setBossView] = useState<"trading" | "restaurant">("trading");
   const [bossResult, setBossResult] = useState<{ passed: boolean; tradingProfit: number; missedOrders: number; requiredProfit: number; maxMissed: number } | null>(null);
   const [showBossIntro, setShowBossIntro] = useState<{ requiredProfit: number; maxMissed: number } | null>(null);
+  const [skipNextRestaurant, setSkipNextRestaurant] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugFF, setDebugFF] = useState(false);
 
@@ -387,6 +388,7 @@ function App() {
       setGameState(gameOverState);
       setRestaurantState(null);
       setBossDay(false);
+      setSkipNextRestaurant(true);
       setEodPhase("summary");
       saveGame(gameOverState);
       if (passed && gameOverState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
@@ -394,12 +396,9 @@ function App() {
       return;
     }
 
-    // After boss day EOD (day already incremented by finishRestaurantDay), skip restaurant
-    // The marker is: marketOpen is false, restaurantState is null, and the previous day was a boss day
-    const prevDayWasBoss = isBossDayCheck(nextState.day - 1);
-
-    // After trading (market just closed), go to Shwendy's (but not after boss day)
-    if (!nextState.marketOpen && restaurantState === null && !prevDayWasBoss) {
+    // After boss day EOD (day already incremented by finishRestaurantDay), skip restaurant once
+    // After trading (market just closed), go to Shwendy's
+    if (!nextState.marketOpen && restaurantState === null && !skipNextRestaurant) {
       setGameState(nextState);
       setShowTransition("restaurant");
       setEodPhase("summary");
@@ -408,6 +407,7 @@ function App() {
 
     // After Shwendy's (or starting a new day), open the market
     setRestaurantState(null);
+    setSkipNextRestaurant(false);
     setSpeed(1);
     const marketState = openMarket(nextState);
     setGameState(marketState);
@@ -420,7 +420,7 @@ function App() {
     if (isBossDay) {
       lastBossEarningsRef.current = 0;
       const rs = createRestaurantState(marketState);
-      setRestaurantState({ ...rs, shiftTimeRemaining: 9999 });
+      setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
       const milestoneNum = marketState.day / 4;
       const requiredProfit = 300 + (milestoneNum - 1) * 100;
       const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
@@ -766,7 +766,7 @@ function App() {
                 if (isBoss) {
                   lastBossEarningsRef.current = 0;
                   const rs = createRestaurantState(marketState);
-                  setRestaurantState({ ...rs, shiftTimeRemaining: 9999 });
+                  setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
                   const milestoneNum = day / 4;
                   const requiredProfit = 300 + (milestoneNum - 1) * 100;
                   const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
@@ -970,6 +970,7 @@ function App() {
           )}
 
           {bossDay && restaurantState && bossView === "restaurant" ? (
+            <div className="boss-restaurant-wrap">
             <Restaurant
               day={gameState.day}
               paused={paused}
@@ -982,6 +983,7 @@ function App() {
               speed={speed}
               onSpeedChange={setSpeed}
               acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
+              isBossDay={true}
               debugFF={debugFF}
               onDebugFF={() => {
                 setGameState((prev) => {
@@ -995,6 +997,7 @@ function App() {
                 setDebugFF(false);
               }}
             />
+            </div>
           ) : (
           <div className="main-layout">
             <div className="monitors-area">
