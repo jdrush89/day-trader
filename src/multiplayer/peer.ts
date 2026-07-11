@@ -136,6 +136,7 @@ export class MultiplayerPeer {
   }
 
   private handleMessage(msg: HostMessage): void {
+    console.log("[Peer] Received message:", msg.type);
     switch (msg.type) {
       case "game_sync":
         this.callbacks.onStateSync(msg);

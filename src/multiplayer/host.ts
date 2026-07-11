@@ -108,6 +108,7 @@ export class MultiplayerHost {
   }
 
   private handleMessage(peerId: string, msg: NetworkMessage): void {
+    console.log("[Host] Received message from", peerId, (msg as any).type);
     // Handle join request
     if ("type" in msg && msg.type === "join_request") {
       const { playerName } = msg as { type: "join_request"; playerName: string };

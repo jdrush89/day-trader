@@ -133,16 +133,20 @@ export class NetworkManager {
     const peer = this.peers.get(peerId);
     if (peer && !peer.destroyed) {
       try {
+        console.log("[MP] Sending to", peerId, (message as any).type);
         peer.send(JSON.stringify(message));
       } catch (e) {
         console.warn("[MP] Failed to send to", peerId, e);
       }
+    } else {
+      console.warn("[MP] No peer found for", peerId, "peers:", Array.from(this.peers.keys()));
     }
   }
 
   // Broadcast to all connected peers
   broadcast(message: NetworkMessage): void {
     const data = JSON.stringify(message);
+    console.log("[MP] Broadcasting", (message as any).type, "to", this.peers.size, "peers");
     for (const [id, peer] of this.peers) {
       if (!peer.destroyed) {
         try {
