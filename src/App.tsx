@@ -11,6 +11,7 @@ import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
 import { Restaurant } from "./components/Restaurant";
 import { SecWheel } from "./components/SecWheel";
+import { DebugPanel } from "./components/DebugPanel";
 import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
 import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
@@ -38,6 +39,7 @@ function App() {
   const [bossDay, setBossDay] = useState(false);
   const [bossView, setBossView] = useState<"trading" | "restaurant">("trading");
   const [bossResult, setBossResult] = useState<{ passed: boolean; tradingProfit: number; missedOrders: number; requiredProfit: number; maxMissed: number } | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -115,12 +117,20 @@ function App() {
       }
 
       if (e.key === "Escape") {
-        if (showOptions === "pause") {
+        if (showDebug) {
+          setShowDebug(false);
+        } else if (showOptions === "pause") {
           setShowOptions(null);
         } else {
           setShowOptions(null);
           setPaused((p) => !p);
         }
+        return;
+      }
+
+      // Debug menu toggle
+      if (e.key === "n" && paused && !showDebug) {
+        setShowDebug(true);
         return;
       }
 
@@ -162,7 +172,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex, bossDay, bossView]);
+  }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex, bossDay, bossView, paused, showDebug, showOptions]);
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
@@ -706,7 +716,13 @@ function App() {
 
       {paused && (
         <div className="pause-overlay">
-          {showOptions === "pause" ? (
+          {showDebug ? (
+            <DebugPanel
+              gameState={gameState}
+              setGameState={(updater) => setGameState(updater)}
+              onClose={() => setShowDebug(false)}
+            />
+          ) : showOptions === "pause" ? (
             <div className="pause-menu">
               <h2>⚙️ Options</h2>
               <div className="options-row">
