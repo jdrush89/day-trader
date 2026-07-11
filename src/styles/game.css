@@ -2787,8 +2787,7 @@ body {
   content: attr(data-tooltip);
   position: absolute;
   top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
   background: var(--bg-dark);
   color: var(--text);
   border: 1px solid var(--border);

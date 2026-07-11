@@ -807,10 +807,24 @@ function App() {
       {gameState.gameOver && (
         <div className="game-over-overlay">
           <div className="game-over">
-            <h2>💸 MARGIN CALLED</h2>
-            <p>You survived {gameState.day} days</p>
-            <p>Total P&L: ${gameState.totalProfit.toFixed(2)}</p>
-            <button onClick={handleRestart}>Try Again</button>
+            {bossResult && !bossResult.passed ? (
+              <>
+                <h2>⚠️ FIRED FROM SHWENDY'S</h2>
+                <p>You failed the boss day shift!</p>
+                <div className="eod-stats" style={{ margin: "12px 0" }}>
+                  <div className="eod-stat-row"><span>Trading profit</span><span className={bossResult.tradingProfit >= bossResult.requiredProfit ? "up" : "danger"}>${bossResult.tradingProfit.toFixed(2)} (need ${bossResult.requiredProfit})</span></div>
+                  <div className="eod-stat-row"><span>Missed orders</span><span className={bossResult.missedOrders <= bossResult.maxMissed ? "up" : "danger"}>{bossResult.missedOrders} (max {bossResult.maxMissed})</span></div>
+                </div>
+                <p>You survived {gameState.day} days</p>
+              </>
+            ) : (
+              <>
+                <h2>💸 MARGIN CALLED</h2>
+                <p>You survived {gameState.day} days</p>
+                <p>Total P&L: ${gameState.totalProfit.toFixed(2)}</p>
+              </>
+            )}
+            <button onClick={() => { setBossResult(null); handleRestart(); }}>Try Again</button>
           </div>
         </div>
       )}
