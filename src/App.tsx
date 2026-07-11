@@ -53,6 +53,7 @@ function App() {
     () => gameState,
     (updater) => setGameState(updater),
     () => restaurantState,
+    (updater) => setRestaurantState(updater),
     () => eodPhase,
     () => paused,
     () => speed,
@@ -85,15 +86,29 @@ function App() {
     localStorage.setItem("rogue-day-trader-text-size", String(textSize));
   }, [textSize]);
 
+  // Peer: apply synced state from host
   useEffect(() => {
+    if (!isPeer) return;
+    if (mpState.syncedGameState) setGameState(mpState.syncedGameState);
+    if (mpState.syncedRestaurantState !== undefined) setRestaurantState(mpState.syncedRestaurantState);
+    if (mpState.syncedEodPhase !== null) setEodPhase(mpState.syncedEodPhase as any);
+    if (mpState.syncedPaused !== null) setPaused(mpState.syncedPaused);
+    if (mpState.syncedSpeed !== null) setSpeed(mpState.syncedSpeed);
+    if (mpState.syncedBossDay !== null) setBossDay(mpState.syncedBossDay);
+    if (mpState.syncedBossView !== null) setBossView(mpState.syncedBossView as any);
+  }, [isPeer, mpState.syncedGameState, mpState.syncedRestaurantState, mpState.syncedEodPhase, mpState.syncedPaused, mpState.syncedSpeed, mpState.syncedBossDay, mpState.syncedBossView]);
+
+  useEffect(() => {
+    if (isPeer) return; // Peers don't tick - host sends state
     if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial || showLoanOffer || showBossIntro) return;
     const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
     return () => clearInterval(interval);
-  }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer, showBossIntro]);
+  }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer, showBossIntro, isPeer]);
 
   // Boss day: tick restaurant alongside trading
   const lastBossEarningsRef = useRef(0);
   useEffect(() => {
+    if (isPeer) return; // Peers don't tick
     if (!bossDay || !restaurantState || paused || !gameState.marketOpen || restaurantState.shiftOver || showBossIntro) return;
     const interval = setInterval(() => {
       setRestaurantState((prev) => {
@@ -109,7 +124,7 @@ function App() {
       });
     }, 50);
     return () => clearInterval(interval);
-  }, [bossDay, restaurantState, paused, gameState.marketOpen, speed, showBossIntro]);
+  }, [bossDay, restaurantState, paused, gameState.marketOpen, speed, showBossIntro, isPeer]);
 
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
 
@@ -162,7 +177,7 @@ function App() {
           setShowOptions(null);
         } else {
           setShowOptions(null);
-          setPaused((p) => !p);
+          handleTogglePause();
         }
         return;
       }
@@ -236,6 +251,7 @@ function App() {
   const NEWS_CHANNELS: MonitorChannel[] = ["business_news", "global_news", "social_media"];
 
   const handleChangeChannel = useCallback((monitorId: number, channel: MonitorChannel) => {
+    if (isPeer) { mpActions.sendAction({ type: "change_channel", monitorId, channel }); return; }
     setGameState((prev) => {
       let tracker = prev.challengeTracker;
       if (NEWS_CHANNELS.includes(channel)) {
@@ -247,34 +263,64 @@ function App() {
         challengeTracker: tracker,
       };
     });
-  }, []);
+  }, [isPeer, mpActions]);
 
   const handleSelectStock = useCallback((monitorId: number, symbol: string) => {
+    if (isPeer) { mpActions.sendAction({ type: "select_stock", monitorId, symbol }); return; }
     setGameState((prev) => ({
       ...prev,
       monitors: prev.monitors.map((m) => (m.id === monitorId ? { ...m, selectedStock: symbol } : m)),
     }));
-  }, []);
+  }, [isPeer, mpActions]);
 
-  const handleBuy = useCallback((symbol: string, shares: number) => setGameState((prev) => buyStock(prev, symbol, shares)), []);
-  const handleSell = useCallback((symbol: string, shares: number) => setGameState((prev) => sellStock(prev, symbol, shares)), []);
-  const handleShort = useCallback((symbol: string, shares: number) => setGameState((prev) => shortStock(prev, symbol, shares)), []);
-  const handleCover = useCallback((symbol: string, shares: number) => setGameState((prev) => coverShort(prev, symbol, shares)), []);
+  const handleBuy = useCallback((symbol: string, shares: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "buy_stock", symbol, shares }); return; }
+    setGameState((prev) => buyStock(prev, symbol, shares));
+  }, [isPeer, mpActions]);
+  const handleSell = useCallback((symbol: string, shares: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "sell_stock", symbol, shares }); return; }
+    setGameState((prev) => sellStock(prev, symbol, shares));
+  }, [isPeer, mpActions]);
+  const handleShort = useCallback((symbol: string, shares: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "short_stock", symbol, shares }); return; }
+    setGameState((prev) => shortStock(prev, symbol, shares));
+  }, [isPeer, mpActions]);
+  const handleCover = useCallback((symbol: string, shares: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "cover_short", symbol, shares }); return; }
+    setGameState((prev) => coverShort(prev, symbol, shares));
+  }, [isPeer, mpActions]);
   const handleTogglePin = useCallback((symbol: string) => setGameState((prev) => togglePinStock(prev, symbol)), []);
   const handleToggleStopLoss = useCallback(() => setGameState((prev) => ({ ...prev, stopLossEnabled: !prev.stopLossEnabled })), []);
   const handlePlaceOrder = useCallback((symbol: string, side: OrderSide, shares: number, orderType: OrderType, limitPrice?: number, stopPrice?: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "place_order", symbol, side, shares, orderType, limitPrice, stopPrice }); return; }
     setGameState((prev) => placeOrder(prev, symbol, side, shares, orderType, limitPrice, stopPrice));
-  }, []);
-  const handleCancelOrder = useCallback((orderId: string) => setGameState((prev) => cancelOrder(prev, orderId)), []);
+  }, [isPeer, mpActions]);
+  const handleCancelOrder = useCallback((orderId: string) => {
+    if (isPeer) { mpActions.sendAction({ type: "cancel_order", orderId }); return; }
+    setGameState((prev) => cancelOrder(prev, orderId));
+  }, [isPeer, mpActions]);
   const handleBuyOption = useCallback((symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "buy_option", symbol, optionType: type, strikePrice: strike, expirationDays: days, contracts }); return; }
     setGameState((prev) => buyOption(prev, symbol, type, strike, days, contracts));
-  }, []);
+  }, [isPeer, mpActions]);
   const handleSellOption = useCallback((symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "sell_option", symbol, optionType: type, strikePrice: strike, expirationDays: days, contracts }); return; }
     setGameState((prev) => sellOption(prev, symbol, type, strike, days, contracts));
-  }, []);
+  }, [isPeer, mpActions]);
   const handleCloseOption = useCallback((optionId: string) => {
+    if (isPeer) { mpActions.sendAction({ type: "close_option", optionId }); return; }
     setGameState((prev) => closeOption(prev, optionId));
-  }, []);
+  }, [isPeer, mpActions]);
+
+  const handleSetSpeed = useCallback((s: number) => {
+    if (isPeer) { mpActions.sendAction({ type: "set_speed", speed: s }); return; }
+    setSpeed(s);
+  }, [isPeer, mpActions]);
+
+  const handleTogglePause = useCallback(() => {
+    if (isPeer) { mpActions.sendAction({ type: "toggle_pause" }); return; }
+    setPaused((p) => !p);
+  }, [isPeer, mpActions]);
 
   const handleTradingTutorialStep = useCallback((step: TutorialStep) => {
     // Handle actions
@@ -849,10 +895,10 @@ function App() {
               <span className="time-label">{paused ? "⏸ PAUSED" : gameState.marketOpen ? `Day ${gameState.day} — ${formatMarketTime(gameState.timeOfDay)}` : "Market Closed"}</span>
             </div>
             <div className="speed-controls">
-              <button className={speed === 1 ? "active" : ""} onClick={() => setSpeed(1)}>1x</button>
-              <button className={speed === 2 ? "active" : ""} onClick={() => setSpeed(2)}>2x</button>
-              <button className={speed === 5 ? "active" : ""} onClick={() => setSpeed(5)}>5x</button>
-              <button className={speed === 10 ? "active" : ""} onClick={() => setSpeed(10)}>10x</button>
+              <button className={speed === 1 ? "active" : ""} onClick={() => handleSetSpeed(1)}>1x</button>
+              <button className={speed === 2 ? "active" : ""} onClick={() => handleSetSpeed(2)}>2x</button>
+              <button className={speed === 5 ? "active" : ""} onClick={() => handleSetSpeed(5)}>5x</button>
+              <button className={speed === 10 ? "active" : ""} onClick={() => handleSetSpeed(10)}>10x</button>
               {debugFF && <button className="debug-ff-btn" onClick={() => {
                 setGameState((prev) => {
                   let state = prev;
@@ -983,7 +1029,7 @@ function App() {
           milestoneDaysLeft={getMilestone(gameState.day) ? getMilestone(gameState.day)!.checkDay - gameState.day : 0}
           netWorth={gameState.cash + gameState.portfolio.reduce((sum: number, pos) => { const s = gameState.stocks.find((st) => st.symbol === pos.symbol); return sum + (s ? s.price * pos.shares : 0); }, 0) + gameState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0) - gameState.shorts.reduce((sum: number, sp) => { const s = gameState.stocks.find((st) => st.symbol === sp.symbol); return sum + (s ? s.price * sp.shares : 0); }, 0) + getOptionsValue(gameState)}
           speed={speed}
-          onSpeedChange={setSpeed}
+          onSpeedChange={handleSetSpeed}
           acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
           activeChallenges={gameState.activeChallenges}
           tickets={gameState.tickets}
@@ -992,6 +1038,10 @@ function App() {
             setRestaurantState((prev) => prev ? { ...prev, shiftTimeRemaining: 0, shiftOver: true } : prev);
             setDebugFF(false);
           }}
+          isPeer={isPeer}
+          onPeerKey={(key) => mpActions.sendAction({ type: "restaurant_key", key })}
+          onPeerKeyUp={(key) => mpActions.sendAction({ type: "restaurant_key_up", key })}
+          onPeerMouse={(x, y) => mpActions.sendAction({ type: "restaurant_mouse", x, y })}
         />
       ) : (
         <>
@@ -1176,7 +1226,7 @@ function App() {
               milestoneDaysLeft={0}
               netWorth={0}
               speed={speed}
-              onSpeedChange={setSpeed}
+              onSpeedChange={handleSetSpeed}
               acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
               isBossDay={true}
               activeChallenges={gameState.activeChallenges}
@@ -1193,6 +1243,10 @@ function App() {
                 });
                 setDebugFF(false);
               }}
+              isPeer={isPeer}
+              onPeerKey={(key) => mpActions.sendAction({ type: "restaurant_key", key })}
+          onPeerKeyUp={(key) => mpActions.sendAction({ type: "restaurant_key_up", key })}
+              onPeerMouse={(x, y) => mpActions.sendAction({ type: "restaurant_mouse", x, y })}
             />
             </div>
           ) : (

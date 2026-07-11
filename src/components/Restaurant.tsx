@@ -31,6 +31,10 @@ interface RestaurantProps {
   isBossDay?: boolean;
   activeChallenges?: ActiveChallenge[];
   tickets?: number;
+  isPeer?: boolean;
+  onPeerKey?: (key: string) => void;
+  onPeerKeyUp?: (key: string) => void;
+  onPeerMouse?: (x: number, y: number) => void;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -293,7 +297,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets }: RestaurantProps) {
+export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse }: RestaurantProps) {
   const activeOrder = useMemo(
     () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
     [state.activeOrderId, state.orderSlots],
@@ -314,6 +318,13 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
       const activeElement = document.activeElement;
       const tag = activeElement?.tagName.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
+
+      // Peers forward key presses to host
+      if (isPeer && onPeerKey) {
+        event.preventDefault();
+        onPeerKey(event.key);
+        return;
+      }
 
       const slotNumber = Number.parseInt(event.key, 10);
       if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= state.orderSlots.length) {
@@ -354,6 +365,10 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
 
     const handleGlobalKeyUp = (event: KeyboardEvent) => {
       if (paused || state.shiftOver) return;
+      if (isPeer && onPeerKeyUp) {
+        onPeerKeyUp(event.key);
+        return;
+      }
       if (/^[a-zA-Z]$/.test(event.key)) {
         setRestaurantState((prev) => (prev ? handleKeyUp(prev, event.key) : prev));
       }
@@ -361,6 +376,10 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
 
     const handleMouseMove = (event: MouseEvent) => {
       if (paused || state.shiftOver) return;
+      if (isPeer && onPeerMouse) {
+        onPeerMouse(event.clientX, event.clientY);
+        return;
+      }
       setRestaurantState((prev) => (prev ? handleRestaurantMouseMove(prev, event.clientX, event.clientY) : prev));
     };
 

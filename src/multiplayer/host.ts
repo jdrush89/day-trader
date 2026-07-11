@@ -3,6 +3,8 @@ import type { RestaurantState } from "../game/restaurant-types";
 import type { PeerAction, Player, ActionFeedItem, GameSync, NetworkMessage } from "./types";
 import { NetworkManager, generateRoomCode, getPlayerColor } from "./network";
 import { buyStock, sellStock, shortStock, coverShort, placeOrder, cancelOrder, buyOption, sellOption, closeOption, togglePinStock } from "../game/engine";
+import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder } from "../game/restaurant-engine";
+import { handleChopKey } from "../game/restaurant-engine";
 
 const MAX_FEED_ITEMS = 20;
 const SYNC_INTERVAL_MS = 100; // 10 syncs/sec
@@ -11,6 +13,7 @@ export interface HostCallbacks {
   getGameState: () => GameState;
   setGameState: (updater: (prev: GameState) => GameState) => void;
   getRestaurantState: () => RestaurantState | null;
+  setRestaurantState: (updater: (prev: RestaurantState | null) => RestaurantState | null) => void;
   getEodPhase: () => string;
   getPaused: () => boolean;
   getSpeed: () => number;
@@ -206,15 +209,58 @@ export class MultiplayerHost {
         this.callbacks.onChooseMenuItem(action.itemName);
         break;
       case "claim_order":
-        // Restaurant order claiming — just forward as key press for now
-        // The host handles restaurant state locally
+        this.callbacks.setRestaurantState((prev) => {
+          if (!prev || prev.shiftOver) return prev;
+          const order = prev.orderSlots[action.slotIndex];
+          if (!order) return prev;
+          return order.completed ? serveOrder(prev, action.slotIndex) : acceptOrder(prev, action.slotIndex);
+        });
         break;
-      case "restaurant_key":
-        // Peer sent a key press for restaurant mini-game
-        // TODO: forward to restaurant engine
+      case "restaurant_key": {
+        // Process the key press through restaurant engine on the host
+        const key = action.key;
+        this.callbacks.setRestaurantState((prev) => {
+          if (!prev || prev.shiftOver) return prev;
+          const slotNumber = Number.parseInt(key, 10);
+          if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= prev.orderSlots.length) {
+            const slotIndex = slotNumber - 1;
+            const order = prev.orderSlots[slotIndex];
+            if (!order) return prev;
+            return order.completed ? serveOrder(prev, slotIndex) : acceptOrder(prev, slotIndex);
+          }
+          if (key === "ArrowLeft" || key === "ArrowRight") {
+            return handleChopKey(prev, key === "ArrowLeft" ? "left" : "right");
+          }
+          if (key === "Enter") {
+            const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
+            const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
+            if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex);
+            return handleKeyPress(prev, key);
+          }
+          if (/^[a-zA-Z]$/.test(key) || key === " ") {
+            return handleKeyPress(prev, key);
+          }
+          return prev;
+        });
+        break;
+      }
+      case "restaurant_key_up":
+        this.callbacks.setRestaurantState((prev) => {
+          if (!prev || prev.shiftOver) return prev;
+          if (/^[a-zA-Z]$/.test(action.key)) {
+            return handleKeyUp(prev, action.key);
+          }
+          return prev;
+        });
         break;
       case "restaurant_mouse":
-        // Peer mouse movement for restaurant mixing
+        this.callbacks.setRestaurantState((prev) => {
+          if (!prev || prev.shiftOver) return prev;
+          return handleRestaurantMouseMove(prev, action.x, action.y);
+        });
+        break;
+      case "join_request":
+        // Handled before processAction is called
         break;
     }
   }

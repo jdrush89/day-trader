@@ -27,6 +27,7 @@ export type PeerAction =
   | { type: "pin_stock"; symbol: string }
   | { type: "claim_order"; slotIndex: number }
   | { type: "restaurant_key"; key: string }
+  | { type: "restaurant_key_up"; key: string }
   | { type: "restaurant_mouse"; x: number; y: number }
   | { type: "choose_upgrade"; upgradeId: string }
   | { type: "choose_stock"; symbol: string }

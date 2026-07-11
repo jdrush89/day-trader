@@ -39,6 +39,7 @@ export function useMultiplayer(
   getGameState: () => GameState,
   setGameState: (updater: (prev: GameState) => GameState) => void,
   getRestaurantState: () => RestaurantState | null,
+  setRestaurantState: (updater: (prev: RestaurantState | null) => RestaurantState | null) => void,
   getEodPhase: () => string,
   getPaused: () => boolean,
   getSpeed: () => number,
@@ -96,6 +97,7 @@ export function useMultiplayer(
       getGameState,
       setGameState,
       getRestaurantState,
+      setRestaurantState,
       getEodPhase,
       getPaused,
       getSpeed,
@@ -134,7 +136,7 @@ export function useMultiplayer(
     } catch (err: any) {
       setState((s) => ({ ...s, connecting: false, error: err.message }));
     }
-  }, [getGameState, setGameState, getRestaurantState, getEodPhase, getPaused, getSpeed, getBossDay, getBossView, appCallbacks]);
+  }, [getGameState, setGameState, getRestaurantState, setRestaurantState, getEodPhase, getPaused, getSpeed, getBossDay, getBossView, appCallbacks]);
 
   const joinGame = useCallback(async (roomCode: string, playerName: string) => {
     setState((s) => ({ ...s, connecting: true, error: null }));
