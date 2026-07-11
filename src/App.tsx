@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.9";
+const GAME_VERSION = "0.0.10";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -88,10 +88,16 @@ function App() {
     localStorage.setItem("rogue-day-trader-text-size", String(textSize));
   }, [textSize]);
 
-  // Peer: apply synced state from host
+  // Peer: apply synced state from host (preserve local-only fields like monitors)
   useEffect(() => {
     if (!isPeer) return;
-    if (mpState.syncedGameState) setGameState(mpState.syncedGameState);
+    if (mpState.syncedGameState) {
+      setGameState((prev) => ({
+        ...mpState.syncedGameState!,
+        // Preserve peer's local monitor views
+        monitors: prev.monitors,
+      }));
+    }
     if (mpState.syncedRestaurantState !== undefined) setRestaurantState(mpState.syncedRestaurantState);
     if (mpState.syncedEodPhase !== null) setEodPhase(mpState.syncedEodPhase as any);
     if (mpState.syncedPaused !== null) setPaused(mpState.syncedPaused);
@@ -253,7 +259,7 @@ function App() {
   const NEWS_CHANNELS: MonitorChannel[] = ["business_news", "global_news", "social_media"];
 
   const handleChangeChannel = useCallback((monitorId: number, channel: MonitorChannel) => {
-    if (isPeer) { mpActions.sendAction({ type: "change_channel", monitorId, channel }); return; }
+    // Channel changes are always local (each player has their own monitor views)
     setGameState((prev) => {
       let tracker = prev.challengeTracker;
       if (NEWS_CHANNELS.includes(channel)) {
@@ -265,15 +271,15 @@ function App() {
         challengeTracker: tracker,
       };
     });
-  }, [isPeer, mpActions]);
+  }, []);
 
   const handleSelectStock = useCallback((monitorId: number, symbol: string) => {
-    if (isPeer) { mpActions.sendAction({ type: "select_stock", monitorId, symbol }); return; }
+    // Stock selection is always local (each player views their own stocks)
     setGameState((prev) => ({
       ...prev,
       monitors: prev.monitors.map((m) => (m.id === monitorId ? { ...m, selectedStock: symbol } : m)),
     }));
-  }, [isPeer, mpActions]);
+  }, []);
 
   const handleBuy = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "buy_stock", symbol, shares }); return; }
