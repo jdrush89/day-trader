@@ -6,6 +6,7 @@ import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishR
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
+import { selectDailyChallenges, evaluateChallenges, getTicketsEarned, ALL_CHALLENGES } from "./game/challenges";
 import { Monitor } from "./components/Monitor";
 import { TradingPanel } from "./components/TradingPanel";
 import { OrdersPanel } from "./components/OrdersPanel";
@@ -29,7 +30,7 @@ function App() {
   });
 
   const [ordersOpen, setOrdersOpen] = useState(false);
-  const [eodPhase, setEodPhase] = useState<"summary" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
+  const [eodPhase, setEodPhase] = useState<"summary" | "challenges" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
   const [activeMonitorId, setActiveMonitorId] = useState(0);
   const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
@@ -172,10 +173,18 @@ function App() {
         if ((tag === "input" || tag === "select" || tag === "textarea") && !isStockSearch) return;
         if (isStockNav) return;
         e.preventDefault();
-        setGameState((prev) => ({
-          ...prev,
-          monitors: prev.monitors.map((m) => (m.id === activeMonitorId ? { ...m, channel: CHANNEL_KEYS[num - 1] } : m)),
-        }));
+        const newChannel = CHANNEL_KEYS[num - 1];
+        setGameState((prev) => {
+          let tracker = prev.challengeTracker;
+          if (["business_news", "global_news", "social_media"].includes(newChannel)) {
+            tracker = { ...tracker, viewedNews: true };
+          }
+          return {
+            ...prev,
+            monitors: prev.monitors.map((m) => (m.id === activeMonitorId ? { ...m, channel: newChannel } : m)),
+            challengeTracker: tracker,
+          };
+        });
       }
     };
 
@@ -189,11 +198,20 @@ function App() {
     if (!gameState.marketOpen && !gameState.gameOver) saveGame(gameState);
   }, [gameState.marketOpen]);
 
+  const NEWS_CHANNELS: MonitorChannel[] = ["business_news", "global_news", "social_media"];
+
   const handleChangeChannel = useCallback((monitorId: number, channel: MonitorChannel) => {
-    setGameState((prev) => ({
-      ...prev,
-      monitors: prev.monitors.map((m) => (m.id === monitorId ? { ...m, channel } : m)),
-    }));
+    setGameState((prev) => {
+      let tracker = prev.challengeTracker;
+      if (NEWS_CHANNELS.includes(channel)) {
+        tracker = { ...tracker, viewedNews: true };
+      }
+      return {
+        ...prev,
+        monitors: prev.monitors.map((m) => (m.id === monitorId ? { ...m, channel } : m)),
+        challengeTracker: tracker,
+      };
+    });
   }, []);
 
   const handleSelectStock = useCallback((monitorId: number, symbol: string) => {
@@ -410,11 +428,13 @@ function App() {
     setSkipNextRestaurant(false);
     setSpeed(1);
     const marketState = openMarket(nextState);
-    setGameState(marketState);
+
+    // Check if this is a boss day and select daily challenges
+    const isBossDay = isBossDayCheck(marketState.day);
+    const challenges = selectDailyChallenges(marketState.day, isBossDay, false);
+    setGameState({ ...marketState, activeChallenges: challenges });
     setEodPhase("summary");
 
-    // Check if this is a boss day
-    const isBossDay = isBossDayCheck(marketState.day);
     setBossDay(isBossDay);
     setBossView("trading");
     if (isBossDay) {
@@ -454,10 +474,33 @@ function App() {
       beginScheduledDay();
       return;
     }
+    // Evaluate challenges and show results
+    const evaluated = evaluateChallenges(
+      gameState.activeChallenges,
+      gameState.challengeTracker,
+      gameState,
+      restaurantState?.challengeTracker,
+    );
+    const earned = getTicketsEarned(evaluated);
+    setGameState((prev) => ({
+      ...prev,
+      activeChallenges: evaluated,
+      tickets: prev.tickets + earned,
+    }));
+    setEodPhase("challenges");
+  }, [beginScheduledDay, gameState, bossDay, restaurantState]);
+
+  const handleChallengesContinue = useCallback(() => {
+    // After challenges, proceed to upgrades/stocks/restaurant-upgrades/menu-draft or next day
     if (gameState.upgradeDraftOptions.length > 0) setEodPhase("upgrades");
     else if (gameState.stockDraftOptions.length > 0) setEodPhase("stocks");
-    else beginScheduledDay();
-  }, [beginScheduledDay, gameState, bossDay]);
+    else if (gameState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
+    else if (gameState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
+    else {
+      setRestaurantState(null);
+      beginScheduledDay();
+    }
+  }, [beginScheduledDay, gameState]);
 
   const restaurantUpgradeCount = useCallback(
     (upgradeId: string) => gameState.acquiredRestaurantUpgrades.filter((id) => id === upgradeId).length,
@@ -496,15 +539,20 @@ function App() {
 
   const handleRestaurantFinish = useCallback((earnings: number) => {
     const nextState = finishRestaurantDay(gameState, earnings);
-    setGameState(nextState);
-    saveGame(nextState);
-    if (nextState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
-    else if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
-    else {
-      setRestaurantState(null);
-      beginScheduledDay(nextState);
-    }
-  }, [beginScheduledDay, gameState]);
+    // Evaluate challenges (restaurant challenges use the restaurant tracker)
+    const evaluated = evaluateChallenges(
+      nextState.activeChallenges,
+      nextState.challengeTracker,
+      nextState,
+      restaurantState?.challengeTracker,
+    );
+    const earned = getTicketsEarned(evaluated);
+    const challengedState = { ...nextState, activeChallenges: evaluated, tickets: nextState.tickets + earned };
+    setGameState(challengedState);
+    saveGame(challengedState);
+    // Show challenge results before restaurant upgrades
+    setEodPhase("challenges");
+  }, [beginScheduledDay, gameState, restaurantState]);
 
   const handleViewInsider = useCallback(() => {
     setGameState((prev) => {
@@ -659,6 +707,9 @@ function App() {
       setShowTransition(null);
       setSpeed(1);
       setRestaurantState(createRestaurantState(gameState));
+      // Select restaurant challenges for this shift
+      const challenges = selectDailyChallenges(gameState.day, false, true);
+      setGameState((prev) => ({ ...prev, activeChallenges: challenges }));
     };
     return (
       <div className="title-screen" onClick={startShift} onKeyDown={startShift} tabIndex={0} ref={(el) => el?.focus()}>
@@ -709,6 +760,20 @@ function App() {
                   </span>
                 );
               })}
+            </div>
+          )}
+          {gameState.activeChallenges.length > 0 && gameState.marketOpen && (
+            <div className="challenge-indicators">
+              {gameState.activeChallenges.map((ch) => {
+                const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
+                if (!def) return null;
+                return (
+                  <span key={ch.id} className={`challenge-pip ${ch.completed ? "done" : ""}`} data-tooltip={`${def.name}: ${def.description} (${def.tickets}🎟️)`}>
+                    {def.icon}
+                  </span>
+                );
+              })}
+              <span className="ticket-count">🎟️ {gameState.tickets}</span>
             </div>
           )}
           <div className="header-controls">
@@ -764,8 +829,9 @@ function App() {
               onSkipToDay={(day, cash) => {
                 const updated = { ...gameState, day, cash, marketOpen: false, loans: [], milestonePayment: null };
                 const marketState = openMarket(updated);
-                setGameState(marketState);
                 const isBoss = isBossDayCheck(day);
+                const challenges = selectDailyChallenges(day, isBoss, false);
+                setGameState({ ...marketState, activeChallenges: challenges });
                 setBossDay(isBoss);
                 setBossView("trading");
                 if (isBoss) {
@@ -852,6 +918,8 @@ function App() {
           speed={speed}
           onSpeedChange={setSpeed}
           acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
+          activeChallenges={gameState.activeChallenges}
+          tickets={gameState.tickets}
           debugFF={debugFF}
           onDebugFF={() => {
             setRestaurantState((prev) => prev ? { ...prev, shiftTimeRemaining: 0, shiftOver: true } : prev);
@@ -944,6 +1012,47 @@ function App() {
             );
           })()}
 
+          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "challenges" && (
+            <div className="end-of-day-overlay">
+              <div className="end-of-day challenge-results">
+                <h2>🎯 Daily Challenges</h2>
+                <div className="challenge-list">
+                  {gameState.activeChallenges.map((ch) => {
+                    const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
+                    if (!def) return null;
+                    return (
+                      <div key={ch.id} className={`challenge-row ${ch.completed ? "completed" : "failed"}`}>
+                        <span className="challenge-icon">{def.icon}</span>
+                        <div className="challenge-info">
+                          <span className="challenge-name">{def.name}</span>
+                          <span className="challenge-desc">{def.description}</span>
+                        </div>
+                        <span className="challenge-reward">
+                          {ch.completed ? `+${def.tickets} 🎟️` : "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {(() => {
+                  const earned = getTicketsEarned(gameState.activeChallenges);
+                  return earned > 0 ? (
+                    <div className="challenge-total">
+                      <span>Tickets earned: <strong>+{earned} 🎟️</strong></span>
+                      <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                    </div>
+                  ) : (
+                    <div className="challenge-total">
+                      <span>No challenges completed</span>
+                      <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                    </div>
+                  );
+                })()}
+                <button onClick={handleChallengesContinue}>Continue →</button>
+              </div>
+            </div>
+          )}
+
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "upgrades" && (
             <div className="end-of-day-overlay">
               <div className="upgrade-draft">
@@ -1003,6 +1112,8 @@ function App() {
               onSpeedChange={setSpeed}
               acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
               isBossDay={true}
+              activeChallenges={gameState.activeChallenges}
+              tickets={gameState.tickets}
               debugFF={debugFF}
               onDebugFF={() => {
                 setGameState((prev) => {

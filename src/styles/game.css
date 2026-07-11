@@ -3085,3 +3085,110 @@ body {
   min-height: 0;
   overflow: hidden;
 }
+
+/* Challenge indicators in header */
+.challenge-indicators {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+}
+.challenge-pip {
+  font-size: 1.1em;
+  opacity: 0.5;
+  cursor: default;
+  position: relative;
+}
+.challenge-pip.done {
+  opacity: 1;
+  filter: none;
+}
+.challenge-pip[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  z-index: 100;
+  border: 1px solid #333;
+  pointer-events: none;
+  max-width: 250px;
+  white-space: normal;
+}
+.ticket-count {
+  font-size: 0.85rem;
+  color: #ffd700;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+/* Challenge results EOD phase */
+.challenge-results {
+  max-width: 450px;
+}
+.challenge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+.challenge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.challenge-row.completed {
+  border-color: rgba(0, 200, 83, 0.3);
+  background: rgba(0, 200, 83, 0.08);
+}
+.challenge-row.failed {
+  opacity: 0.55;
+}
+.challenge-icon {
+  font-size: 1.4em;
+  flex-shrink: 0;
+}
+.challenge-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.challenge-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.challenge-desc {
+  font-size: 0.78rem;
+  color: #999;
+}
+.challenge-reward {
+  font-weight: bold;
+  font-size: 0.9rem;
+  color: #ffd700;
+  flex-shrink: 0;
+}
+.challenge-row.failed .challenge-reward {
+  color: #666;
+}
+.challenge-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
+}
+.challenge-balance {
+  color: #ffd700;
+}

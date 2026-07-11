@@ -10,6 +10,7 @@ import {
 } from "../game/restaurant-engine";
 import { ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
+import { ALL_CHALLENGES, type ActiveChallenge } from "../game/challenges";
 
 const TICK_MS = 50;
 
@@ -28,6 +29,8 @@ interface RestaurantProps {
   debugFF?: boolean;
   onDebugFF?: () => void;
   isBossDay?: boolean;
+  activeChallenges?: ActiveChallenge[];
+  tickets?: number;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -290,7 +293,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay }: RestaurantProps) {
+export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets }: RestaurantProps) {
   const activeOrder = useMemo(
     () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
     [state.activeOrderId, state.orderSlots],
@@ -389,6 +392,20 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
                   </span>
                 );
               })}
+            </div>
+          )}
+          {activeChallenges && activeChallenges.length > 0 && (
+            <div className="challenge-indicators">
+              {activeChallenges.map((ch) => {
+                const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
+                if (!def) return null;
+                return (
+                  <span key={ch.id} className={`challenge-pip ${ch.completed ? "done" : ""}`} data-tooltip={`${def.name}: ${def.description} (${def.tickets}🎟️)`}>
+                    {def.icon}
+                  </span>
+                );
+              })}
+              <span className="ticket-count">🎟️ {tickets ?? 0}</span>
             </div>
           )}
         </div>

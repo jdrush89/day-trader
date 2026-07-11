@@ -1,4 +1,5 @@
 import { GameState } from "./types";
+import { createRestaurantTracker } from "./challenges";
 import {
   ActiveOrder,
   AssembleIngredient,
@@ -691,6 +692,7 @@ export function createRestaurantState(state: GameState): RestaurantState {
     availableMenu: getAvailableMenu(state),
     acquiredUpgrades: [...state.acquiredRestaurantUpgrades],
     comboStreak: 0,
+    challengeTracker: createRestaurantTracker(),
   };
 
   return spawnOrder(baseState);
@@ -726,6 +728,19 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
     comboStreak: failureOccurred ? 0 : state.comboStreak,
     failedOrders: state.failedOrders + newFailures,
   };
+
+  // Challenge tracking: count active orders and check timer thresholds
+  let tracker = { ...state.challengeTracker };
+  const activeCount = orderSlots.filter((s) => s && !s.failed && !s.served).length;
+  if (activeCount > tracker.maxActiveOrders) tracker.maxActiveOrders = activeCount;
+  // Check if any order's patience went below 50%
+  for (const slot of orderSlots) {
+    if (slot && !slot.failed && !slot.served) {
+      const ratio = slot.patienceRemaining / slot.menuItem.patience;
+      if (ratio < 0.5) tracker.anyTimerBelow50 = true;
+    }
+  }
+  nextState = { ...nextState, challengeTracker: tracker };
 
   if (!shiftOver && hasEmptySlot && nextState.nextOrderTimer <= 0) nextState = spawnOrder(nextState);
   return nextState;
@@ -957,6 +972,14 @@ export function serveOrder(state: RestaurantState, slotIndex: number): Restauran
   const orderSlots = [...state.orderSlots];
   orderSlots[slotIndex] = null;
 
+  // Challenge tracking
+  let tracker = { ...state.challengeTracker };
+  const elapsed = order.menuItem.patience - order.patienceRemaining;
+  if (elapsed <= 3) tracker.fastCompletions++;
+  if (elapsed < 1) tracker.subSecondCompletion = true;
+  if (order.patienceRemaining < 2) tracker.clutchCompletions++;
+  if (tip <= 0) tracker.allTipsPositive = false;
+
   return {
     ...state,
     orderSlots,
@@ -965,6 +988,7 @@ export function serveOrder(state: RestaurantState, slotIndex: number): Restauran
     totalEarnings: Math.round((state.totalEarnings + payout) * 100) / 100,
     totalTips: Math.round((state.totalTips + tip) * 100) / 100,
     comboStreak: nextComboStreak,
+    challengeTracker: tracker,
   };
 }
 

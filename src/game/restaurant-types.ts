@@ -1,3 +1,5 @@
+import type { RestaurantChallengeTracker } from "./challenges";
+
 export type StepType = "grill" | "fry" | "chop" | "mix" | "assemble" | "rhythm" | "hold" | "memorize";
 
 export interface AssembleIngredient {
@@ -120,4 +122,5 @@ export interface RestaurantState {
   availableMenu: MenuItem[];
   acquiredUpgrades: string[];
   comboStreak: number;
+  challengeTracker: RestaurantChallengeTracker;
 }

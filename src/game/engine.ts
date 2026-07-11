@@ -1,6 +1,7 @@
 import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, PendingOrder, OrderSide, OrderType, DailyPrice, InstitutionalOrder, Position, OptionsContract } from "./types";
 import { STOCK_POOL, StockCandidate } from "./stock-pool";
 import { UPGRADE_POOL } from "./upgrades";
+import { TradingChallengeTracker, createTradingTracker } from "./challenges";
 
 // Milestone schedule: day 3, 7, 11, 15... (every 3 trading days, boss days don't count)
 // Boss day schedule: day 4, 8, 12, 16... (day after each milestone)
@@ -225,19 +226,27 @@ export function closeOption(state: GameState, optionId: string): GameState {
   const valuePerContract = currentValue * 100;
 
   let cashDelta: number;
+  let profit: number;
   if (option.side === "long") {
-    // Selling back a long option: receive current value
     cashDelta = valuePerContract * option.contracts;
+    profit = cashDelta - option.premium * option.contracts * 100;
   } else {
-    // Buying back a short option: pay current value
     cashDelta = -valuePerContract * option.contracts;
-    if (state.cash + cashDelta < 0 && cashDelta < 0) return state; // can't afford buyback
+    profit = option.premium * option.contracts * 100 + cashDelta;
+    if (state.cash + cashDelta < 0 && cashDelta < 0) return state;
+  }
+
+  // Challenge tracking
+  let tracker = state.challengeTracker;
+  if (profit > 0) {
+    tracker = { ...tracker, optionsProfit: tracker.optionsProfit + profit };
   }
 
   return {
     ...state,
     cash: state.cash + cashDelta,
     optionsPositions: state.optionsPositions.filter((o) => o.id !== optionId),
+    challengeTracker: tracker,
   };
 }
 
@@ -664,6 +673,27 @@ export function tick(state: GameState): GameState {
     return { ...item, upvotes: newUpvotes, commentCount: newComments, momentum: newMomentum, impact: socialImpact };
   });
 
+  // Challenge: track bad news stocks for contrarian challenge
+  let challengeTracker = workingState.challengeTracker;
+  const prevNewsIds = new Set(workingState.news.map((n) => n.id));
+  const freshNegativeNews = newNews.filter((n) => !prevNewsIds.has(n.id) && n.sentiment === "negative");
+  if (freshNegativeNews.length > 0) {
+    const updatedBadNews = { ...challengeTracker.badNewsStocks };
+    for (const item of freshNegativeNews) {
+      for (const sym of item.affectedStocks ?? []) updatedBadNews[sym] = newTimeOfDay;
+      // Also map affected tags to specific stocks
+      if (item.affectedTags) {
+        for (const tag of item.affectedTags) {
+          for (const s of workingState.stocks) {
+            if (s.tags.includes(tag)) updatedBadNews[s.symbol] = newTimeOfDay;
+          }
+        }
+      }
+    }
+    challengeTracker = { ...challengeTracker, badNewsStocks: updatedBadNews };
+    workingState = { ...workingState, challengeTracker };
+  }
+
   const newStocks = workingState.stocks.map((s) => updateStockPrice(s, newNews));
   const postOrderState = processOrders({ ...workingState, stocks: newStocks, news: newNews, institutionalOrders });
 
@@ -747,6 +777,11 @@ export function togglePinStock(state: GameState, symbol: string): GameState {
   return { ...state, pinnedStocks: pinned };
 }
 
+function addTradedStock(tracker: TradingChallengeTracker, symbol: string): TradingChallengeTracker {
+  if (tracker.tradedStocks.includes(symbol)) return tracker;
+  return { ...tracker, tradedStocks: [...tracker.tradedStocks, symbol] };
+}
+
 export function buyStock(state: GameState, symbol: string, shares: number): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock || shares <= 0) return state;
@@ -763,7 +798,17 @@ export function buyStock(state: GameState, symbol: string, shares: number): Game
   } else {
     newPortfolio = [...state.portfolio, { symbol, shares: totalNewShares, avgCost: cost / totalNewShares, dayAcquired: state.day }];
   }
-  return { ...state, cash: state.cash - cost, portfolio: newPortfolio, recentTrades: pushRecent(state.recentTrades, symbol) };
+
+  // Challenge tracking
+  let tracker = addTradedStock(state.challengeTracker, symbol);
+  tracker = { ...tracker, boughtAny: true, buyPrices: [...tracker.buyPrices, { symbol, price: stock.price }] };
+  // Contrarian: check if buying during bad news window
+  const badNewsTick = tracker.badNewsStocks[symbol];
+  if (badNewsTick !== undefined && state.timeOfDay - badNewsTick <= 10) {
+    tracker = { ...tracker, contrarianBuys: [...tracker.contrarianBuys, { symbol, buyPrice: stock.price }] };
+  }
+
+  return { ...state, cash: state.cash - cost, portfolio: newPortfolio, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
 }
 
 export function sellStock(state: GameState, symbol: string, shares: number): GameState {
@@ -784,7 +829,23 @@ export function sellStock(state: GameState, symbol: string, shares: number): Gam
     const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
     if (insiderShares > 0) insiderRealizedProfit += (stock.price - position.avgCost) * insiderShares;
   }
-  return { ...state, cash: state.cash + cashDelta, portfolio: newPortfolio, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol) };
+
+  // Challenge tracking
+  let tracker = addTradedStock(state.challengeTracker, symbol);
+  tracker = { ...tracker, soldAny: true, sellPrices: [...tracker.sellPrices, { symbol, price: stock.price }] };
+  // Track profit by stock
+  const prevProfit = tracker.profitByStock[symbol] ?? 0;
+  tracker = { ...tracker, profitByStock: { ...tracker.profitByStock, [symbol]: prevProfit + adjustedProfit } };
+  // Track max single trade profit
+  if (adjustedProfit > tracker.maxSingleTradeProfit) {
+    tracker = { ...tracker, maxSingleTradeProfit: adjustedProfit };
+  }
+  // Track tech profit
+  if (stock.tags.includes("tech") && adjustedProfit > 0) {
+    tracker = { ...tracker, techProfit: tracker.techProfit + adjustedProfit };
+  }
+
+  return { ...state, cash: state.cash + cashDelta, portfolio: newPortfolio, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
 }
 
 export function shortStock(state: GameState, symbol: string, shares: number): GameState {
@@ -799,7 +860,8 @@ export function shortStock(state: GameState, symbol: string, shares: number): Ga
     const totalEntry = existing.entryPrice * existing.shares + stock.price * shares;
     newShorts = state.shorts.map((p) => p.symbol === symbol ? { ...p, shares: totalShares, entryPrice: totalEntry / totalShares } : p);
   } else newShorts = [...state.shorts, { symbol, shares, entryPrice: stock.price }];
-  return { ...state, cash: state.cash - collateral, shorts: newShorts, recentTrades: pushRecent(state.recentTrades, symbol) };
+  const tracker = addTradedStock(state.challengeTracker, symbol);
+  return { ...state, cash: state.cash - collateral, shorts: newShorts, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
 }
 
 export function coverShort(state: GameState, symbol: string, shares: number): GameState {
@@ -819,12 +881,24 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
     const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
     if (insiderShares > 0) insiderRealizedProfit += (position.entryPrice - stock.price) * insiderShares;
   }
-  return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol) };
+
+  // Challenge tracking
+  let tracker = addTradedStock(state.challengeTracker, symbol);
+  const prevProfit = tracker.profitByStock[symbol] ?? 0;
+  tracker = { ...tracker, profitByStock: { ...tracker.profitByStock, [symbol]: prevProfit + profit } };
+  if (profit > tracker.maxSingleTradeProfit) {
+    tracker = { ...tracker, maxSingleTradeProfit: profit };
+  }
+  if (stock.tags.includes("tech") && profit > 0) {
+    tracker = { ...tracker, techProfit: tracker.techProfit + profit };
+  }
+
+  return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
 }
 
 export function openMarket(state: GameState): GameState {
   const netWorth = getNetWorth(state);
-  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [] };
+  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [], challengeTracker: createTradingTracker() };
 }
 
 export function acquireUpgrade(state: GameState, upgradeId: string): GameState {
@@ -896,16 +970,12 @@ export function processOrders(state: GameState): GameState {
     let shouldFill = false;
 
     if (order.orderType === "limit") {
-      // Limit buy/short: fill when price drops to or below limit
-      // Limit sell/cover: fill when price rises to or above limit
       if (order.side === "buy" || order.side === "short") {
         shouldFill = stock.price <= (order.limitPrice ?? 0);
       } else {
         shouldFill = stock.price >= (order.limitPrice ?? Infinity);
       }
     } else if (order.orderType === "stop-loss") {
-      // Stop-loss sell: triggers when price drops to stop price
-      // Stop-loss cover: triggers when price rises to stop price
       if (order.side === "sell") {
         shouldFill = stock.price <= (order.stopPrice ?? 0);
       } else if (order.side === "cover") {
@@ -914,11 +984,29 @@ export function processOrders(state: GameState): GameState {
     }
 
     if (shouldFill) {
+      // Track limit order profit by comparing cash before and after
+      const cashBefore = newState.cash;
+      const portfolioValueBefore = getPortfolioValue(newState) + getShortCollateral(newState);
       switch (order.side) {
         case "buy": newState = buyStock(newState, order.symbol, order.shares); break;
         case "sell": newState = sellStock(newState, order.symbol, order.shares); break;
         case "short": newState = shortStock(newState, order.symbol, order.shares); break;
         case "cover": newState = coverShort(newState, order.symbol, order.shares); break;
+      }
+      // For sell/cover limit orders, track the profit earned
+      if (order.orderType === "limit" && (order.side === "sell" || order.side === "cover")) {
+        const cashAfter = newState.cash;
+        const portfolioValueAfter = getPortfolioValue(newState) + getShortCollateral(newState);
+        const netDelta = (cashAfter + portfolioValueAfter) - (cashBefore + portfolioValueBefore);
+        if (netDelta > 0) {
+          newState = {
+            ...newState,
+            challengeTracker: {
+              ...newState.challengeTracker,
+              limitOrderProfit: newState.challengeTracker.limitOrderProfit + netDelta,
+            },
+          };
+        }
       }
     } else {
       remainingOrders.push(order);

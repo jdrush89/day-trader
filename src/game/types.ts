@@ -1,4 +1,5 @@
 import type { MenuItem } from "./restaurant-types";
+import type { TradingChallengeTracker, ActiveChallenge } from "./challenges";
 
 export type HistoryRange = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "MAX";
 
@@ -168,4 +169,7 @@ export interface GameState {
   pinnedStocks: string[];
   institutionalOrders: InstitutionalOrder[];
   optionsPositions: OptionsContract[];
+  challengeTracker: TradingChallengeTracker;
+  activeChallenges: ActiveChallenge[];
+  tickets: number;
 }

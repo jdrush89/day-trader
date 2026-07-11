@@ -1,4 +1,5 @@
 import { GameState, Stock, DailyPrice } from "./types";
+import { createTradingTracker, selectDailyChallenges } from "./challenges";
 
 function seededRandom(seed: number): () => number {
   let s = seed;
@@ -88,5 +89,8 @@ export function createInitialState(): GameState {
     pinnedStocks: [],
     institutionalOrders: [],
     optionsPositions: [],
+    challengeTracker: createTradingTracker(),
+    activeChallenges: selectDailyChallenges(1, false, false),
+    tickets: 0,
   };
 }

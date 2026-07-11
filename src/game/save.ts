@@ -1,4 +1,5 @@
 import { GameState } from "./types";
+import { createTradingTracker } from "./challenges";
 
 const SAVE_KEY = "rogue-day-trader-save";
 const SAVE_VERSION = 1;
@@ -29,7 +30,12 @@ export function loadGame(): GameState | null {
     const data: SaveData = JSON.parse(raw);
     if (data.version !== SAVE_VERSION) return null;
     if (!data.gameState || typeof data.gameState.day !== "number") return null;
-    return data.gameState;
+    // Backfill challenge fields for older saves
+    const gs = data.gameState;
+    if (!gs.challengeTracker) gs.challengeTracker = createTradingTracker();
+    if (!gs.activeChallenges) gs.activeChallenges = [];
+    if (gs.tickets == null) gs.tickets = 0;
+    return gs;
   } catch {
     return null;
   }
