@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.42";
+const GAME_VERSION = "0.0.43";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -59,6 +59,7 @@ function App() {
   const [localUpgrades, setLocalUpgrades] = useState<string[]>([]); // per-player trading upgrades (MP only)
   const [localRestaurantUpgrades, setLocalRestaurantUpgrades] = useState<string[]>([]); // per-player restaurant upgrades (MP only)
   const [challengeReadyPlayers, setChallengeReadyPlayers] = useState<Set<string>>(new Set()); // players who clicked "start" on challenge intro
+  const [resumeReadyPlayers, setResumeReadyPlayers] = useState<Set<string>>(new Set()); // players who clicked "resume" after pause
   const [mpSaveId, setMpSaveId] = useState<string | null>(null); // current MP save ID for auto-save
   const mpSaveIdRef = useRef<string | null>(null);
   mpSaveIdRef.current = mpSaveId;
@@ -105,8 +106,18 @@ function App() {
           return next;
         });
       },
+      onResumeReady: (playerId: string) => {
+        setResumeReadyPlayers((prev) => {
+          const next = new Set(prev);
+          next.add(playerId);
+          return next;
+        });
+      },
       onSetSpeed: setSpeed,
-      onTogglePause: () => setPaused((p) => !p),
+      onTogglePause: () => {
+        // In MP, toggle_pause only pauses. Unpausing requires all players to click resume.
+        setPaused(true);
+      },
       onChooseUpgrade: (id) => { const nextState = acquireUpgrade(gameState, id); if (nextState.stockDraftOptions.length > 0) { setGameState(nextState); setEodPhase("stocks"); } else { setGameState(nextState); setEodPhase("summary"); } },
       onChooseStock: (symbol) => { setGameState(draftStock(gameState, symbol)); setEodPhase("summary"); },
       onChooseRestaurantUpgrade: (id) => { const nextState = acquireRestaurantUpgrade(gameState, id); setGameState(nextState); if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft"); else setEodPhase("summary"); },
@@ -148,7 +159,7 @@ function App() {
         setPaused(sync.paused);
         setSpeed(sync.speed);
         setBossDay(sync.bossDay);
-        setBossView(sync.bossView as any);
+        // Don't sync bossView — each player toggles independently
         // Update peer's local activeOrderId from host's tracking
         if (sync.playerActiveOrders && mpState.localPlayer) {
           const myActiveOrder = sync.playerActiveOrders[mpState.localPlayer.id];
@@ -261,6 +272,23 @@ function App() {
       setChallengeReadyPlayers(new Set());
     }
   }, [challengeReadyPlayers, isMultiplayer, showChallengeIntro, mpState.players.length]);
+
+  // Resume gate: reset when pause starts, unpause when all players click resume
+  useEffect(() => {
+    if (isMultiplayer && paused && !showChallengeIntro && !showLoanOffer && !disconnectedPlayer) {
+      setResumeReadyPlayers(new Set());
+    }
+  }, [paused]);
+
+  useEffect(() => {
+    if (!isMultiplayer || !paused) return;
+    const totalPlayers = mpState.players.length;
+    if (totalPlayers < 2) return;
+    if (resumeReadyPlayers.size >= totalPlayers) {
+      setPaused(false);
+      setResumeReadyPlayers(new Set());
+    }
+  }, [resumeReadyPlayers, isMultiplayer, paused, mpState.players.length]);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -505,9 +533,36 @@ function App() {
   }, [isPeer, mpActions]);
 
   const handleTogglePause = useCallback(() => {
-    if (isPeer) { mpActions.sendAction({ type: "toggle_pause" }); return; }
+    if (isMultiplayer) {
+      if (isPeer) {
+        // Peer can only pause (sends to host) or signal resume ready
+        if (!paused) {
+          mpActions.sendAction({ type: "toggle_pause" });
+        } else {
+          // Peer clicks resume — signal ready
+          mpActions.sendAction({ type: "resume_ready" });
+          setResumeReadyPlayers((prev) => {
+            const next = new Set(prev);
+            next.add(mpState.localPlayer?.id ?? "");
+            return next;
+          });
+        }
+      } else {
+        // Host: pause or signal resume ready
+        if (!paused) {
+          setPaused(true);
+        } else {
+          setResumeReadyPlayers((prev) => {
+            const next = new Set(prev);
+            next.add("host");
+            return next;
+          });
+        }
+      }
+      return;
+    }
     setPaused((p) => !p);
-  }, [isPeer, mpActions]);
+  }, [isPeer, isMultiplayer, mpActions, paused, mpState.localPlayer]);
 
   const handleTradingTutorialStep = useCallback((step: TutorialStep) => {
     // Handle actions
@@ -1309,7 +1364,14 @@ function App() {
           ) : (
             <div className="pause-menu">
               <h2>⏸ Paused</h2>
-              <button className="pause-menu-btn resume" onClick={() => { setShowOptions(null); setPaused(false); }}>Resume</button>
+              <button className="pause-menu-btn resume" onClick={() => {
+                setShowOptions(null);
+                if (isMultiplayer) {
+                  handleTogglePause(); // signals resume ready
+                } else {
+                  setPaused(false);
+                }
+              }}>{isMultiplayer && resumeReadyPlayers.has(isPeer ? (mpState.localPlayer?.id ?? "") : "host") ? "Waiting for players..." : "Resume"}</button>
               <button className="pause-menu-btn" onClick={() => setShowOptions("pause")}>Options</button>
             <button className="pause-menu-btn save-quit" onClick={() => {
               doSave(gameState, "manual");

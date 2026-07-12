@@ -38,6 +38,7 @@ export type PeerAction =
   | { type: "decline_loan" }
   | { type: "dismiss_transition" }
   | { type: "dismiss_challenge_intro" }
+  | { type: "resume_ready" }
   | { type: "set_speed"; speed: number }
   | { type: "toggle_pause" }
   | { type: "view_insider" };
