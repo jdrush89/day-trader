@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.37";
+const GAME_VERSION = "0.0.38";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -129,10 +129,10 @@ function App() {
           return merged;
         });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
-        // Don't override local EOD phase during upgrade/stock picking
+        // Don't override local EOD phase during upgrade/stock/restaurant picking
         setEodPhase((prev) => {
-          const localPicking = prev === "upgrades" || prev === "stocks";
-          const hostPicking = sync.eodPhase === "upgrades" || sync.eodPhase === "stocks";
+          const localPicking = prev === "upgrades" || prev === "stocks" || prev === "restaurant-upgrades" || prev === "menu-draft";
+          const hostPicking = sync.eodPhase === "upgrades" || sync.eodPhase === "stocks" || sync.eodPhase === "restaurant-upgrades" || sync.eodPhase === "menu-draft";
           // If peer is locally picking, only accept phase change if host moves to a non-picking phase (e.g., summary = next day started)
           if (localPicking && hostPicking) return prev;
           if (prev !== sync.eodPhase) setEodChoiceMade(false);
@@ -236,6 +236,11 @@ function App() {
     peerMenuDraftGenerated.current = gameState.day;
     setGameState((prev) => generateMenuDraft(prev));
   }, [isPeer, eodPhase, gameState.day]);
+
+  // Reset challenge ready state when a new challenge intro appears
+  useEffect(() => {
+    if (showChallengeIntro) setChallengeReadyPlayers(new Set());
+  }, [showChallengeIntro]);
 
   // Challenge intro gate: when all players clicked "start", dismiss the challenge intro
   useEffect(() => {
