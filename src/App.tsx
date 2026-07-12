@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.21";
+const GAME_VERSION = "0.0.22";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -795,6 +795,9 @@ function App() {
     setTitleTutorial(null);
     setMenuFocusIndex(-1);
     setEodPhase("summary");
+    setShowOptions(null);
+    setShowChallengeIntro(null);
+    setPaused(false);
   }, []);
 
   const formatMarketTime = (pct: number): string => {
