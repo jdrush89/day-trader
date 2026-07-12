@@ -131,24 +131,25 @@ export class NetworkManager {
   // Send to a specific peer via WebRTC data channel
   send(peerId: string, message: NetworkMessage): void {
     const peer = this.peers.get(peerId);
-    if (peer && !peer.destroyed) {
+    if (peer && !peer.destroyed && peer.connected) {
       try {
         console.log("[MP] Sending to", peerId, (message as any).type);
         peer.send(JSON.stringify(message));
       } catch (e) {
         console.warn("[MP] Failed to send to", peerId, e);
       }
+    } else if (peer && !peer.destroyed) {
+      console.warn("[MP] Peer not yet connected:", peerId);
     } else {
-      console.warn("[MP] No peer found for", peerId, "peers:", Array.from(this.peers.keys()));
+      console.warn("[MP] No peer found for", peerId);
     }
   }
 
   // Broadcast to all connected peers
   broadcast(message: NetworkMessage): void {
     const data = JSON.stringify(message);
-    console.log("[MP] Broadcasting", (message as any).type, "to", this.peers.size, "peers");
     for (const [id, peer] of this.peers) {
-      if (!peer.destroyed) {
+      if (!peer.destroyed && peer.connected) {
         try {
           peer.send(data);
         } catch (e) {
@@ -161,7 +162,7 @@ export class NetworkManager {
   // Send to host (peer only) — the first connected peer is the host
   sendToHost(message: NetworkMessage): void {
     const firstPeer = this.peers.values().next().value;
-    if (firstPeer && !firstPeer.destroyed) {
+    if (firstPeer && !firstPeer.destroyed && firstPeer.connected) {
       try {
         firstPeer.send(JSON.stringify(message));
       } catch (e) {
@@ -248,7 +249,26 @@ export class NetworkManager {
         iceServers: [
           { urls: "stun:stun.l.google.com:19302" },
           { urls: "stun:stun1.l.google.com:19302" },
-          { urls: "stun:stun2.l.google.com:19302" },
+          {
+            urls: "turn:openrelay.metered.ca:80",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turn:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
+          {
+            urls: "turns:openrelay.metered.ca:443?transport=tcp",
+            username: "openrelayproject",
+            credential: "openrelayproject",
+          },
         ],
       },
     });

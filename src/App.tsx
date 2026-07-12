@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.25";
+const GAME_VERSION = "0.0.26";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
