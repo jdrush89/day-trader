@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft } from "./game/engine";
 import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
@@ -719,10 +719,6 @@ function App() {
     }
   }, [beginScheduledDay, gameState, isMultiplayer, mpActions]);
 
-  const restaurantUpgradeCount = useCallback(
-    (upgradeId: string) => gameState.acquiredRestaurantUpgrades.filter((id) => id === upgradeId).length,
-    [gameState.acquiredRestaurantUpgrades],
-  );
 
   const handleAcquireUpgrade = useCallback((upgradeId: string) => {
     if (isMultiplayer) {
@@ -888,8 +884,6 @@ function App() {
     return `${displayHour}:${mins.toString().padStart(2, "0")} ${ampm}`;
   };
 
-  const showAnalystRating = isMultiplayer ? effectiveHasUpgrade("analyst_ratings") : hasUpgrade(gameState, "analyst_ratings");
-  const showDarkPool = isMultiplayer ? effectiveHasUpgrade("dark_pool") : hasUpgrade(gameState, "dark_pool");
   const isRestaurantShift = restaurantState !== null && !bossDay;
 
   // In multiplayer, use per-player upgrades; in single-player, use shared state
@@ -898,6 +892,9 @@ function App() {
   const effectiveHasUpgrade = (id: string) => effectiveUpgrades.includes(id);
   const effectiveUpgradeCount = (id: string) => effectiveUpgrades.filter((u) => u === id).length;
   const effectiveRestaurantUpgradeCount = (id: string) => effectiveRestaurantUpgrades.filter((u) => u === id).length;
+
+  const showAnalystRating = isMultiplayer ? effectiveHasUpgrade("analyst_ratings") : hasUpgrade(gameState, "analyst_ratings");
+  const showDarkPool = isMultiplayer ? effectiveHasUpgrade("dark_pool") : hasUpgrade(gameState, "dark_pool");
 
   // Multiplayer lobby overlay — but close it when game starts for peers
   if (showMultiplayerLobby && !(isPeer && mpState.gameStarted)) {

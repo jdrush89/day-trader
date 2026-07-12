@@ -131,7 +131,7 @@ export class NetworkManager {
   // Send to a specific peer via WebRTC data channel
   send(peerId: string, message: NetworkMessage): void {
     const peer = this.peers.get(peerId);
-    if (peer && !peer.destroyed && peer.connected) {
+    if (peer && !peer.destroyed && (peer as any).connected) {
       try {
         console.log("[MP] Sending to", peerId, (message as any).type);
         peer.send(JSON.stringify(message));
@@ -149,7 +149,7 @@ export class NetworkManager {
   broadcast(message: NetworkMessage): void {
     const data = JSON.stringify(message);
     for (const [id, peer] of this.peers) {
-      if (!peer.destroyed && peer.connected) {
+      if (!peer.destroyed && (peer as any).connected) {
         try {
           peer.send(data);
         } catch (e) {
@@ -162,7 +162,7 @@ export class NetworkManager {
   // Send to host (peer only) — the first connected peer is the host
   sendToHost(message: NetworkMessage): void {
     const firstPeer = this.peers.values().next().value;
-    if (firstPeer && !firstPeer.destroyed && firstPeer.connected) {
+    if (firstPeer && !firstPeer.destroyed && (firstPeer as any).connected) {
       try {
         firstPeer.send(JSON.stringify(message));
       } catch (e) {
