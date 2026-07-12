@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.33";
+const GAME_VERSION = "0.0.34";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1343,10 +1343,9 @@ function App() {
               <button className="pause-menu-btn resume" onClick={() => {
                 if (isMultiplayer) {
                   const myId = mpState.localPlayer?.id ?? "host";
+                  setChallengeReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
                   if (isPeer) {
                     mpActions.sendAction({ type: "dismiss_challenge_intro" } as any);
-                  } else {
-                    setChallengeReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
                   }
                 } else {
                   setShowChallengeIntro(null);
@@ -1765,10 +1764,9 @@ function App() {
             <button className="pause-menu-btn resume" onClick={() => {
               if (isMultiplayer) {
                 const myId = mpState.localPlayer?.id ?? "host";
+                setChallengeReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
                 if (isPeer) {
                   mpActions.sendAction({ type: "dismiss_challenge_intro" } as any);
-                } else {
-                  setChallengeReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
                 }
               } else {
                 setShowChallengeIntro(null);
