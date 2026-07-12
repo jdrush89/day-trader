@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.35";
+const GAME_VERSION = "0.0.36";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -157,23 +157,8 @@ function App() {
         setDisconnectedPlayer(playerName);
         setPaused(true);
       },
-      onAllUpgradesChosen: (choices) => {
-        // Each player's upgrade applies only to them (stored locally)
-        const myId = mpState.localPlayer?.id ?? "host";
-        const myChoice = choices.find((c) => c.playerId === myId);
-        if (myChoice) {
-          setLocalUpgrades((prev) => [...prev, myChoice.upgradeId]);
-          // Handle special upgrades that affect shared state (monitor, golden_parachute)
-          const upgrade = UPGRADE_POOL.find((u) => u.id === myChoice.upgradeId);
-          if (upgrade) {
-            if (myChoice.upgradeId === "monitor") {
-              setGameState((prev) => prev.monitors.length < 3 ? { ...prev, monitors: [...prev.monitors, { id: prev.monitors.length, channel: "business_news" as any }] } : prev);
-            }
-            if (myChoice.upgradeId === "golden_parachute") {
-              setGameState((prev) => ({ ...prev, goldenParachutes: prev.goldenParachutes + 1 }));
-            }
-          }
-        }
+      onAllUpgradesChosen: (_choices) => {
+        // Upgrades are now stored locally in handleDraftStock — nothing to do here
       },
       onAllStocksChosen: (choices) => {
         // Apply all stocks and advance to next day
@@ -187,24 +172,8 @@ function App() {
         });
         setEodChoiceMade(false);
       },
-      onAllRestaurantUpgradesChosen: (choices) => {
-        // Each player's restaurant upgrade applies only to them (stored locally)
-        const myId = mpState.localPlayer?.id ?? "host";
-        const myChoice = choices.find((c) => c.playerId === myId);
-        if (myChoice) {
-          setLocalRestaurantUpgrades((prev) => [...prev, myChoice.upgradeId]);
-        }
-        setEodChoiceMade(false);
-        // Move to menu-draft if available, else advance to trading
-        setGameState((prev) => {
-          if (prev.menuDraftOptions.length > 0) {
-            setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
-            return prev;
-          }
-          setRestaurantState(null);
-          setTimeout(() => beginScheduledDayRef.current(prev, { skipRestaurantTransition: true }), 0);
-          return prev;
-        });
+      onAllRestaurantUpgradesChosen: (_choices) => {
+        // Restaurant upgrades are now stored locally in handleAcquireRestaurantUpgrade
       },
       onAllMenuItemsChosen: (choices) => {
         // All menu items get added to shared pool
@@ -803,6 +772,17 @@ function App() {
     if (isMultiplayer) {
       // Submit both upgrade + stock choices together
       const upgradeId = mpUpgradeChoice;
+      // Store upgrade locally (per-player) immediately
+      if (upgradeId) {
+        setLocalUpgrades((prev) => [...prev, upgradeId]);
+        // Handle special upgrades that affect shared state
+        if (upgradeId === "monitor") {
+          setGameState((prev) => prev.monitors.length < 3 ? { ...prev, monitors: [...prev.monitors, { id: prev.monitors.length, channel: "business_news" as any }] } : prev);
+        }
+        if (upgradeId === "golden_parachute") {
+          setGameState((prev) => ({ ...prev, goldenParachutes: prev.goldenParachutes + 1 }));
+        }
+      }
       if (isPeer) {
         if (upgradeId) mpActions.sendAction({ type: "choose_upgrade", upgradeId });
         mpActions.sendAction({ type: "choose_stock", symbol });
