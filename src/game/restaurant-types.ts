@@ -123,4 +123,8 @@ export interface RestaurantState {
   acquiredUpgrades: string[];
   comboStreak: number;
   challengeTracker: RestaurantChallengeTracker;
+  // Multiplayer counter system
+  numCounters: number; // 1 for single player, N for multiplayer
+  slotsPerCounter: number; // typically 5 (or 6 with upgrade)
+  playerFocus: Record<string, number | null>; // playerId → activeOrderId they're focused on
 }

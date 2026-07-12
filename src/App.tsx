@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.16";
+const GAME_VERSION = "0.0.17";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -51,6 +51,8 @@ function App() {
   const [showMultiplayerLobby, setShowMultiplayerLobby] = useState(false);
   const [eodChoiceMade, setEodChoiceMade] = useState(false); // local player submitted their EOD choice
   const [mpUpgradeChoice, setMpUpgradeChoice] = useState<string | null>(null); // track upgrade pick locally in MP
+  const [myCounter, setMyCounter] = useState(0); // which restaurant counter the local player is viewing
+  const [peerActiveOrderId, setPeerActiveOrderId] = useState<number | null>(null); // peer's local active order
   const beginScheduledDayRef = useRef<(state?: GameState) => void>(() => {});
 
   // Multiplayer hook
@@ -109,6 +111,11 @@ function App() {
         setSpeed(sync.speed);
         setBossDay(sync.bossDay);
         setBossView(sync.bossView as any);
+        // Update peer's local activeOrderId from host's tracking
+        if (sync.playerActiveOrders && mpState.localPlayer) {
+          const myActiveOrder = sync.playerActiveOrders[mpState.localPlayer.id];
+          if (myActiveOrder !== undefined) setPeerActiveOrderId(myActiveOrder);
+        }
       },
       onEodAllReady: () => {
         // All players have chosen — unblock the peer's EOD state so sync can resume
@@ -580,7 +587,7 @@ function App() {
     setBossView("trading");
     if (isBossDay) {
       lastBossEarningsRef.current = 0;
-      const rs = createRestaurantState(marketState);
+      const rs = createRestaurantState(marketState, isMultiplayer ? mpState.players.length : 1);
       setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
       const milestoneNum = marketState.day / 4;
       const requiredProfit = 300 + (milestoneNum - 1) * 100;
@@ -909,8 +916,8 @@ function App() {
     const startShift = () => {
       setShowTransition(null);
       setSpeed(1);
-      setRestaurantState(createRestaurantState(gameState));
-      // Select restaurant challenges for this shift
+      setMyCounter(0);
+      setRestaurantState(createRestaurantState(gameState, isMultiplayer ? mpState.players.length : 1));
       const challenges = selectDailyChallenges(gameState.day, false, true);
       setGameState((prev) => ({ ...prev, activeChallenges: challenges }));
     };
@@ -1039,7 +1046,7 @@ function App() {
                 setBossView("trading");
                 if (isBoss) {
                   lastBossEarningsRef.current = 0;
-                  const rs = createRestaurantState(marketState);
+                  const rs = createRestaurantState(marketState, isMultiplayer ? mpState.players.length : 1);
                   setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
                   const milestoneNum = day / 4;
                   const requiredProfit = 300 + (milestoneNum - 1) * 100;
@@ -1132,6 +1139,12 @@ function App() {
           onPeerKey={(key) => mpActions.sendAction({ type: "restaurant_key", key })}
           onPeerKeyUp={(key) => mpActions.sendAction({ type: "restaurant_key_up", key })}
           onPeerMouse={(x, y) => mpActions.sendAction({ type: "restaurant_mouse", x, y })}
+          currentCounter={myCounter}
+          onSwitchCounter={(c) => {
+            setMyCounter(c);
+            if (isPeer) mpActions.sendAction({ type: "switch_counter", counter: c });
+          }}
+          localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
         />
       ) : (
         <>
@@ -1346,8 +1359,14 @@ function App() {
               }}
               isPeer={isPeer}
               onPeerKey={(key) => mpActions.sendAction({ type: "restaurant_key", key })}
-          onPeerKeyUp={(key) => mpActions.sendAction({ type: "restaurant_key_up", key })}
+              onPeerKeyUp={(key) => mpActions.sendAction({ type: "restaurant_key_up", key })}
               onPeerMouse={(x, y) => mpActions.sendAction({ type: "restaurant_mouse", x, y })}
+              currentCounter={myCounter}
+              onSwitchCounter={(c) => {
+                setMyCounter(c);
+                if (isPeer) mpActions.sendAction({ type: "switch_counter", counter: c });
+              }}
+              localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
             />
             </div>
           ) : (

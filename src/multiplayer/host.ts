@@ -52,6 +52,10 @@ export class MultiplayerHost {
   private stockChoices: Map<string, string> = new Map(); // playerId → symbol
   private _eodWaitingFor: string[] = []; // player names still choosing
 
+  // Per-player restaurant state
+  private playerActiveOrder: Map<string, number | null> = new Map(); // playerId → activeOrderId
+  private playerCounter: Map<string, number> = new Map(); // playerId → current counter index
+
   constructor(callbacks: HostCallbacks) {
     this.callbacks = callbacks;
     this._roomCode = generateRoomCode();
@@ -76,6 +80,34 @@ export class MultiplayerHost {
 
   setHostPlayer(player: Player): void {
     this._hostPlayer = player;
+  }
+
+  // Restaurant counter system
+  getPlayerCounter(playerId: string): number {
+    return this.playerCounter.get(playerId) ?? 0;
+  }
+
+  setPlayerCounter(playerId: string, counter: number): void {
+    this.playerCounter.set(playerId, counter);
+  }
+
+  getPlayerActiveOrder(playerId: string): number | null {
+    return this.playerActiveOrder.get(playerId) ?? null;
+  }
+
+  setPlayerActiveOrder(playerId: string, orderId: number | null): void {
+    this.playerActiveOrder.set(playerId, orderId);
+    // Update playerFocus in restaurant state
+    this.callbacks.setRestaurantState((prev) => {
+      if (!prev) return prev;
+      return { ...prev, playerFocus: { ...prev.playerFocus, [playerId]: orderId } };
+    });
+  }
+
+  // Get host's own active order (from playerActiveOrder map, not restaurantState.activeOrderId)
+  getHostActiveOrder(): number | null {
+    if (!this._hostPlayer) return null;
+    return this.playerActiveOrder.get(this._hostPlayer.id) ?? null;
   }
 
   // Called when EOD phase starts — resets tracking
@@ -135,10 +167,20 @@ export class MultiplayerHost {
   }
 
   private broadcastState(): void {
+    let rs = this.callbacks.getRestaurantState();
+    // Build playerActiveOrders including host's own
+    const activeOrders: Record<string, number | null> = Object.fromEntries(this.playerActiveOrder);
+    if (this._hostPlayer) {
+      activeOrders[this._hostPlayer.id] = rs?.activeOrderId ?? null;
+    }
+    // Write playerFocus into restaurant state for UI rendering
+    if (rs) {
+      rs = { ...rs, playerFocus: activeOrders };
+    }
     const sync: GameSync = {
       type: "game_sync",
       gameState: this.callbacks.getGameState(),
-      restaurantState: this.callbacks.getRestaurantState(),
+      restaurantState: rs,
       eodPhase: this.callbacks.getEodPhase(),
       paused: this.callbacks.getPaused(),
       speed: this.callbacks.getSpeed(),
@@ -147,6 +189,7 @@ export class MultiplayerHost {
       showTransition: this.callbacks.getShowTransition(),
       players: this.playerList,
       recentActions: this.actionFeed.slice(0, 5),
+      playerActiveOrders: activeOrders,
     };
     this.network.broadcast(sync);
   }
@@ -277,32 +320,55 @@ export class MultiplayerHost {
           if (!prev || prev.shiftOver) return prev;
           const order = prev.orderSlots[action.slotIndex];
           if (!order) return prev;
-          return order.completed ? serveOrder(prev, action.slotIndex) : acceptOrder(prev, action.slotIndex);
+          // Use player's active order context
+          const withPlayerActive = { ...prev, activeOrderId: this.getPlayerActiveOrder(player.id) };
+          const result = order.completed ? serveOrder(withPlayerActive, action.slotIndex) : acceptOrder(withPlayerActive, action.slotIndex);
+          this.setPlayerActiveOrder(player.id, result.activeOrderId);
+          return { ...result, activeOrderId: prev.activeOrderId };
         });
         break;
+      case "switch_counter": {
+        const numCounters = this.callbacks.getRestaurantState()?.numCounters ?? 1;
+        if (action.counter >= 0 && action.counter < numCounters) {
+          this.setPlayerCounter(player.id, action.counter);
+        }
+        break;
+      }
       case "restaurant_key": {
-        // Process the key press through restaurant engine on the host
+        // Process the key press through restaurant engine using player's own activeOrderId
         const key = action.key;
         this.callbacks.setRestaurantState((prev) => {
           if (!prev || prev.shiftOver) return prev;
+          const playerActiveId = this.getPlayerActiveOrder(player.id);
+          const playerCounterIdx = this.getPlayerCounter(player.id);
+          const withPlayerActive = { ...prev, activeOrderId: playerActiveId };
+
           const slotNumber = Number.parseInt(key, 10);
-          if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= prev.orderSlots.length) {
-            const slotIndex = slotNumber - 1;
-            const order = prev.orderSlots[slotIndex];
+          if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= prev.slotsPerCounter) {
+            // Map local slot number to global index based on player's current counter
+            const globalIndex = playerCounterIdx * prev.slotsPerCounter + (slotNumber - 1);
+            const order = prev.orderSlots[globalIndex];
             if (!order) return prev;
-            return order.completed ? serveOrder(prev, slotIndex) : acceptOrder(prev, slotIndex);
+            const result = order.completed ? serveOrder(withPlayerActive, globalIndex) : acceptOrder(withPlayerActive, globalIndex);
+            this.setPlayerActiveOrder(player.id, result.activeOrderId);
+            return { ...result, activeOrderId: prev.activeOrderId };
           }
           if (key === "ArrowLeft" || key === "ArrowRight") {
-            return handleChopKey(prev, key === "ArrowLeft" ? "left" : "right");
+            const result = handleChopKey(withPlayerActive, key === "ArrowLeft" ? "left" : "right");
+            this.setPlayerActiveOrder(player.id, result.activeOrderId);
+            return { ...result, activeOrderId: prev.activeOrderId };
           }
           if (key === "Enter") {
-            const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
+            const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === playerActiveId);
             const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
-            if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex);
-            return handleKeyPress(prev, key);
+            const result = currentOrder?.completed ? serveOrder(withPlayerActive, activeSlotIndex) : handleKeyPress(withPlayerActive, key);
+            this.setPlayerActiveOrder(player.id, result.activeOrderId);
+            return { ...result, activeOrderId: prev.activeOrderId };
           }
           if (/^[a-zA-Z]$/.test(key) || key === " ") {
-            return handleKeyPress(prev, key);
+            const result = handleKeyPress(withPlayerActive, key);
+            this.setPlayerActiveOrder(player.id, result.activeOrderId);
+            return { ...result, activeOrderId: prev.activeOrderId };
           }
           return prev;
         });
@@ -312,7 +378,10 @@ export class MultiplayerHost {
         this.callbacks.setRestaurantState((prev) => {
           if (!prev || prev.shiftOver) return prev;
           if (/^[a-zA-Z]$/.test(action.key)) {
-            return handleKeyUp(prev, action.key);
+            const playerActiveId = this.getPlayerActiveOrder(player.id);
+            const withPlayerActive = { ...prev, activeOrderId: playerActiveId };
+            const result = handleKeyUp(withPlayerActive, action.key);
+            return { ...result, activeOrderId: prev.activeOrderId };
           }
           return prev;
         });
@@ -320,7 +389,10 @@ export class MultiplayerHost {
       case "restaurant_mouse":
         this.callbacks.setRestaurantState((prev) => {
           if (!prev || prev.shiftOver) return prev;
-          return handleRestaurantMouseMove(prev, action.x, action.y);
+          const playerActiveId = this.getPlayerActiveOrder(player.id);
+          const withPlayerActive = { ...prev, activeOrderId: playerActiveId };
+          const result = handleRestaurantMouseMove(withPlayerActive, action.x, action.y);
+          return { ...result, activeOrderId: prev.activeOrderId };
         });
         break;
       case "join_request":

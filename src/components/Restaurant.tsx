@@ -35,6 +35,10 @@ interface RestaurantProps {
   onPeerKey?: (key: string) => void;
   onPeerKeyUp?: (key: string) => void;
   onPeerMouse?: (x: number, y: number) => void;
+  // Multiplayer counter props
+  currentCounter?: number;
+  onSwitchCounter?: (counter: number) => void;
+  localActiveOrderId?: number | null; // peer's local active order (separate from state.activeOrderId)
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -297,19 +301,51 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId }: RestaurantProps) {
+  // Backward compat: default counter fields
+  const state = useMemo(() => ({
+    ...rawState,
+    numCounters: rawState.numCounters ?? 1,
+    slotsPerCounter: rawState.slotsPerCounter ?? rawState.orderSlots.length,
+    playerFocus: rawState.playerFocus ?? {},
+  }), [rawState]);
+
+  // Determine which activeOrderId to use for rendering
+  const effectiveActiveOrderId = localActiveOrderId !== undefined ? localActiveOrderId : state.activeOrderId;
+
   const activeOrder = useMemo(
-    () => state.orderSlots.find((slot) => slot?.id === state.activeOrderId) ?? null,
-    [state.activeOrderId, state.orderSlots],
+    () => state.orderSlots.find((slot) => slot?.id === effectiveActiveOrderId) ?? null,
+    [effectiveActiveOrderId, state.orderSlots],
   );
 
+  // Get slots for the current counter view
+  const counterStart = currentCounter * state.slotsPerCounter;
+  const counterSlots = state.orderSlots.slice(counterStart, counterStart + state.slotsPerCounter);
+
+  // Cross-counter orders (orders on other counters)
+  const crossCounterOrders = useMemo(() => {
+    if (state.numCounters <= 1) return [];
+    const others: { counterIndex: number; slotIndex: number; order: ActiveOrder; patienceRatio: number }[] = [];
+    for (let c = 0; c < state.numCounters; c++) {
+      if (c === currentCounter) continue;
+      const start = c * state.slotsPerCounter;
+      for (let s = 0; s < state.slotsPerCounter; s++) {
+        const order = state.orderSlots[start + s];
+        if (order && !order.failed && !order.served) {
+          others.push({ counterIndex: c, slotIndex: s, order, patienceRatio: order.patienceRemaining / order.menuItem.patience });
+        }
+      }
+    }
+    return others;
+  }, [state.orderSlots, state.numCounters, state.slotsPerCounter, currentCounter]);
+
   useEffect(() => {
-    if (paused || state.shiftOver) return;
+    if (isPeer || paused || state.shiftOver) return; // Peers don't tick — they receive state from host
     const interval = window.setInterval(() => {
       setRestaurantState((prev) => (prev ? restaurantTick(prev, (TICK_MS / 1000) * speed) : prev));
     }, TICK_MS);
     return () => window.clearInterval(interval);
-  }, [paused, setRestaurantState, state.shiftOver, speed]);
+  }, [isPeer, paused, setRestaurantState, state.shiftOver, speed]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -319,6 +355,21 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
       const tag = activeElement?.tagName.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
 
+      // Shift+Number: switch counter
+      if (event.shiftKey && state.numCounters > 1) {
+        const counterNum = Number.parseInt(event.key, 10);
+        if (!Number.isNaN(counterNum) && counterNum >= 1 && counterNum <= state.numCounters) {
+          event.preventDefault();
+          if (isPeer && onPeerKey) {
+            // Peer sends switch_counter via onSwitchCounter
+            onSwitchCounter?.(counterNum - 1);
+          } else {
+            onSwitchCounter?.(counterNum - 1);
+          }
+          return;
+        }
+      }
+
       // Peers forward key presses to host
       if (isPeer && onPeerKey) {
         event.preventDefault();
@@ -327,14 +378,15 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
       }
 
       const slotNumber = Number.parseInt(event.key, 10);
-      if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= state.orderSlots.length) {
+      if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= state.slotsPerCounter) {
         event.preventDefault();
-        const slotIndex = slotNumber - 1;
+        // Map local slot to global index based on current counter
+        const globalIndex = currentCounter * state.slotsPerCounter + (slotNumber - 1);
         setRestaurantState((prev) => {
           if (!prev) return prev;
-          const order = prev.orderSlots[slotIndex];
+          const order = prev.orderSlots[globalIndex];
           if (!order) return prev;
-          return order.completed ? serveOrder(prev, slotIndex) : acceptOrder(prev, slotIndex);
+          return order.completed ? serveOrder(prev, globalIndex) : acceptOrder(prev, globalIndex);
         });
         return;
       }
@@ -460,12 +512,25 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
       </header>
 
       <section className="restaurant-queue">
-        {Array.from({ length: state.orderSlots.length }, (_, index) => {
-          const order = state.orderSlots[index];
+        {state.numCounters > 1 && (
+          <div className="counter-tabs">
+            {Array.from({ length: state.numCounters }, (_, c) => (
+              <button
+                key={c}
+                className={`counter-tab ${c === currentCounter ? "active" : ""}`}
+                onClick={() => onSwitchCounter?.(c)}
+              >
+                Counter {c + 1}
+              </button>
+            ))}
+          </div>
+        )}
+        {counterSlots.map((order, localIndex) => {
+          const globalIndex = counterStart + localIndex;
           if (!order) {
             return (
-              <div key={`slot-${index}`} className="order-slot empty">
-                <div className="slot-number">{index + 1}</div>
+              <div key={`slot-${globalIndex}`} className="order-slot empty">
+                <div className="slot-number">{localIndex + 1}</div>
                 <div className="slot-empty-copy">Waiting for next customer…</div>
               </div>
             );
@@ -474,21 +539,26 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
           const patiencePct = Math.max(0, Math.min(100, (order.patienceRemaining / order.menuItem.patience) * 100));
           const currentStep = getCurrentStep(order);
           const miniProgress = getSlotMiniProgress(order);
+          // Check if other players are focused on this order
+          const focusedByOthers = Object.entries(state.playerFocus || {}).filter(([, orderId]) => orderId === order.id);
           return (
             <button
-              key={`slot-${index}`}
+              key={`slot-${globalIndex}`}
               type="button"
-              className={`order-slot ${state.activeOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""}`}
+              className={`order-slot ${effectiveActiveOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""}`}
               onClick={() =>
-                setRestaurantState((prev) => {
-                  if (!prev) return prev;
-                  const currentOrder = prev.orderSlots[index];
-                  if (!currentOrder) return prev;
-                  return currentOrder.completed ? serveOrder(prev, index) : acceptOrder(prev, index);
-                })
+                isPeer && onPeerKey
+                  ? onPeerKey(String(localIndex + 1))
+                  : setRestaurantState((prev) => {
+                      if (!prev) return prev;
+                      const currentOrder = prev.orderSlots[globalIndex];
+                      if (!currentOrder) return prev;
+                      return currentOrder.completed ? serveOrder(prev, globalIndex) : acceptOrder(prev, globalIndex);
+                    })
               }
             >
-              <div className="slot-number">{index + 1}</div>
+              <div className="slot-number">{localIndex + 1}</div>
+              {focusedByOthers.length > 0 && <div className="slot-player-focus">👤</div>}
               <div className="slot-main">
                 <div className="slot-title-row">
                   <span className="slot-item">{order.menuItem.icon} {order.menuItem.name}</span>
@@ -527,6 +597,31 @@ export function Restaurant({ day, paused, state, setRestaurantState, onFinish, m
             </button>
           );
         })}
+        {/* Cross-counter order indicators */}
+        {crossCounterOrders.length > 0 && (
+          <div className="cross-counter-indicators">
+            {crossCounterOrders.map(({ counterIndex, slotIndex, order, patienceRatio }) => (
+              <div
+                key={`cc-${counterIndex}-${slotIndex}`}
+                className={`cross-counter-pip ${patienceRatio < 0.3 ? "urgent" : ""}`}
+                onClick={() => onSwitchCounter?.(counterIndex)}
+                title={`Counter ${counterIndex + 1}: ${order.menuItem.name} (${Math.round(patienceRatio * 100)}%)`}
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" fill="none" stroke="#555" strokeWidth="2" />
+                  <circle
+                    cx="12" cy="12" r="10" fill="none"
+                    stroke={patienceRatio < 0.3 ? "#f44" : patienceRatio < 0.6 ? "#fa0" : "#4f4"}
+                    strokeWidth="2"
+                    strokeDasharray={`${patienceRatio * 62.8} 62.8`}
+                    transform="rotate(-90 12 12)"
+                  />
+                  <text x="12" y="16" textAnchor="middle" fontSize="10" fill="#fff">{counterIndex + 1}</text>
+                </svg>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="restaurant-work-area">

@@ -26,6 +26,7 @@ export type PeerAction =
   | { type: "select_stock"; monitorId: number; symbol: string }
   | { type: "pin_stock"; symbol: string }
   | { type: "claim_order"; slotIndex: number }
+  | { type: "switch_counter"; counter: number }
   | { type: "restaurant_key"; key: string }
   | { type: "restaurant_key_up"; key: string }
   | { type: "restaurant_mouse"; x: number; y: number }
@@ -53,6 +54,7 @@ export interface GameSync {
   showTransition: string | null;
   players: Player[];
   recentActions: ActionFeedItem[];
+  playerActiveOrders?: Record<string, number | null>; // playerId → their active order ID
 }
 
 export interface ActionFeedItem {

@@ -775,3 +775,77 @@
     align-items: stretch;
   }
 }
+
+/* Multiplayer counter tabs */
+.counter-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  grid-column: 1 / -1;
+}
+
+.counter-tab {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 163, 92, 0.3);
+  border-radius: 8px;
+  background: rgba(19, 26, 43, 0.8);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.15s ease;
+}
+
+.counter-tab.active {
+  background: rgba(255, 163, 92, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.counter-tab:hover:not(.active) {
+  border-color: rgba(255, 163, 92, 0.5);
+}
+
+/* Cross-counter order indicators */
+.cross-counter-indicators {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 163, 92, 0.15);
+  margin-top: 4px;
+}
+
+.cross-counter-pip {
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.cross-counter-pip:hover {
+  opacity: 1;
+  transform: scale(1.15);
+}
+
+.cross-counter-pip.urgent {
+  animation: pulse-urgent 0.8s infinite alternate;
+}
+
+@keyframes pulse-urgent {
+  from { opacity: 0.7; }
+  to { opacity: 1; transform: scale(1.1); }
+}
+
+/* Player focus indicator on slots */
+.slot-player-focus {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+.order-slot {
+  position: relative;
+}

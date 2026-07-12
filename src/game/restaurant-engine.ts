@@ -296,9 +296,11 @@ function hasRestaurantUpgrade(source: GameState | string[], id: string): boolean
   return restaurantUpgradeCount(source, id) > 0;
 }
 
-function randomOrderInterval(upgrades: string[] = []): number {
+function randomOrderInterval(upgrades: string[] = [], numCounters = 1): number {
   const rushMultiplier = hasRestaurantUpgrade(upgrades, "rush_hour") ? 0.75 : 1;
-  return (ORDER_INTERVAL_MIN + Math.random() * (ORDER_INTERVAL_MAX - ORDER_INTERVAL_MIN)) * rushMultiplier;
+  // Scale order frequency by number of counters (more players = more orders)
+  const counterScale = numCounters > 1 ? 1 / numCounters : 1;
+  return (ORDER_INTERVAL_MIN + Math.random() * (ORDER_INTERVAL_MAX - ORDER_INTERVAL_MIN)) * rushMultiplier * counterScale;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -520,8 +522,39 @@ function replaceOrder(
 }
 
 function spawnOrder(state: RestaurantState): RestaurantState {
-  const emptyIndex = state.orderSlots.findIndex((slot) => slot === null);
-  if (emptyIndex === -1 || state.shiftOver || state.availableMenu.length === 0) return state;
+  if (state.shiftOver || state.availableMenu.length === 0) return state;
+
+  // Pick a target counter with some randomness (not always balanced)
+  let emptyIndex = -1;
+  if (state.numCounters > 1) {
+    // Weight toward counters that have more empty slots (but still random)
+    const counterWeights: number[] = [];
+    for (let c = 0; c < state.numCounters; c++) {
+      const start = c * state.slotsPerCounter;
+      const end = start + state.slotsPerCounter;
+      const emptyCount = state.orderSlots.slice(start, end).filter((s) => s === null).length;
+      // Weight: empties + 1 random factor to create imbalance
+      counterWeights.push(emptyCount > 0 ? emptyCount + Math.random() * 2 : 0);
+    }
+    const totalWeight = counterWeights.reduce((a, b) => a + b, 0);
+    if (totalWeight === 0) return state;
+    let roll = Math.random() * totalWeight;
+    let targetCounter = 0;
+    for (let c = 0; c < state.numCounters; c++) {
+      roll -= counterWeights[c];
+      if (roll <= 0) { targetCounter = c; break; }
+    }
+    // Find first empty slot in target counter
+    const start = targetCounter * state.slotsPerCounter;
+    const end = start + state.slotsPerCounter;
+    for (let i = start; i < end; i++) {
+      if (state.orderSlots[i] === null) { emptyIndex = i; break; }
+    }
+  } else {
+    emptyIndex = state.orderSlots.findIndex((slot) => slot === null);
+  }
+
+  if (emptyIndex === -1) return state;
   const menuItem = state.availableMenu[Math.floor(Math.random() * state.availableMenu.length)];
   const order = createOrder(menuItem, state.orderIdCounter, state.acquiredUpgrades);
   const orderSlots = [...state.orderSlots];
@@ -530,7 +563,7 @@ function spawnOrder(state: RestaurantState): RestaurantState {
     ...state,
     orderSlots,
     orderIdCounter: state.orderIdCounter + 1,
-    nextOrderTimer: randomOrderInterval(state.acquiredUpgrades),
+    nextOrderTimer: randomOrderInterval(state.acquiredUpgrades, state.numCounters),
   };
 }
 
@@ -676,23 +709,28 @@ function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[]): Ac
   return updatedOrder;
 }
 
-export function createRestaurantState(state: GameState): RestaurantState {
+export function createRestaurantState(state: GameState, numPlayers = 1): RestaurantState {
+  const slotsPerCounter = hasRestaurantUpgrade(state, "sixth_slot") ? 6 : 5;
+  const numCounters = numPlayers;
   const baseState: RestaurantState = {
     shiftActive: true,
-    orderSlots: Array.from({ length: hasRestaurantUpgrade(state, "sixth_slot") ? 6 : 5 }, () => null),
+    orderSlots: Array.from({ length: slotsPerCounter * numCounters }, () => null),
     activeOrderId: null,
     completedOrders: 0,
     failedOrders: 0,
     totalEarnings: 0,
     totalTips: 0,
     shiftTimeRemaining: SHIFT_DURATION_SECONDS + restaurantUpgradeCount(state, "longer_shift") * 30,
-    nextOrderTimer: randomOrderInterval(state.acquiredRestaurantUpgrades),
+    nextOrderTimer: randomOrderInterval(state.acquiredRestaurantUpgrades, numCounters),
     orderIdCounter: 1,
     shiftOver: false,
     availableMenu: getAvailableMenu(state),
     acquiredUpgrades: [...state.acquiredRestaurantUpgrades],
     comboStreak: 0,
     challengeTracker: createRestaurantTracker(),
+    numCounters,
+    slotsPerCounter,
+    playerFocus: {},
   };
 
   return spawnOrder(baseState);
