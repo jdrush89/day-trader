@@ -663,7 +663,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         ) : (
           <div className="restaurant-empty-state">
             <h2>{state.shiftOver ? "Shift complete" : "Pick an order"}</h2>
-            <p>{state.shiftOver ? "Cash out and head back to the market." : `Hit 1-${state.slotsPerCounter} or click a ticket to start cooking.${state.numCounters > 1 ? ` Shift+1-${state.numCounters} to switch counters.` : ""}`}</p>
+            <p>{state.shiftOver ? "Great work! Let's see how you did." : `Hit 1-${state.slotsPerCounter} or click a ticket to start cooking.${state.numCounters > 1 ? ` Shift+1-${state.numCounters} to switch counters.` : ""}`}</p>
           </div>
         )}
       </section>
@@ -683,7 +683,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
               <div><span>Food sales + tips</span><strong>${state.totalEarnings.toFixed(2)}</strong></div>
               <div><span>Tips earned</span><strong>${state.totalTips.toFixed(2)}</strong></div>
             </div>
-            <button type="button" onClick={() => onFinish(state.totalEarnings)}>Back to the market</button>
+            <button type="button" onClick={() => onFinish(state.totalEarnings)}>Continue</button>
           </div>
         </div>
       )}

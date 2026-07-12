@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.18";
+const GAME_VERSION = "0.0.19";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -726,7 +726,7 @@ function App() {
     const challengedState = { ...nextState, activeChallenges: evaluated, tickets: nextState.tickets + earned };
     setGameState(challengedState);
     saveGame(challengedState);
-    setRestaurantState(null);
+    // Don't clear restaurantState yet — keep restaurant UI visible during post-shift phases
     // Show challenge results before restaurant upgrades
     setEodPhase("challenges");
   }, [beginScheduledDay, gameState, restaurantState]);
@@ -1111,9 +1111,10 @@ function App() {
       )}
 
       {isRestaurantShift && restaurantState && !gameState.gameOver ? (
+        <>
         <Restaurant
           day={gameState.day}
-          paused={paused || titleTutorial === "restaurant"}
+          paused={paused || titleTutorial === "restaurant" || restaurantState.shiftOver}
           state={restaurantState}
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
@@ -1146,6 +1147,98 @@ function App() {
           }}
           localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
         />
+        {/* Post-shift overlays render on top of restaurant UI */}
+        {eodPhase === "challenges" && (
+          <div className="end-of-day-overlay">
+            <div className="end-of-day challenge-results">
+              <h2>🎯 Daily Challenges</h2>
+              <div className="challenge-list">
+                {gameState.activeChallenges.map((ch) => {
+                  const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
+                  if (!def) return null;
+                  return (
+                    <div key={ch.id} className={`challenge-row ${ch.completed ? "completed" : "failed"}`}>
+                      <span className="challenge-icon">{def.icon}</span>
+                      <div className="challenge-info">
+                        <span className="challenge-name">{def.name}</span>
+                        <span className="challenge-desc">{def.description}</span>
+                      </div>
+                      <span className="challenge-reward">
+                        {ch.completed ? `+${def.tickets} 🎟️` : "—"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+              {(() => {
+                const earned = getTicketsEarned(gameState.activeChallenges);
+                return earned > 0 ? (
+                  <div className="challenge-total">
+                    <span>Tickets earned: <strong>+{earned} 🎟️</strong></span>
+                    <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                  </div>
+                ) : (
+                  <div className="challenge-total">
+                    <span>No challenges completed</span>
+                    <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                  </div>
+                );
+              })()}
+              <button onClick={handleChallengesContinue}>Continue →</button>
+            </div>
+          </div>
+        )}
+        {eodPhase === "restaurant-upgrades" && (
+          <div className="end-of-day-overlay">
+            {isPeer ? (
+              <div className="upgrade-draft"><h2>⏳ Waiting for host...</h2><p className="upgrade-draft-sub">Host is choosing a restaurant upgrade</p></div>
+            ) : (
+            <div className="upgrade-draft">
+              <h2>🍽️ Choose a Restaurant Upgrade</h2>
+              <p className="upgrade-draft-sub">Pick one kitchen upgrade for every future Shwendy's shift</p>
+              <div className="upgrade-draft-options">
+                {gameState.restaurantUpgradeDraftOptions.map((id) => {
+                  const card = RESTAURANT_UPGRADE_POOL.find((upgrade) => upgrade.id === id);
+                  if (!card) return null;
+                  const owned = restaurantUpgradeCount(id);
+                  return (
+                    <button key={id} className="upgrade-draft-card" onClick={() => handleAcquireRestaurantUpgrade(id)}>
+                      <div className="upgrade-card-icon">{card.icon}</div>
+                      <div className="upgrade-card-name">{card.name}</div>
+                      <div className="upgrade-card-desc">{card.description}</div>
+                      <div className="upgrade-card-category">{card.category}</div>
+                      {owned > 0 && <div className="upgrade-card-owned">Owned: {owned}/{card.maxStacks}</div>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            )}
+          </div>
+        )}
+        {eodPhase === "menu-draft" && (
+          <div className="end-of-day-overlay">
+            {isPeer ? (
+              <div className="stock-draft"><h2>⏳ Waiting for host...</h2><p className="stock-draft-sub">Host is choosing a menu item</p></div>
+            ) : (
+            <div className="stock-draft">
+              <h2>🧾 Add a New Menu Item</h2>
+              <p className="stock-draft-sub">Choose one recipe to add to Shwendy's permanent menu for Day {gameState.day}</p>
+              <div className="stock-draft-options">
+                {gameState.menuDraftOptions.map((item) => (
+                  <button key={item.name} className="stock-draft-card" onClick={() => handleDraftMenuItem(item.name)}>
+                    <div className="draft-card-symbol">{item.icon}</div>
+                    <div className="draft-card-name">{item.name}</div>
+                    <div className="draft-card-price">${item.basePay.toFixed(2)} • {item.patience}s patience</div>
+                    <div className="draft-card-tags">{item.steps.map((step, index) => <span key={`${item.name}-${step.type}-${index}`} className="stock-tag">{step.type}</span>)}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            )}
+          </div>
+        )}
+        </>
       ) : (
         <>
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "summary" && (() => {
@@ -1407,58 +1500,6 @@ function App() {
           </div>
           )}
         </>
-      )}
-
-      {!gameState.marketOpen && !gameState.gameOver && eodPhase === "restaurant-upgrades" && (
-        <div className="end-of-day-overlay">
-          {isPeer ? (
-            <div className="upgrade-draft"><h2>⏳ Waiting for host...</h2><p className="upgrade-draft-sub">Host is choosing a restaurant upgrade</p></div>
-          ) : (
-          <div className="upgrade-draft">
-            <h2>🍽️ Choose a Restaurant Upgrade</h2>
-            <p className="upgrade-draft-sub">Pick one kitchen upgrade for every future Shwendy's shift</p>
-            <div className="upgrade-draft-options">
-              {gameState.restaurantUpgradeDraftOptions.map((id) => {
-                const card = RESTAURANT_UPGRADE_POOL.find((upgrade) => upgrade.id === id);
-                if (!card) return null;
-                const owned = restaurantUpgradeCount(id);
-                return (
-                  <button key={id} className="upgrade-draft-card" onClick={() => handleAcquireRestaurantUpgrade(id)}>
-                    <div className="upgrade-card-icon">{card.icon}</div>
-                    <div className="upgrade-card-name">{card.name}</div>
-                    <div className="upgrade-card-desc">{card.description}</div>
-                    <div className="upgrade-card-category">{card.category}</div>
-                    {owned > 0 && <div className="upgrade-card-owned">Owned: {owned}/{card.maxStacks}</div>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          )}
-        </div>
-      )}
-
-      {!gameState.marketOpen && !gameState.gameOver && eodPhase === "menu-draft" && (
-        <div className="end-of-day-overlay">
-          {isPeer ? (
-            <div className="stock-draft"><h2>⏳ Waiting for host...</h2><p className="stock-draft-sub">Host is choosing a menu item</p></div>
-          ) : (
-          <div className="stock-draft">
-            <h2>🧾 Add a New Menu Item</h2>
-            <p className="stock-draft-sub">Choose one recipe to add to Shwendy's permanent menu for Day {gameState.day}</p>
-            <div className="stock-draft-options">
-              {gameState.menuDraftOptions.map((item) => (
-                <button key={item.name} className="stock-draft-card" onClick={() => handleDraftMenuItem(item.name)}>
-                  <div className="draft-card-symbol">{item.icon}</div>
-                  <div className="draft-card-name">{item.name}</div>
-                  <div className="draft-card-price">${item.basePay.toFixed(2)} • {item.patience}s patience</div>
-                  <div className="draft-card-tags">{item.steps.map((step, index) => <span key={`${item.name}-${step.type}-${index}`} className="stock-tag">{step.type}</span>)}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-          )}
-        </div>
       )}
 
       {gameState.pendingSECCheck && !gameState.marketOpen && (
