@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.23";
+const GAME_VERSION = "0.0.24";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -50,6 +50,7 @@ function App() {
   const [showDebug, setShowDebug] = useState(false);
   const [debugFF, setDebugFF] = useState(false);
   const [showMultiplayerLobby, setShowMultiplayerLobby] = useState(false);
+  const [disconnectedPlayer, setDisconnectedPlayer] = useState<string | null>(null);
   const [eodChoiceMade, setEodChoiceMade] = useState(false); // local player submitted their EOD choice
   const [mpUpgradeChoice, setMpUpgradeChoice] = useState<string | null>(null); // track upgrade pick locally in MP
   const [myCounter, setMyCounter] = useState(0); // which restaurant counter the local player is viewing
@@ -124,6 +125,10 @@ function App() {
         // All players have chosen — unblock the peer's EOD state so sync can resume
         setEodChoiceMade(false);
         setEodPhase("summary"); // will be overwritten by next sync from host
+      },
+      onPlayerDisconnected: (playerName: string) => {
+        setDisconnectedPlayer(playerName);
+        setPaused(true);
       },
       onAllUpgradesChosen: (choices) => {
         // Apply all upgrades to shared state
@@ -800,6 +805,7 @@ function App() {
     setShowChallengeIntro(null);
     setPaused(false);
     setShowMultiplayerLobby(false);
+    setDisconnectedPlayer(null);
   }, [mpActions]);
 
   const formatMarketTime = (pct: number): string => {
@@ -1043,7 +1049,7 @@ function App() {
         </header>
       )}
 
-      {paused && !showChallengeIntro && (
+      {paused && !showChallengeIntro && !disconnectedPlayer && (
         <div className="pause-overlay">
           {showDebug ? (
             <DebugPanel
@@ -1594,6 +1600,16 @@ function App() {
               })}
             </div>
             <button className="pause-menu-btn resume" onClick={() => { setShowChallengeIntro(null); setPaused(false); }}>Start Trading →</button>
+          </div>
+        </div>
+      )}
+
+      {disconnectedPlayer && (
+        <div className="end-of-day-overlay">
+          <div className="end-of-day challenge-intro">
+            <h2>⚠️ Player Disconnected</h2>
+            <p style={{ margin: "16px 0", color: "rgba(255,255,255,0.8)" }}><strong>{disconnectedPlayer}</strong> has left the game.</p>
+            <button className="pause-menu-btn resume" onClick={() => { setDisconnectedPlayer(null); setPaused(false); }}>Continue →</button>
           </div>
         </div>
       )}

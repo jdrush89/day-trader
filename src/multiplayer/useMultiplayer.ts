@@ -66,6 +66,7 @@ export function useMultiplayer(
     onSelectStock: (monitorId: number, symbol: string) => void;
     onPeerStateSync: (sync: GameSync) => void;
     onEodAllReady: () => void;
+    onPlayerDisconnected: (playerName: string) => void;
     onAllUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
     onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
   },
@@ -91,6 +92,8 @@ export function useMultiplayer(
 
   const hostRef = useRef<MultiplayerHost | null>(null);
   const peerRef = useRef<MultiplayerPeer | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const appCallbacksRef = useRef(appCallbacks);
   appCallbacksRef.current = appCallbacks;
 
@@ -143,7 +146,9 @@ export function useMultiplayer(
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },
       onPlayerLeft: (playerId) => {
+        const player = stateRef.current.players.find((p) => p.id === playerId);
         setState((s) => ({ ...s, players: s.players.filter((p) => p.id !== playerId) }));
+        if (player) appCallbacksRef.current.onPlayerDisconnected(player.name);
       },
       onViewInsider: () => appCallbacksRef.current.onViewInsider(),
       onAcceptLoan: () => appCallbacksRef.current.onAcceptLoan(),
@@ -200,7 +205,9 @@ export function useMultiplayer(
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },
       onPlayerLeft: (playerId) => {
+        const player = stateRef.current.players.find((p) => p.id === playerId);
         setState((s) => ({ ...s, players: s.players.filter((p) => p.id !== playerId) }));
+        if (player) appCallbacksRef.current.onPlayerDisconnected(player.name);
       },
       onActionFeed: (item) => {
         setState((s) => ({
