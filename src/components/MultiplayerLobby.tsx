@@ -5,6 +5,7 @@ interface MultiplayerLobbyProps {
   onHost: (playerName: string) => void;
   onJoin: (roomCode: string, playerName: string) => void;
   onCancel: () => void;
+  onReset: () => void;
   connecting: boolean;
   error: string | null;
   roomCode: string | null;
@@ -17,6 +18,7 @@ export function MultiplayerLobby({
   onHost,
   onJoin,
   onCancel,
+  onReset,
   connecting,
   error,
   roomCode,
@@ -139,7 +141,7 @@ export function MultiplayerLobby({
             {connecting ? "Connecting..." : mode === "host" ? "Create Room" : "Join Room"}
           </button>
         </div>
-        <button className="mp-cancel-btn" onClick={() => { setMode("pick"); }}>Back</button>
+        <button className="mp-cancel-btn" onClick={() => { onReset(); setMode("pick"); }}>Back</button>
       </div>
     </div>
   );

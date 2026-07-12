@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.26";
+const GAME_VERSION = "0.0.27";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -909,6 +909,7 @@ function App() {
           mpActions.disconnect();
           setShowMultiplayerLobby(false);
         }}
+        onReset={() => mpActions.disconnect()}
         connecting={mpState.connecting}
         error={mpState.error}
         roomCode={mpState.roomCode}

@@ -181,7 +181,8 @@ export function useMultiplayer(
     });
 
     try {
-      const roomCode = await host.start();
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Connection timed out")), 15000));
+      const roomCode = await Promise.race([host.start(), timeout]);
       host.setHostPlayer(localPlayer);
       hostRef.current = host;
       setState((s) => ({
@@ -193,6 +194,7 @@ export function useMultiplayer(
         connecting: false,
       }));
     } catch (err: any) {
+      host.stop();
       setState((s) => ({ ...s, connecting: false, error: err.message }));
     }
   }, [setGameState, setRestaurantState]);
@@ -260,10 +262,12 @@ export function useMultiplayer(
     });
 
     try {
-      await peer.connect(roomCode, playerName);
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Connection timed out")), 15000));
+      await Promise.race([peer.connect(roomCode, playerName), timeout]);
       peerRef.current = peer;
       setState((s) => ({ ...s, role: "peer", roomCode, connecting: false }));
     } catch (err: any) {
+      peer.disconnect();
       setState((s) => ({ ...s, connecting: false, error: err.message }));
     }
   }, []);
