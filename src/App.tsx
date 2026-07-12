@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft } from "./game/engine";
-import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU } from "./game/restaurant-engine";
+import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU, generateRestaurantUpgradeDraft, generateMenuDraft } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.29";
+const GAME_VERSION = "0.0.30";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -57,7 +57,7 @@ function App() {
   const [peerActiveOrderId, setPeerActiveOrderId] = useState<number | null>(null); // peer's local active order
   const [localUpgrades, setLocalUpgrades] = useState<string[]>([]); // per-player trading upgrades (MP only)
   const [localRestaurantUpgrades, setLocalRestaurantUpgrades] = useState<string[]>([]); // per-player restaurant upgrades (MP only)
-  const beginScheduledDayRef = useRef<(state?: GameState) => void>(() => {});
+  const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean }) => void>(() => {});
 
   // Multiplayer hook
   const [mpState, mpActions] = useMultiplayer(
@@ -170,14 +170,14 @@ function App() {
           setLocalRestaurantUpgrades((prev) => [...prev, myChoice.upgradeId]);
         }
         setEodChoiceMade(false);
-        // Move to menu-draft if available, else advance
+        // Move to menu-draft if available, else advance to trading
         setGameState((prev) => {
           if (prev.menuDraftOptions.length > 0) {
             setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
             return prev;
           }
           setRestaurantState(null);
-          setTimeout(() => beginScheduledDayRef.current(prev), 0);
+          setTimeout(() => beginScheduledDayRef.current(prev, { skipRestaurantTransition: true }), 0);
           return prev;
         });
       },
@@ -189,7 +189,7 @@ function App() {
             state = draftMenuItem(state, itemName);
           }
           setRestaurantState(null);
-          setTimeout(() => beginScheduledDayRef.current(state), 0);
+          setTimeout(() => beginScheduledDayRef.current(state, { skipRestaurantTransition: true }), 0);
           return state;
         });
         setEodChoiceMade(false);
@@ -208,6 +208,26 @@ function App() {
     peerDraftGenerated.current = gameState.day;
     // Generate our own random draft options
     setGameState((prev) => generateDraftOptions(generateUpgradeDraft(prev)));
+  }, [isPeer, eodPhase, gameState.day]);
+
+  // Peer: generate local restaurant upgrade draft options (different from host)
+  const peerRestaurantDraftGenerated = useRef<number>(0);
+  useEffect(() => {
+    if (!isPeer) return;
+    if (eodPhase !== "restaurant-upgrades") return;
+    if (peerRestaurantDraftGenerated.current === gameState.day) return;
+    peerRestaurantDraftGenerated.current = gameState.day;
+    setGameState((prev) => generateRestaurantUpgradeDraft(prev));
+  }, [isPeer, eodPhase, gameState.day]);
+
+  // Peer: generate local menu draft options (different from host)
+  const peerMenuDraftGenerated = useRef<number>(0);
+  useEffect(() => {
+    if (!isPeer) return;
+    if (eodPhase !== "menu-draft") return;
+    if (peerMenuDraftGenerated.current === gameState.day) return;
+    peerMenuDraftGenerated.current = gameState.day;
+    setGameState((prev) => generateMenuDraft(prev));
   }, [isPeer, eodPhase, gameState.day]);
 
   useEffect(() => {
@@ -568,7 +588,7 @@ function App() {
     }
   }, []);
 
-  const beginScheduledDay = useCallback((stateOverride?: GameState) => {
+  const beginScheduledDay = useCallback((stateOverride?: GameState, opts?: { skipRestaurantTransition?: boolean }) => {
     const nextState = stateOverride ?? gameState;
 
     // Boss day: when market closes, day is done (restaurant was running alongside)
@@ -614,7 +634,7 @@ function App() {
 
     // After boss day EOD (day already incremented by finishRestaurantDay), skip restaurant once
     // After trading (market just closed), go to Shwendy's
-    if (!nextState.marketOpen && restaurantState === null && !skipNextRestaurant) {
+    if (!nextState.marketOpen && restaurantState === null && !skipNextRestaurant && !opts?.skipRestaurantTransition) {
       const challenges = selectDailyChallenges(nextState.day, false, true);
       setGameState({ ...nextState, activeChallenges: challenges });
       setShowTransition("restaurant");
