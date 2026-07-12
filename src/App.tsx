@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.44";
+const GAME_VERSION = "0.0.45";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1110,8 +1110,8 @@ function App() {
               setShowBossIntro({ requiredProfit, maxMissed });
             } else {
               setShowChallengeIntro("trading");
+              setPaused(true);
             }
-            setPaused(true);
           } else {
             setGameState(createInitialState());
             setShowChallengeIntro("trading");
