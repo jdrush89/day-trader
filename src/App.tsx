@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.22";
+const GAME_VERSION = "0.0.23";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -787,6 +787,7 @@ function App() {
 
   const handleRestart = useCallback(() => {
     deleteSave();
+    mpActions.disconnect();
     setGameState(createInitialState());
     setRestaurantState(null);
     setBossDay(false);
@@ -798,7 +799,8 @@ function App() {
     setShowOptions(null);
     setShowChallengeIntro(null);
     setPaused(false);
-  }, []);
+    setShowMultiplayerLobby(false);
+  }, [mpActions]);
 
   const formatMarketTime = (pct: number): string => {
     const startMinutes = 570;
