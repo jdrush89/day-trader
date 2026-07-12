@@ -55,6 +55,7 @@ export function useMultiplayer(
   getShowChallengeIntro: () => string | null,
   getShowLoanOffer: () => { amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null,
   getPlayerSaves: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined,
+  getMpSaveId: () => string | undefined,
   appCallbacks: {
     onViewInsider: () => void;
     onAcceptLoan: () => void;
@@ -127,6 +128,8 @@ export function useMultiplayer(
   getShowLoanOfferRef.current = getShowLoanOffer;
   const getPlayerSavesRef = useRef(getPlayerSaves);
   getPlayerSavesRef.current = getPlayerSaves;
+  const getMpSaveIdRef = useRef(getMpSaveId);
+  getMpSaveIdRef.current = getMpSaveId;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -155,6 +158,7 @@ export function useMultiplayer(
       getShowChallengeIntro: () => getShowChallengeIntroRef.current(),
       getShowLoanOffer: () => getShowLoanOfferRef.current(),
       getPlayerSaves: () => getPlayerSavesRef.current(),
+      getMpSaveId: () => getMpSaveIdRef.current(),
       onPlayerJoined: (player) => {
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },

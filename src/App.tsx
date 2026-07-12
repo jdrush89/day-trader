@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.41";
+const GAME_VERSION = "0.0.42";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -80,6 +80,7 @@ function App() {
     () => showChallengeIntro,
     () => showLoanOffer,
     () => mpResumeData?.players,
+    () => mpSaveIdRef.current ?? undefined,
     {
       onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
@@ -161,6 +162,11 @@ function App() {
             setLocalUpgrades(mySave.upgrades);
             setLocalRestaurantUpgrades(mySave.restaurantUpgrades);
           }
+        }
+        // Sync save ID from host so peer uses same save slot
+        if (sync.mpSaveId && !mpSaveIdRef.current) {
+          mpSaveIdRef.current = sync.mpSaveId;
+          setMpSaveId(sync.mpSaveId);
         }
       },
       onEodAllReady: () => {
@@ -425,8 +431,8 @@ function App() {
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
-    // Auto-save when market closes (end of trading day)
-    if (!gameState.marketOpen && !gameState.gameOver) doSave(gameState);
+    // Auto-save when market closes (end of trading day) — only host saves in MP
+    if (!gameState.marketOpen && !gameState.gameOver && !isPeer) doSave(gameState);
   }, [gameState.marketOpen]);
 
   const NEWS_CHANNELS: MonitorChannel[] = ["business_news", "global_news", "social_media"];
@@ -670,7 +676,7 @@ function App() {
       setBossDay(false);
       setSkipNextRestaurant(true);
       setEodPhase("summary");
-      doSave(gameOverState);
+      if (!isPeer) doSave(gameOverState);
       if (passed && gameOverState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
       else if (passed && gameOverState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
       return;
@@ -882,11 +888,11 @@ function App() {
     const earned = getTicketsEarned(evaluated);
     const challengedState = { ...nextState, activeChallenges: evaluated, tickets: nextState.tickets + earned };
     setGameState(challengedState);
-    doSave(challengedState);
+    if (!isPeer) doSave(challengedState);
     // Don't clear restaurantState yet — keep restaurant UI visible during post-shift phases
     // Show challenge results before restaurant upgrades
     setEodPhase("challenges");
-  }, [beginScheduledDay, gameState, restaurantState]);
+  }, [beginScheduledDay, gameState, restaurantState, isPeer]);
 
   const handleViewInsider = useCallback(() => {
     setGameState((prev) => {
