@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.34";
+const GAME_VERSION = "0.0.35";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -819,13 +819,14 @@ function App() {
 
   const handleAcquireRestaurantUpgrade = useCallback((upgradeId: string) => {
     if (isMultiplayer) {
-      // In MP, submit choice to gate and wait
+      // Store upgrade locally (per-player) and move to menu-draft immediately
+      setLocalRestaurantUpgrades((prev) => [...prev, upgradeId]);
+      // Notify host of choice (for tracking only, no gate)
       if (isPeer) {
         mpActions.sendAction({ type: "choose_restaurant_upgrade", upgradeId });
-      } else {
-        mpActions.submitHostChoice("restaurant-upgrades", upgradeId);
       }
-      setEodChoiceMade(true);
+      setEodPhase("menu-draft");
+      if (isMultiplayer) mpActions.resetEodGate();
       return;
     }
     const nextState = acquireRestaurantUpgrade(gameState, upgradeId);

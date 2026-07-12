@@ -359,10 +359,8 @@ export class MultiplayerHost {
         this.checkEodGate();
         break;
       case "choose_restaurant_upgrade":
-        this._eodGatePhase = "restaurant-upgrades";
-        this.restaurantUpgradeChoices.set(player.id, action.upgradeId);
+        // No gate — each player picks independently and moves to menu-draft
         this.addFeedItem(player.id, player.name, `${player.name} chose a kitchen upgrade`);
-        this.checkEodGate();
         break;
       case "choose_menu_item":
         this._eodGatePhase = "menu-draft";
