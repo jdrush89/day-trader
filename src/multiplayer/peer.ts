@@ -164,6 +164,7 @@ export class MultiplayerPeer {
         break;
       case "join_rejected":
         this.callbacks.onJoinRejected((msg as any).reason);
+        this.disconnect();
         break;
       case "eod_waiting":
         this.callbacks.onEodWaiting((msg as any).waitingFor);

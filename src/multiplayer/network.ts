@@ -438,9 +438,13 @@ export class NetworkManager {
 
   private destroyPeerConnection(peerId: string): void {
     const peer = this.peers.get(peerId);
+    const wasRelay = this._relayPeers.has(peerId);
     if (peer) {
       peer.destroy();
       this.peers.delete(peerId);
+    }
+    this._relayPeers.delete(peerId);
+    if (peer || wasRelay) {
       this.callbacks.onPeerDisconnected(peerId);
     }
   }

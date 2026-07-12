@@ -38,6 +38,7 @@ export interface MultiplayerActions {
   // EOD gate controls (host only)
   resetEodGate: () => void;
   submitHostChoice: (phase: "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft", choice: string) => void;
+  setRequiredNames: (names: string[] | null) => void;
 }
 
 export function useMultiplayer(
@@ -258,8 +259,12 @@ export function useMultiplayer(
         setState((s) => ({ ...s, error: reason, connecting: false }));
       },
       onDisconnected: () => {
-        setState((s) => ({ ...s, role: "none", roomCode: null, error: "Disconnected from host", gameStarted: false }));
+        const wasInGame = stateRef.current.gameStarted;
+        setState((s) => ({ ...s, role: "none", roomCode: null, gameStarted: false }));
         peerRef.current = null;
+        if (wasInGame) {
+          appCallbacksRef.current.onPlayerDisconnected("Host");
+        }
       },
       onError: (err) => {
         setState((s) => ({ ...s, error: err, connecting: false }));
@@ -337,5 +342,11 @@ export function useMultiplayer(
     }
   }, []);
 
-  return [state, { hostGame, joinGame, startGame, disconnect, sendAction, resetEodGate, submitHostChoice }];
+  const setRequiredNames = useCallback((names: string[] | null) => {
+    if (hostRef.current) {
+      hostRef.current.setRequiredNames(names);
+    }
+  }, []);
+
+  return [state, { hostGame, joinGame, startGame, disconnect, sendAction, resetEodGate, submitHostChoice, setRequiredNames }];
 }

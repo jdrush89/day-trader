@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.38";
+const GAME_VERSION = "0.0.39";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -404,14 +404,14 @@ function App() {
   }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex, bossDay, bossView, paused, showDebug, showOptions]);
 
   // MP-aware save helper
-  const doSave = useCallback((gs: GameState) => {
+  const doSave = useCallback((gs: GameState, type: "auto" | "manual" = "auto") => {
     if (isMultiplayer) {
       const playerSaves: PlayerSaveData[] = mpState.players.map((p) => ({
         name: p.name,
         upgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localUpgrades : [],
         restaurantUpgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localRestaurantUpgrades : [],
       }));
-      const id = saveMpGame(gs, playerSaves, mpSaveId ?? undefined);
+      const id = saveMpGame(gs, playerSaves, mpSaveId ?? undefined, type);
       if (!mpSaveId) setMpSaveId(id);
     } else {
       saveGame(gs);
@@ -1004,10 +1004,11 @@ function App() {
         isHost={mpState.role === "host"}
         mpSaves={loadAllMpSaves()}
         resumeData={mpResumeData}
-        onResume={(save, playerName) => {
+        onResume={async (save, playerName) => {
           setMpResumeData(save);
           setMpSaveId(save.id);
-          mpActions.hostGame(playerName);
+          await mpActions.hostGame(playerName);
+          mpActions.setRequiredNames(save.players.map((p) => p.name));
         }}
         onDeleteSave={(id) => {
           deleteMpSave(id);
@@ -1298,7 +1299,7 @@ function App() {
               <button className="pause-menu-btn resume" onClick={() => { setShowOptions(null); setPaused(false); }}>Resume</button>
               <button className="pause-menu-btn" onClick={() => setShowOptions("pause")}>Options</button>
             <button className="pause-menu-btn save-quit" onClick={() => {
-              doSave(gameState);
+              doSave(gameState, "manual");
               if (isMultiplayer) mpActions.disconnect();
               setPaused(false); setRestaurantState(null); setShowTitle(true); setMenuFocusIndex(-1);
             }}>Save & Quit</button>
@@ -1834,7 +1835,24 @@ function App() {
           <div className="end-of-day challenge-intro">
             <h2>⚠️ Player Disconnected</h2>
             <p style={{ margin: "16px 0", color: "rgba(255,255,255,0.8)" }}><strong>{disconnectedPlayer}</strong> has left the game.</p>
-            <button className="pause-menu-btn resume" onClick={() => { setDisconnectedPlayer(null); setPaused(false); }}>Continue →</button>
+            <p style={{ margin: "0 0 16px", color: "rgba(255,255,255,0.6)", fontSize: "0.9rem" }}>The game cannot continue without all players.</p>
+            <button className="pause-menu-btn resume" onClick={() => {
+              doSave(gameState, "manual");
+              setDisconnectedPlayer(null);
+              mpActions.disconnect();
+              setPaused(false);
+              setRestaurantState(null);
+              setShowTitle(true);
+              setMenuFocusIndex(-1);
+            }}>Save & Return to Menu</button>
+            <button className="pause-menu-btn restart" style={{ marginTop: "8px" }} onClick={() => {
+              setDisconnectedPlayer(null);
+              mpActions.disconnect();
+              setPaused(false);
+              setRestaurantState(null);
+              setShowTitle(true);
+              setMenuFocusIndex(-1);
+            }}>Return to Menu (Don't Save)</button>
           </div>
         </div>
       )}

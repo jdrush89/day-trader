@@ -66,6 +66,7 @@ export interface MpSaveData {
   gameState: GameState;
   players: PlayerSaveData[];
   savedAt: number;
+  saveType: "auto" | "manual";
 }
 
 function generateSaveId(): string {
@@ -76,25 +77,45 @@ export function saveMpGame(
   gameState: GameState,
   players: PlayerSaveData[],
   existingId?: string,
+  saveType: "auto" | "manual" = "manual",
 ): string {
   const saves = loadAllMpSaves();
   const id = existingId ?? generateSaveId();
+
+  if (saveType === "auto") {
+    // Only one auto-save per game (by id). Overwrite the previous auto-save for this game.
+    const autoIdx = saves.findIndex((s) => s.id === id && s.saveType === "auto");
+    if (autoIdx >= 0) saves.splice(autoIdx, 1);
+    // Also remove any auto-save with a different id but same player set (shouldn't happen normally)
+  }
+
   const data: MpSaveData = {
     id,
     version: SAVE_VERSION,
     gameState,
     players,
     savedAt: Date.now(),
+    saveType,
   };
-  const idx = saves.findIndex((s) => s.id === id);
-  if (idx >= 0) saves[idx] = data;
-  else saves.push(data);
+
+  if (saveType === "auto") {
+    // For auto-saves, replace any existing save with same id
+    const idx = saves.findIndex((s) => s.id === id);
+    if (idx >= 0) saves[idx] = data;
+    else saves.push(data);
+  } else {
+    // Manual saves always create a new entry with a new id
+    const manualId = generateSaveId();
+    data.id = manualId;
+    saves.push(data);
+  }
+
   try {
     localStorage.setItem(MP_SAVES_KEY, JSON.stringify(saves));
   } catch {
     // silently fail
   }
-  return id;
+  return data.id;
 }
 
 export function loadAllMpSaves(): MpSaveData[] {
@@ -102,7 +123,9 @@ export function loadAllMpSaves(): MpSaveData[] {
     const raw = localStorage.getItem(MP_SAVES_KEY);
     if (!raw) return [];
     const saves: MpSaveData[] = JSON.parse(raw);
-    return saves.filter((s) => s.version === SAVE_VERSION && s.gameState && typeof s.gameState.day === "number");
+    return saves
+      .filter((s) => s.version === SAVE_VERSION && s.gameState && typeof s.gameState.day === "number")
+      .map((s) => ({ ...s, saveType: s.saveType ?? "manual" })); // backfill old saves
   } catch {
     return [];
   }

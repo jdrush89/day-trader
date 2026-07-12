@@ -65,6 +65,7 @@ export class MultiplayerHost {
   // Per-player restaurant state
   private playerActiveOrder: Map<string, number | null> = new Map(); // playerId → activeOrderId
   private playerCounter: Map<string, number> = new Map(); // playerId → current counter index
+  private _requiredNames: string[] | null = null; // for resume: only these names can join
 
   constructor(callbacks: HostCallbacks) {
     this.callbacks = callbacks;
@@ -90,6 +91,10 @@ export class MultiplayerHost {
 
   setHostPlayer(player: Player): void {
     this._hostPlayer = player;
+  }
+
+  setRequiredNames(names: string[] | null): void {
+    this._requiredNames = names;
   }
 
   // Restaurant counter system
@@ -258,6 +263,18 @@ export class MultiplayerHost {
     // Handle join request
     if ("type" in msg && msg.type === "join_request") {
       const { playerName } = msg as { type: "join_request"; playerName: string };
+      // Validate name for resume games
+      if (this._requiredNames) {
+        const alreadyJoined = this.playerList.map((p) => p.name);
+        const allowed = this._requiredNames.filter((n) => !alreadyJoined.includes(n));
+        if (!allowed.includes(playerName)) {
+          this.network.send(peerId, {
+            type: "join_rejected",
+            reason: `This is a resumed game. Required players: ${this._requiredNames.join(", ")}. "${playerName}" is not one of them or has already joined.`,
+          });
+          return;
+        }
+      }
       const color = getPlayerColor(this.players.size + 1); // +1 for host
       const player: Player = { id: peerId, name: playerName, color };
       this.players.set(peerId, player);

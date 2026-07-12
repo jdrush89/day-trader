@@ -3427,6 +3427,25 @@ body {
   font-weight: 600;
   font-size: 0.95rem;
   color: #eee;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mp-save-type {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.mp-save-type.auto {
+  background: rgba(79, 195, 247, 0.15);
+  color: #4fc3f7;
+}
+.mp-save-type.manual {
+  background: rgba(102, 187, 106, 0.15);
+  color: #66bb6a;
 }
 .mp-save-players {
   font-size: 0.8rem;

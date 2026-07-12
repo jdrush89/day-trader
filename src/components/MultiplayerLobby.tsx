@@ -121,7 +121,12 @@ export function MultiplayerLobby({
               {mpSaves.sort((a, b) => b.savedAt - a.savedAt).map((save) => (
                 <div key={save.id} className="mp-save-card">
                   <div className="mp-save-info">
-                    <span className="mp-save-day">Day {save.gameState.day}</span>
+                    <span className="mp-save-day">
+                      Day {save.gameState.day}
+                      <span className={`mp-save-type ${save.saveType === "auto" ? "auto" : "manual"}`}>
+                        {save.saveType === "auto" ? "Auto" : "Manual"}
+                      </span>
+                    </span>
                     <span className="mp-save-players">
                       {save.players.map((p) => p.name).join(", ")}
                     </span>
