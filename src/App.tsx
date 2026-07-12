@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.43";
+const GAME_VERSION = "0.0.44";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1096,14 +1096,22 @@ function App() {
               setLocalUpgrades(mySave.upgrades);
               setLocalRestaurantUpgrades(mySave.restaurantUpgrades);
             }
-            // Determine what phase to show
-            if (gs.marketOpen) {
-              setShowChallengeIntro("trading");
-              setPaused(true);
+            // Check if resuming on a boss day
+            const isBoss = isBossDayCheck(gs.day);
+            setBossDay(isBoss);
+            setBossView("trading");
+            if (isBoss) {
+              lastBossEarningsRef.current = 0;
+              const rs = createRestaurantState(gs, mpState.players.length);
+              setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
+              const milestoneNum = gs.day / 4;
+              const requiredProfit = 300 + (milestoneNum - 1) * 100;
+              const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
+              setShowBossIntro({ requiredProfit, maxMissed });
             } else {
               setShowChallengeIntro("trading");
-              setPaused(true);
             }
+            setPaused(true);
           } else {
             setGameState(createInitialState());
             setShowChallengeIntro("trading");
