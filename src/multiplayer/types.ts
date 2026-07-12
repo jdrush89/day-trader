@@ -53,6 +53,7 @@ export interface GameSync {
   bossView: string;
   showTransition: string | null;
   showChallengeIntro: string | null;
+  showLoanOffer: { amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null;
   players: Player[];
   recentActions: ActionFeedItem[];
   playerActiveOrders?: Record<string, number | null>; // playerId → their active order ID

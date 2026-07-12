@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.30";
+const GAME_VERSION = "0.0.31";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -72,15 +72,17 @@ function App() {
     () => bossView,
     () => showTransition,
     () => showChallengeIntro,
+    () => showLoanOffer,
     {
       onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
         if (showLoanOffer) {
           setGameState((prev) => ({ ...prev, cash: prev.cash + showLoanOffer.amount, loans: [...prev.loans, { amount: showLoanOffer.amount, dueDay: showLoanOffer.dueDay, interestRate: showLoanOffer.interestRate }] }));
           setShowLoanOffer(null);
+          setShowChallengeIntro("trading");
         }
       },
-      onDeclineLoan: () => setShowLoanOffer(null),
+      onDeclineLoan: () => { setShowLoanOffer(null); setShowChallengeIntro("trading"); },
       onSetSpeed: setSpeed,
       onTogglePause: () => setPaused((p) => !p),
       onChooseUpgrade: (id) => { const nextState = acquireUpgrade(gameState, id); if (nextState.stockDraftOptions.length > 0) { setGameState(nextState); setEodPhase("stocks"); } else { setGameState(nextState); setEodPhase("summary"); } },
@@ -98,6 +100,13 @@ function App() {
             merged.upgradeDraftOptions = prev.upgradeDraftOptions;
             merged.stockDraftOptions = prev.stockDraftOptions;
           }
+          // Preserve local restaurant/menu draft options during picking
+          if (prev.restaurantUpgradeDraftOptions.length > 0) {
+            merged.restaurantUpgradeDraftOptions = prev.restaurantUpgradeDraftOptions;
+          }
+          if (prev.menuDraftOptions.length > 0) {
+            merged.menuDraftOptions = prev.menuDraftOptions;
+          }
           return merged;
         });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
@@ -113,6 +122,7 @@ function App() {
         // Sync showTransition so peer sees Shwendy's start screen
         if (sync.showTransition !== undefined) setShowTransition(sync.showTransition as any);
         if (sync.showChallengeIntro !== undefined) setShowChallengeIntro(sync.showChallengeIntro as any);
+        if (sync.showLoanOffer !== undefined) setShowLoanOffer(sync.showLoanOffer);
         setPaused(sync.paused);
         setSpeed(sync.speed);
         setBossDay(sync.bossDay);
@@ -653,10 +663,6 @@ function App() {
     const challenges = selectDailyChallenges(marketState.day, isBossDay, false);
     setGameState({ ...marketState, activeChallenges: challenges });
     setEodPhase("summary");
-    if (!isBossDay) {
-      setShowChallengeIntro("trading");
-      setPaused(true);
-    }
 
     setBossDay(isBossDay);
     setBossView("trading");
@@ -671,23 +677,32 @@ function App() {
     }
 
     // Offer a loan after day 1, but not on boss days
+    let hasLoanOffer = false;
     if (marketState.day > 1 && !isBossDay) {
       const milestone = getMilestone(marketState.day);
       const nextMilestoneDay = milestone?.checkDay ?? marketState.day + 3;
       const dueDay = nextMilestoneDay <= marketState.day ? nextMilestoneDay + 3 : nextMilestoneDay;
 
       if (marketState.cash < 0) {
-        // Emergency loan: fixed high rate
         const amount = Math.abs(marketState.cash) + 500;
         setShowLoanOffer({ amount: Math.round(amount * 100) / 100, interestRate: 0.35, dueDay, isEmergency: true });
+        hasLoanOffer = true;
       } else {
-        // Normal loan: random 20-100% of milestone target, random 5-30% interest
         const milestoneTarget = milestone?.required ?? 2000;
         const pct = 0.2 + Math.random() * 0.8;
         const amount = Math.round(milestoneTarget * pct);
         const interestRate = Math.round((0.05 + Math.random() * 0.25) * 100) / 100;
         setShowLoanOffer({ amount, interestRate, dueDay, isEmergency: false });
+        hasLoanOffer = true;
       }
+    }
+
+    if (!isBossDay && !hasLoanOffer) {
+      setShowChallengeIntro("trading");
+      setPaused(true);
+    } else if (!isBossDay && hasLoanOffer) {
+      // Loan shows first; challenge intro shown after loan is dismissed
+      setPaused(true);
     }
   }, [gameState, restaurantState, bossDay]);
   beginScheduledDayRef.current = beginScheduledDay;
@@ -857,6 +872,11 @@ function App() {
   }, []);
 
   const handleAcceptLoan = useCallback(() => {
+    if (isMultiplayer && isPeer) {
+      // Peer sends action to host; host handles it and syncs state back
+      mpActions.sendAction({ type: "accept_loan" });
+      return;
+    }
     setGameState((prev) => {
       if (!showLoanOffer) return prev;
       const { amount, interestRate, dueDay } = showLoanOffer;
@@ -867,11 +887,17 @@ function App() {
       };
     });
     setShowLoanOffer(null);
-  }, [showLoanOffer]);
+    setShowChallengeIntro("trading");
+  }, [showLoanOffer, isMultiplayer, isPeer, mpActions]);
 
   const handleDeclineLoan = useCallback(() => {
+    if (isMultiplayer && isPeer) {
+      mpActions.sendAction({ type: "decline_loan" });
+      return;
+    }
     setShowLoanOffer(null);
-  }, []);
+    setShowChallengeIntro("trading");
+  }, [isMultiplayer, isPeer, mpActions]);
 
   const handleRestart = useCallback(() => {
     deleteSave();

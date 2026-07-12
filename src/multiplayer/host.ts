@@ -21,6 +21,7 @@ export interface HostCallbacks {
   getBossView: () => string;
   getShowTransition: () => string | null;
   getShowChallengeIntro: () => string | null;
+  getShowLoanOffer: () => { amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null;
   onPlayerJoined: (player: Player) => void;
   onPlayerLeft: (playerId: string) => void;
   onViewInsider: () => void;
@@ -226,6 +227,7 @@ export class MultiplayerHost {
       bossView: this.callbacks.getBossView(),
       showTransition: this.callbacks.getShowTransition(),
       showChallengeIntro: this.callbacks.getShowChallengeIntro(),
+      showLoanOffer: this.callbacks.getShowLoanOffer(),
       players: this.playerList,
       recentActions: this.actionFeed.slice(0, 5),
       playerActiveOrders: activeOrders,

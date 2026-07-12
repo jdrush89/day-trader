@@ -52,6 +52,7 @@ export function useMultiplayer(
   getBossView: () => string,
   getShowTransition: () => string | null,
   getShowChallengeIntro: () => string | null,
+  getShowLoanOffer: () => { amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null,
   appCallbacks: {
     onViewInsider: () => void;
     onAcceptLoan: () => void;
@@ -118,6 +119,8 @@ export function useMultiplayer(
   getShowTransitionRef.current = getShowTransition;
   const getShowChallengeIntroRef = useRef(getShowChallengeIntro);
   getShowChallengeIntroRef.current = getShowChallengeIntro;
+  const getShowLoanOfferRef = useRef(getShowLoanOffer);
+  getShowLoanOfferRef.current = getShowLoanOffer;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -144,6 +147,7 @@ export function useMultiplayer(
       getBossView: () => getBossViewRef.current(),
       getShowTransition: () => getShowTransitionRef.current(),
       getShowChallengeIntro: () => getShowChallengeIntroRef.current(),
+      getShowLoanOffer: () => getShowLoanOfferRef.current(),
       onPlayerJoined: (player) => {
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },
