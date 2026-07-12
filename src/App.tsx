@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.19";
+const GAME_VERSION = "0.0.20";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -38,6 +38,7 @@ function App() {
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
   const [activeMonitorId, setActiveMonitorId] = useState(0);
   const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
+  const [showChallengeIntro, setShowChallengeIntro] = useState<"trading" | "restaurant" | null>(null);
   const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
   const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
   const [showLoanOffer, setShowLoanOffer] = useState<{ amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null>(null);
@@ -67,6 +68,7 @@ function App() {
     () => bossDay,
     () => bossView,
     () => showTransition,
+    () => showChallengeIntro,
     {
       onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
@@ -107,6 +109,7 @@ function App() {
         });
         // Sync showTransition so peer sees Shwendy's start screen
         if (sync.showTransition !== undefined) setShowTransition(sync.showTransition as any);
+        if (sync.showChallengeIntro !== undefined) setShowChallengeIntro(sync.showChallengeIntro as any);
         setPaused(sync.paused);
         setSpeed(sync.speed);
         setBossDay(sync.bossDay);
@@ -565,8 +568,9 @@ function App() {
     // After boss day EOD (day already incremented by finishRestaurantDay), skip restaurant once
     // After trading (market just closed), go to Shwendy's
     if (!nextState.marketOpen && restaurantState === null && !skipNextRestaurant) {
-      setGameState(nextState);
-      setShowTransition("restaurant");
+      const challenges = selectDailyChallenges(nextState.day, false, true);
+      setGameState({ ...nextState, activeChallenges: challenges });
+      setShowChallengeIntro("restaurant");
       setEodPhase("summary");
       return;
     }
@@ -582,6 +586,10 @@ function App() {
     const challenges = selectDailyChallenges(marketState.day, isBossDay, false);
     setGameState({ ...marketState, activeChallenges: challenges });
     setEodPhase("summary");
+    if (!isBossDay) {
+      setShowChallengeIntro("trading");
+      setPaused(true);
+    }
 
     setBossDay(isBossDay);
     setBossView("trading");
@@ -912,14 +920,45 @@ function App() {
     );
   }
 
+  if (showChallengeIntro === "restaurant") {
+    const startCooking = () => {
+      setShowChallengeIntro(null);
+      setShowTransition("restaurant");
+    };
+    return (
+      <div className="title-screen" onClick={startCooking} onKeyDown={startCooking} tabIndex={0} ref={(el) => el?.focus()}>
+        <img src={shwendysExterior} alt="Shwendy's Restaurant" className="title-screen-bg" />
+        <div className="title-screen-overlay transition-overlay">
+          <h1 className="transition-title">🎯 Daily Challenge</h1>
+          <div className="challenge-intro-list">
+            {gameState.activeChallenges.map((ch) => {
+              const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
+              if (!def) return null;
+              return (
+                <div key={ch.id} className="challenge-intro-item">
+                  <span className="challenge-intro-icon">{def.icon}</span>
+                  <div className="challenge-intro-info">
+                    <span className="challenge-intro-name">{def.name}</span>
+                    <span className="challenge-intro-desc">{def.description}</span>
+                  </div>
+                  <span className="challenge-intro-reward">+{def.tickets} 🎟️</span>
+                </div>
+              );
+            })}
+          </div>
+          <button className="title-start-btn" onClick={startCooking}>START COOKING</button>
+          <p className="title-hint">Press any key to start</p>
+        </div>
+      </div>
+    );
+  }
+
   if (showTransition === "restaurant") {
     const startShift = () => {
       setShowTransition(null);
       setSpeed(1);
       setMyCounter(0);
       setRestaurantState(createRestaurantState(gameState, isMultiplayer ? mpState.players.length : 1));
-      const challenges = selectDailyChallenges(gameState.day, false, true);
-      setGameState((prev) => ({ ...prev, activeChallenges: challenges }));
     };
     return (
       <div className="title-screen" onClick={startShift} onKeyDown={startShift} tabIndex={0} ref={(el) => el?.focus()}>
@@ -1531,6 +1570,31 @@ function App() {
               <button className="pause-menu-btn" onClick={handleAcceptLoan}>💰 Take the Loan</button>
               <button className="pause-menu-btn" onClick={handleDeclineLoan}>🚫 Decline</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showChallengeIntro === "trading" && (
+        <div className="end-of-day-overlay">
+          <div className="end-of-day challenge-intro">
+            <h2>🎯 Daily Challenge</h2>
+            <div className="challenge-intro-list">
+              {gameState.activeChallenges.map((ch) => {
+                const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
+                if (!def) return null;
+                return (
+                  <div key={ch.id} className="challenge-intro-item">
+                    <span className="challenge-intro-icon">{def.icon}</span>
+                    <div className="challenge-intro-info">
+                      <span className="challenge-intro-name">{def.name}</span>
+                      <span className="challenge-intro-desc">{def.description}</span>
+                    </div>
+                    <span className="challenge-intro-reward">+{def.tickets} 🎟️</span>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="pause-menu-btn resume" onClick={() => { setShowChallengeIntro(null); setPaused(false); }}>Start Trading →</button>
           </div>
         </div>
       )}

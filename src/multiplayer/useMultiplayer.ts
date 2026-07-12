@@ -51,6 +51,7 @@ export function useMultiplayer(
   getBossDay: () => boolean,
   getBossView: () => string,
   getShowTransition: () => string | null,
+  getShowChallengeIntro: () => string | null,
   appCallbacks: {
     onViewInsider: () => void;
     onAcceptLoan: () => void;
@@ -110,6 +111,8 @@ export function useMultiplayer(
   getBossViewRef.current = getBossView;
   const getShowTransitionRef = useRef(getShowTransition);
   getShowTransitionRef.current = getShowTransition;
+  const getShowChallengeIntroRef = useRef(getShowChallengeIntro);
+  getShowChallengeIntroRef.current = getShowChallengeIntro;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -135,6 +138,7 @@ export function useMultiplayer(
       getBossDay: () => getBossDayRef.current(),
       getBossView: () => getBossViewRef.current(),
       getShowTransition: () => getShowTransitionRef.current(),
+      getShowChallengeIntro: () => getShowChallengeIntroRef.current(),
       onPlayerJoined: (player) => {
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },

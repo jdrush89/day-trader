@@ -3481,3 +3481,52 @@ body {
   color: rgba(255, 255, 255, 0.35);
   pointer-events: none;
 }
+
+/* Challenge Intro Dialog */
+.challenge-intro {
+  text-align: center;
+}
+.challenge-intro-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 20px 0;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.challenge-intro-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 200, 50, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: left;
+}
+.challenge-intro-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+.challenge-intro-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.challenge-intro-name {
+  font-weight: 600;
+  color: #ffd700;
+  font-size: 0.95rem;
+}
+.challenge-intro-desc {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+}
+.challenge-intro-reward {
+  font-weight: 600;
+  color: #ffd700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}

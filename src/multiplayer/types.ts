@@ -52,6 +52,7 @@ export interface GameSync {
   bossDay: boolean;
   bossView: string;
   showTransition: string | null;
+  showChallengeIntro: string | null;
   players: Player[];
   recentActions: ActionFeedItem[];
   playerActiveOrders?: Record<string, number | null>; // playerId → their active order ID

@@ -20,6 +20,7 @@ export interface HostCallbacks {
   getBossDay: () => boolean;
   getBossView: () => string;
   getShowTransition: () => string | null;
+  getShowChallengeIntro: () => string | null;
   onPlayerJoined: (player: Player) => void;
   onPlayerLeft: (playerId: string) => void;
   onViewInsider: () => void;
@@ -187,6 +188,7 @@ export class MultiplayerHost {
       bossDay: this.callbacks.getBossDay(),
       bossView: this.callbacks.getBossView(),
       showTransition: this.callbacks.getShowTransition(),
+      showChallengeIntro: this.callbacks.getShowChallengeIntro(),
       players: this.playerList,
       recentActions: this.actionFeed.slice(0, 5),
       playerActiveOrders: activeOrders,
