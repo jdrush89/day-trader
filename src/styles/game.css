@@ -3396,6 +3396,105 @@ body {
   margin: 12px 0;
 }
 
+/* Multiplayer save/resume styles */
+.mp-saves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.mp-save-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  text-align: left;
+}
+.mp-save-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.mp-save-day {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #eee;
+}
+.mp-save-players {
+  font-size: 0.8rem;
+  color: #aaa;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mp-save-date {
+  font-size: 0.72rem;
+  color: #666;
+}
+.mp-save-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.mp-save-resume-btn {
+  padding: 6px 14px;
+  background: #66bb6a;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.mp-save-resume-btn:hover {
+  background: #81c784;
+}
+.mp-save-delete-btn {
+  padding: 4px 8px;
+  background: none;
+  border: 1px solid rgba(239, 83, 80, 0.3);
+  border-radius: 4px;
+  color: #ef5350;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.mp-save-delete-btn:hover {
+  background: rgba(239, 83, 80, 0.1);
+  border-color: #ef5350;
+}
+.mp-resume-info {
+  margin: 12px 0;
+  padding: 12px;
+  background: rgba(102, 187, 106, 0.08);
+  border-radius: 8px;
+  border: 1px solid rgba(102, 187, 106, 0.2);
+}
+.mp-resume-label {
+  font-size: 0.85rem;
+  color: #ccc;
+  margin: 0 0 8px;
+}
+.mp-needed-players {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mp-needed-player {
+  font-size: 0.85rem;
+  color: #999;
+}
+.mp-needed-player.joined {
+  color: #66bb6a;
+}
+
 /* Multiplayer action feed */
 .mp-feed {
   position: fixed;

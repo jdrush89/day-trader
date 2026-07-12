@@ -16,11 +16,12 @@ import { Restaurant } from "./components/Restaurant";
 import { SecWheel } from "./components/SecWheel";
 import { DebugPanel } from "./components/DebugPanel";
 import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
-import { saveGame, loadGame, deleteSave } from "./game/save";
+import { saveGame, loadGame, deleteSave, saveMpGame, loadAllMpSaves, deleteMpSave } from "./game/save";
+import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.36";
+const GAME_VERSION = "0.0.37";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -58,6 +59,8 @@ function App() {
   const [localUpgrades, setLocalUpgrades] = useState<string[]>([]); // per-player trading upgrades (MP only)
   const [localRestaurantUpgrades, setLocalRestaurantUpgrades] = useState<string[]>([]); // per-player restaurant upgrades (MP only)
   const [challengeReadyPlayers, setChallengeReadyPlayers] = useState<Set<string>>(new Set()); // players who clicked "start" on challenge intro
+  const [mpSaveId, setMpSaveId] = useState<string | null>(null); // current MP save ID for auto-save
+  const [mpResumeData, setMpResumeData] = useState<MpSaveData | null>(null); // MP save being resumed (waiting for players)
   const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean }) => void>(() => {});
 
   // Multiplayer hook
@@ -74,6 +77,7 @@ function App() {
     () => showTransition,
     () => showChallengeIntro,
     () => showLoanOffer,
+    () => mpResumeData?.players,
     {
       onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
@@ -146,6 +150,15 @@ function App() {
         if (sync.playerActiveOrders && mpState.localPlayer) {
           const myActiveOrder = sync.playerActiveOrders[mpState.localPlayer.id];
           if (myActiveOrder !== undefined) setPeerActiveOrderId(myActiveOrder);
+        }
+        // Restore per-player upgrades on resume sync
+        if (sync.playerSaves && mpState.localPlayer) {
+          const myName = mpState.players.find((p) => p.id === mpState.localPlayer!.id)?.name;
+          const mySave = sync.playerSaves.find((p) => p.name === myName);
+          if (mySave) {
+            setLocalUpgrades(mySave.upgrades);
+            setLocalRestaurantUpgrades(mySave.restaurantUpgrades);
+          }
         }
       },
       onEodAllReady: () => {
@@ -385,10 +398,25 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex, bossDay, bossView, paused, showDebug, showOptions]);
 
+  // MP-aware save helper
+  const doSave = useCallback((gs: GameState) => {
+    if (isMultiplayer) {
+      const playerSaves: PlayerSaveData[] = mpState.players.map((p) => ({
+        name: p.name,
+        upgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localUpgrades : [],
+        restaurantUpgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localRestaurantUpgrades : [],
+      }));
+      const id = saveMpGame(gs, playerSaves, mpSaveId ?? undefined);
+      if (!mpSaveId) setMpSaveId(id);
+    } else {
+      saveGame(gs);
+    }
+  }, [isMultiplayer, mpState.players, mpState.localPlayer, localUpgrades, localRestaurantUpgrades, mpSaveId]);
+
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
     // Auto-save when market closes (end of trading day)
-    if (!gameState.marketOpen && !gameState.gameOver) saveGame(gameState);
+    if (!gameState.marketOpen && !gameState.gameOver) doSave(gameState);
   }, [gameState.marketOpen]);
 
   const NEWS_CHANNELS: MonitorChannel[] = ["business_news", "global_news", "social_media"];
@@ -632,7 +660,7 @@ function App() {
       setBossDay(false);
       setSkipNextRestaurant(true);
       setEodPhase("summary");
-      saveGame(gameOverState);
+      doSave(gameOverState);
       if (passed && gameOverState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
       else if (passed && gameOverState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
       return;
@@ -844,7 +872,7 @@ function App() {
     const earned = getTicketsEarned(evaluated);
     const challengedState = { ...nextState, activeChallenges: evaluated, tickets: nextState.tickets + earned };
     setGameState(challengedState);
-    saveGame(challengedState);
+    doSave(challengedState);
     // Don't clear restaurantState yet — keep restaurant UI visible during post-shift phases
     // Show challenge results before restaurant upgrades
     setEodPhase("challenges");
@@ -925,6 +953,8 @@ function App() {
     setDisconnectedPlayer(null);
     setLocalUpgrades([]);
     setLocalRestaurantUpgrades([]);
+    setMpSaveId(null);
+    setMpResumeData(null);
   }, [mpActions]);
 
   const formatMarketTime = (pct: number): string => {
@@ -959,6 +989,7 @@ function App() {
         onCancel={() => {
           mpActions.disconnect();
           setShowMultiplayerLobby(false);
+          setMpResumeData(null);
         }}
         onReset={() => mpActions.disconnect()}
         connecting={mpState.connecting}
@@ -966,13 +997,44 @@ function App() {
         roomCode={mpState.roomCode}
         players={mpState.players}
         isHost={mpState.role === "host"}
+        mpSaves={loadAllMpSaves()}
+        resumeData={mpResumeData}
+        onResume={(save, playerName) => {
+          setMpResumeData(save);
+          setMpSaveId(save.id);
+          mpActions.hostGame(playerName);
+        }}
+        onDeleteSave={(id) => {
+          deleteMpSave(id);
+        }}
         onStart={() => {
           mpActions.startGame();
           setShowMultiplayerLobby(false);
           setShowTitle(false);
-          setGameState(createInitialState());
-          setShowChallengeIntro("trading");
-          setPaused(true);
+          if (mpResumeData) {
+            // Resume from saved game
+            const gs = mpResumeData.gameState;
+            setGameState(gs);
+            // Find this player's upgrades by name
+            const myName = mpState.players.find((p) => p.id === (mpState.localPlayer?.id ?? "host"))?.name;
+            const mySave = mpResumeData.players.find((p) => p.name === myName);
+            if (mySave) {
+              setLocalUpgrades(mySave.upgrades);
+              setLocalRestaurantUpgrades(mySave.restaurantUpgrades);
+            }
+            // Determine what phase to show
+            if (gs.marketOpen) {
+              setShowChallengeIntro("trading");
+              setPaused(true);
+            } else {
+              setShowChallengeIntro("trading");
+              setPaused(true);
+            }
+          } else {
+            setGameState(createInitialState());
+            setShowChallengeIntro("trading");
+            setPaused(true);
+          }
         }}
       />
     );
@@ -1230,7 +1292,11 @@ function App() {
               <h2>⏸ Paused</h2>
               <button className="pause-menu-btn resume" onClick={() => { setShowOptions(null); setPaused(false); }}>Resume</button>
               <button className="pause-menu-btn" onClick={() => setShowOptions("pause")}>Options</button>
-            <button className="pause-menu-btn save-quit" onClick={() => { saveGame(gameState); setPaused(false); setRestaurantState(null); setShowTitle(true); setMenuFocusIndex(-1); }}>Save & Quit</button>
+            <button className="pause-menu-btn save-quit" onClick={() => {
+              doSave(gameState);
+              if (isMultiplayer) mpActions.disconnect();
+              setPaused(false); setRestaurantState(null); setShowTitle(true); setMenuFocusIndex(-1);
+            }}>Save & Quit</button>
             <button className="pause-menu-btn restart" onClick={() => { setPaused(false); handleRestart(); }}>Start Over</button>
             <p className="pause-hint">Press ESC to resume</p>
           </div>

@@ -42,6 +42,7 @@ export interface HostCallbacks {
   onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
   onAllRestaurantUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
   onAllMenuItemsChosen: (choices: { playerId: string; itemName: string }[]) => void;
+  getPlayerSaves?: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined;
 }
 
 export class MultiplayerHost {
@@ -233,6 +234,7 @@ export class MultiplayerHost {
       players: this.playerList,
       recentActions: this.actionFeed.slice(0, 5),
       playerActiveOrders: activeOrders,
+      playerSaves: this.callbacks.getPlayerSaves?.(),
     };
     this.network.broadcast(sync);
   }

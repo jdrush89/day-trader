@@ -2,6 +2,7 @@ import { GameState } from "./types";
 import { createTradingTracker } from "./challenges";
 
 const SAVE_KEY = "rogue-day-trader-save";
+const MP_SAVES_KEY = "rogue-day-trader-mp-saves";
 const SAVE_VERSION = 1;
 
 interface SaveData {
@@ -23,6 +24,13 @@ export function saveGame(gameState: GameState): void {
   }
 }
 
+function backfillGameState(gs: GameState): GameState {
+  if (!gs.challengeTracker) gs.challengeTracker = createTradingTracker();
+  if (!gs.activeChallenges) gs.activeChallenges = [];
+  if (gs.tickets == null) gs.tickets = 0;
+  return gs;
+}
+
 export function loadGame(): GameState | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
@@ -30,12 +38,7 @@ export function loadGame(): GameState | null {
     const data: SaveData = JSON.parse(raw);
     if (data.version !== SAVE_VERSION) return null;
     if (!data.gameState || typeof data.gameState.day !== "number") return null;
-    // Backfill challenge fields for older saves
-    const gs = data.gameState;
-    if (!gs.challengeTracker) gs.challengeTracker = createTradingTracker();
-    if (!gs.activeChallenges) gs.activeChallenges = [];
-    if (gs.tickets == null) gs.tickets = 0;
-    return gs;
+    return backfillGameState(data.gameState);
   } catch {
     return null;
   }
@@ -47,4 +50,77 @@ export function hasSavedGame(): boolean {
 
 export function deleteSave(): void {
   localStorage.removeItem(SAVE_KEY);
+}
+
+// --- Multiplayer saves ---
+
+export interface PlayerSaveData {
+  name: string;
+  upgrades: string[];
+  restaurantUpgrades: string[];
+}
+
+export interface MpSaveData {
+  id: string;
+  version: number;
+  gameState: GameState;
+  players: PlayerSaveData[];
+  savedAt: number;
+}
+
+function generateSaveId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+export function saveMpGame(
+  gameState: GameState,
+  players: PlayerSaveData[],
+  existingId?: string,
+): string {
+  const saves = loadAllMpSaves();
+  const id = existingId ?? generateSaveId();
+  const data: MpSaveData = {
+    id,
+    version: SAVE_VERSION,
+    gameState,
+    players,
+    savedAt: Date.now(),
+  };
+  const idx = saves.findIndex((s) => s.id === id);
+  if (idx >= 0) saves[idx] = data;
+  else saves.push(data);
+  try {
+    localStorage.setItem(MP_SAVES_KEY, JSON.stringify(saves));
+  } catch {
+    // silently fail
+  }
+  return id;
+}
+
+export function loadAllMpSaves(): MpSaveData[] {
+  try {
+    const raw = localStorage.getItem(MP_SAVES_KEY);
+    if (!raw) return [];
+    const saves: MpSaveData[] = JSON.parse(raw);
+    return saves.filter((s) => s.version === SAVE_VERSION && s.gameState && typeof s.gameState.day === "number");
+  } catch {
+    return [];
+  }
+}
+
+export function loadMpSave(id: string): MpSaveData | null {
+  const saves = loadAllMpSaves();
+  const save = saves.find((s) => s.id === id);
+  if (!save) return null;
+  save.gameState = backfillGameState(save.gameState);
+  return save;
+}
+
+export function deleteMpSave(id: string): void {
+  const saves = loadAllMpSaves().filter((s) => s.id !== id);
+  try {
+    localStorage.setItem(MP_SAVES_KEY, JSON.stringify(saves));
+  } catch {
+    // silently fail
+  }
 }

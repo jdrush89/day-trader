@@ -59,6 +59,7 @@ export interface GameSync {
   players: Player[];
   recentActions: ActionFeedItem[];
   playerActiveOrders?: Record<string, number | null>; // playerId → their active order ID
+  playerSaves?: Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }>; // for resume sync
 }
 
 export interface ActionFeedItem {
