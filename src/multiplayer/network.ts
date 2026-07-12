@@ -100,26 +100,44 @@ export class NetworkManager {
         this.setStatus("error");
       }, CONNECTION_TIMEOUT_MS);
 
+      let resolved = false;
+      const doResolve = () => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeout);
+        this.setStatus("connected");
+        resolve();
+      };
+
       const handler = (e: MessageEvent) => {
         const msg = JSON.parse(e.data);
         if (msg.type === "room_joined") {
-          clearTimeout(timeout);
           console.log("[MP Peer] Joined room:", roomCode, "existing peers:", msg.peers);
+          const peerIds = msg.peers as string[];
           // Initiate WebRTC connections to all existing peers
-          for (const existingPeerId of msg.peers) {
+          for (const existingPeerId of peerIds) {
             this.createPeerConnection(existingPeerId, true);
           }
-          // Don't resolve yet — wait for first WebRTC peer to connect
-          this._onFirstPeerConnected = () => {
-            clearTimeout(timeout);
-            this.setStatus("connected");
-            resolve();
-          };
+          // Wait for first WebRTC peer to connect
+          this._onFirstPeerConnected = doResolve;
           // If no peers exist, resolve immediately (host waiting for joiners)
-          if (msg.peers.length === 0) {
-            clearTimeout(timeout);
-            this.setStatus("connected");
-            resolve();
+          if (peerIds.length === 0) {
+            doResolve();
+          } else {
+            // If WebRTC doesn't connect in 8s, fall back to relay
+            setTimeout(() => {
+              if (!resolved && this.ws?.readyState === 1) {
+                console.log("[MP] WebRTC timed out, falling back to relay for all peers");
+                this._useRelay = true;
+                for (const pid of peerIds) {
+                  if (!(this.peers.get(pid) as any)?.connected) {
+                    this._relayPeers.add(pid);
+                    this.callbacks.onPeerConnected(pid);
+                  }
+                }
+                doResolve();
+              }
+            }, 8000);
           }
         } else if (msg.type === "error") {
           clearTimeout(timeout);
@@ -252,6 +270,19 @@ export class NetworkManager {
         case "peer_joined":
           // New peer joined our room — wait for them to initiate WebRTC
           console.log("[MP] Peer joined room:", msg.peerId);
+          // Set relay fallback timer — if WebRTC doesn't connect in 8s, use relay
+          if (this._isHost) {
+            const joinedPeerId = msg.peerId as string;
+            setTimeout(() => {
+              const peer = this.peers.get(joinedPeerId);
+              if ((!peer || peer.destroyed || !(peer as any).connected) && this.ws?.readyState === 1) {
+                console.log("[MP Host] WebRTC timed out for", joinedPeerId, "- falling back to relay");
+                this._useRelay = true;
+                this._relayPeers.add(joinedPeerId);
+                this.callbacks.onPeerConnected(joinedPeerId);
+              }
+            }, 8000);
+          }
           break;
 
         case "peer_left":
@@ -335,7 +366,14 @@ export class NetworkManager {
 
     peer.on("connect", () => {
       console.log("[MP] WebRTC connected to", remotePeerId);
-      this.callbacks.onPeerConnected(remotePeerId);
+      // If already connected via relay, upgrade to WebRTC silently
+      if (!this._relayPeers.has(remotePeerId)) {
+        this.callbacks.onPeerConnected(remotePeerId);
+      } else {
+        // Upgrade: remove from relay since WebRTC is now working
+        this._relayPeers.delete(remotePeerId);
+        console.log("[MP] Upgraded from relay to WebRTC for", remotePeerId);
+      }
       if (this._onFirstPeerConnected) {
         this._onFirstPeerConnected();
         this._onFirstPeerConnected = null;
@@ -366,7 +404,9 @@ export class NetworkManager {
       console.error("[MP] Peer error with", remotePeerId, err.message);
       this.peers.delete(remotePeerId);
       // Fall back to WebSocket relay instead of disconnecting
-      if (this.ws?.readyState === 1) {
+      if (this._relayPeers.has(remotePeerId)) {
+        // Already set up as relay peer (by timeout), nothing to do
+      } else if (this.ws?.readyState === 1) {
         console.log("[MP] Falling back to WebSocket relay for", remotePeerId);
         this._useRelay = true;
         this._relayPeers.add(remotePeerId);

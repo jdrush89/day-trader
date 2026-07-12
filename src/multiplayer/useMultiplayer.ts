@@ -181,7 +181,7 @@ export function useMultiplayer(
     });
 
     try {
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Connection timed out")), 15000));
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Connection timed out")), 25000));
       const roomCode = await Promise.race([host.start(), timeout]);
       host.setHostPlayer(localPlayer);
       hostRef.current = host;
@@ -262,7 +262,7 @@ export function useMultiplayer(
     });
 
     try {
-      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Connection timed out")), 15000));
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Connection timed out")), 25000));
       await Promise.race([peer.connect(roomCode, playerName), timeout]);
       peerRef.current = peer;
       setState((s) => ({ ...s, role: "peer", roomCode, connecting: false }));
