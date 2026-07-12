@@ -37,6 +37,8 @@ export interface HostCallbacks {
   // EOD gate callbacks: called when ALL players have made their choice
   onAllUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
   onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
+  onAllRestaurantUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
+  onAllMenuItemsChosen: (choices: { playerId: string; itemName: string }[]) => void;
 }
 
 export class MultiplayerHost {
@@ -51,7 +53,10 @@ export class MultiplayerHost {
   // EOD gate tracking
   private upgradeChoices: Map<string, string> = new Map(); // playerId → upgradeId
   private stockChoices: Map<string, string> = new Map(); // playerId → symbol
+  private restaurantUpgradeChoices: Map<string, string> = new Map(); // playerId → upgradeId
+  private menuItemChoices: Map<string, string> = new Map(); // playerId → itemName
   private _eodWaitingFor: string[] = []; // player names still choosing
+  private _eodGatePhase: "upgrades" | "restaurant-upgrades" | "menu-draft" | null = null;
 
   // Per-player restaurant state
   private playerActiveOrder: Map<string, number | null> = new Map(); // playerId → activeOrderId
@@ -115,32 +120,64 @@ export class MultiplayerHost {
   resetEodGate(): void {
     this.upgradeChoices.clear();
     this.stockChoices.clear();
+    this.restaurantUpgradeChoices.clear();
+    this.menuItemChoices.clear();
     this._eodWaitingFor = this.playerList.map((p) => p.name);
+    this._eodGatePhase = null;
   }
 
   // Host player submits their own EOD choice
-  submitHostChoice(phase: "upgrades" | "stocks", choice: string): void {
+  submitHostChoice(phase: "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft", choice: string): void {
     if (!this._hostPlayer) return;
     if (phase === "upgrades") {
       this.upgradeChoices.set(this._hostPlayer.id, choice);
-    } else {
+    } else if (phase === "stocks") {
       this.stockChoices.set(this._hostPlayer.id, choice);
+    } else if (phase === "restaurant-upgrades") {
+      this._eodGatePhase = "restaurant-upgrades";
+      this.restaurantUpgradeChoices.set(this._hostPlayer.id, choice);
+    } else if (phase === "menu-draft") {
+      this._eodGatePhase = "menu-draft";
+      this.menuItemChoices.set(this._hostPlayer.id, choice);
     }
     this.checkEodGate();
   }
 
   private checkEodGate(): void {
     const allPlayers = this.playerList;
-    // A player is "done" when they have submitted their stock choice
-    // (upgrade is optional — some rounds may not have upgrades)
+
+    if (this._eodGatePhase === "restaurant-upgrades") {
+      const remaining = allPlayers.filter((p) => !this.restaurantUpgradeChoices.has(p.id));
+      this._eodWaitingFor = remaining.map((p) => p.name);
+      this.network.broadcast({ type: "eod_waiting", waitingFor: this._eodWaitingFor });
+      if (remaining.length === 0) {
+        const choices = Array.from(this.restaurantUpgradeChoices.entries()).map(([playerId, upgradeId]) => ({ playerId, upgradeId }));
+        this.callbacks.onAllRestaurantUpgradesChosen(choices);
+        this.network.broadcast({ type: "eod_all_ready" });
+        this._eodGatePhase = null;
+      }
+      return;
+    }
+
+    if (this._eodGatePhase === "menu-draft") {
+      const remaining = allPlayers.filter((p) => !this.menuItemChoices.has(p.id));
+      this._eodWaitingFor = remaining.map((p) => p.name);
+      this.network.broadcast({ type: "eod_waiting", waitingFor: this._eodWaitingFor });
+      if (remaining.length === 0) {
+        const choices = Array.from(this.menuItemChoices.entries()).map(([playerId, itemName]) => ({ playerId, itemName }));
+        this.callbacks.onAllMenuItemsChosen(choices);
+        this.network.broadcast({ type: "eod_all_ready" });
+        this._eodGatePhase = null;
+      }
+      return;
+    }
+
+    // Default: trading upgrades + stocks gate
     const remaining = allPlayers.filter((p) => !this.stockChoices.has(p.id));
     this._eodWaitingFor = remaining.map((p) => p.name);
-
-    // Broadcast waiting status
     this.network.broadcast({ type: "eod_waiting", waitingFor: this._eodWaitingFor });
 
     if (remaining.length === 0) {
-      // All players have chosen — fire combined callback
       const upgradeList = Array.from(this.upgradeChoices.entries()).map(([playerId, upgradeId]) => ({ playerId, upgradeId }));
       const stockList = Array.from(this.stockChoices.entries()).map(([playerId, symbol]) => ({ playerId, symbol }));
       this.callbacks.onAllUpgradesChosen(upgradeList);
@@ -312,10 +349,16 @@ export class MultiplayerHost {
         this.checkEodGate();
         break;
       case "choose_restaurant_upgrade":
-        this.callbacks.onChooseRestaurantUpgrade(action.upgradeId);
+        this._eodGatePhase = "restaurant-upgrades";
+        this.restaurantUpgradeChoices.set(player.id, action.upgradeId);
+        this.addFeedItem(player.id, player.name, `${player.name} chose a kitchen upgrade`);
+        this.checkEodGate();
         break;
       case "choose_menu_item":
-        this.callbacks.onChooseMenuItem(action.itemName);
+        this._eodGatePhase = "menu-draft";
+        this.menuItemChoices.set(player.id, action.itemName);
+        this.addFeedItem(player.id, player.name, `${player.name} chose a recipe`);
+        this.checkEodGate();
         break;
       case "claim_order":
         this.callbacks.setRestaurantState((prev) => {

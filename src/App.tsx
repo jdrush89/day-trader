@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.24";
+const GAME_VERSION = "0.0.25";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -55,6 +55,8 @@ function App() {
   const [mpUpgradeChoice, setMpUpgradeChoice] = useState<string | null>(null); // track upgrade pick locally in MP
   const [myCounter, setMyCounter] = useState(0); // which restaurant counter the local player is viewing
   const [peerActiveOrderId, setPeerActiveOrderId] = useState<number | null>(null); // peer's local active order
+  const [localUpgrades, setLocalUpgrades] = useState<string[]>([]); // per-player trading upgrades (MP only)
+  const [localRestaurantUpgrades, setLocalRestaurantUpgrades] = useState<string[]>([]); // per-player restaurant upgrades (MP only)
   const beginScheduledDayRef = useRef<(state?: GameState) => void>(() => {});
 
   // Multiplayer hook
@@ -131,14 +133,22 @@ function App() {
         setPaused(true);
       },
       onAllUpgradesChosen: (choices) => {
-        // Apply all upgrades to shared state
-        setGameState((prev) => {
-          let state = prev;
-          for (const { upgradeId } of choices) {
-            state = acquireUpgrade(state, upgradeId);
+        // Each player's upgrade applies only to them (stored locally)
+        const myId = mpState.localPlayer?.id ?? "host";
+        const myChoice = choices.find((c) => c.playerId === myId);
+        if (myChoice) {
+          setLocalUpgrades((prev) => [...prev, myChoice.upgradeId]);
+          // Handle special upgrades that affect shared state (monitor, golden_parachute)
+          const upgrade = UPGRADE_POOL.find((u) => u.id === myChoice.upgradeId);
+          if (upgrade) {
+            if (myChoice.upgradeId === "monitor") {
+              setGameState((prev) => prev.monitors.length < 3 ? { ...prev, monitors: [...prev.monitors, { id: prev.monitors.length, channel: "business_news" as any }] } : prev);
+            }
+            if (myChoice.upgradeId === "golden_parachute") {
+              setGameState((prev) => ({ ...prev, goldenParachutes: prev.goldenParachutes + 1 }));
+            }
           }
-          return state;
-        });
+        }
       },
       onAllStocksChosen: (choices) => {
         // Apply all stocks and advance to next day
@@ -147,6 +157,38 @@ function App() {
           for (const { symbol } of choices) {
             state = draftStock(state, symbol);
           }
+          setTimeout(() => beginScheduledDayRef.current(state), 0);
+          return state;
+        });
+        setEodChoiceMade(false);
+      },
+      onAllRestaurantUpgradesChosen: (choices) => {
+        // Each player's restaurant upgrade applies only to them (stored locally)
+        const myId = mpState.localPlayer?.id ?? "host";
+        const myChoice = choices.find((c) => c.playerId === myId);
+        if (myChoice) {
+          setLocalRestaurantUpgrades((prev) => [...prev, myChoice.upgradeId]);
+        }
+        setEodChoiceMade(false);
+        // Move to menu-draft if available, else advance
+        setGameState((prev) => {
+          if (prev.menuDraftOptions.length > 0) {
+            setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
+            return prev;
+          }
+          setRestaurantState(null);
+          setTimeout(() => beginScheduledDayRef.current(prev), 0);
+          return prev;
+        });
+      },
+      onAllMenuItemsChosen: (choices) => {
+        // All menu items get added to shared pool
+        setGameState((prev) => {
+          let state = prev;
+          for (const { itemName } of choices) {
+            state = draftMenuItem(state, itemName);
+          }
+          setRestaurantState(null);
           setTimeout(() => beginScheduledDayRef.current(state), 0);
           return state;
         });
@@ -663,9 +705,15 @@ function App() {
       setEodPhase("stocks");
       setEodChoiceMade(false);
       if (isMultiplayer) mpActions.resetEodGate();
-    } else if (gameState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
-    else if (gameState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
-    else {
+    } else if (gameState.restaurantUpgradeDraftOptions.length > 0) {
+      setEodPhase("restaurant-upgrades");
+      setEodChoiceMade(false);
+      if (isMultiplayer) mpActions.resetEodGate();
+    } else if (gameState.menuDraftOptions.length > 0) {
+      setEodPhase("menu-draft");
+      setEodChoiceMade(false);
+      if (isMultiplayer) mpActions.resetEodGate();
+    } else {
       setRestaurantState(null);
       beginScheduledDay();
     }
@@ -712,6 +760,16 @@ function App() {
   }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions, mpUpgradeChoice]);
 
   const handleAcquireRestaurantUpgrade = useCallback((upgradeId: string) => {
+    if (isMultiplayer) {
+      // In MP, submit choice to gate and wait
+      if (isPeer) {
+        mpActions.sendAction({ type: "choose_restaurant_upgrade", upgradeId });
+      } else {
+        mpActions.submitHostChoice("restaurant-upgrades", upgradeId);
+      }
+      setEodChoiceMade(true);
+      return;
+    }
     const nextState = acquireRestaurantUpgrade(gameState, upgradeId);
     setGameState(nextState);
     if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
@@ -719,12 +777,21 @@ function App() {
       setRestaurantState(null);
       beginScheduledDay(nextState);
     }
-  }, [beginScheduledDay, gameState]);
+  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
 
   const handleDraftMenuItem = useCallback((itemName: string) => {
+    if (isMultiplayer) {
+      if (isPeer) {
+        mpActions.sendAction({ type: "choose_menu_item", itemName });
+      } else {
+        mpActions.submitHostChoice("menu-draft", itemName);
+      }
+      setEodChoiceMade(true);
+      return;
+    }
     setRestaurantState(null);
     beginScheduledDay(draftMenuItem(gameState, itemName));
-  }, [beginScheduledDay, gameState]);
+  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
 
   const handleRestaurantFinish = useCallback((earnings: number) => {
     const nextState = finishRestaurantDay(gameState, earnings);
@@ -806,6 +873,8 @@ function App() {
     setPaused(false);
     setShowMultiplayerLobby(false);
     setDisconnectedPlayer(null);
+    setLocalUpgrades([]);
+    setLocalRestaurantUpgrades([]);
   }, [mpActions]);
 
   const formatMarketTime = (pct: number): string => {
@@ -819,9 +888,16 @@ function App() {
     return `${displayHour}:${mins.toString().padStart(2, "0")} ${ampm}`;
   };
 
-  const showAnalystRating = hasUpgrade(gameState, "analyst_ratings");
-  const showDarkPool = hasUpgrade(gameState, "dark_pool");
+  const showAnalystRating = isMultiplayer ? effectiveHasUpgrade("analyst_ratings") : hasUpgrade(gameState, "analyst_ratings");
+  const showDarkPool = isMultiplayer ? effectiveHasUpgrade("dark_pool") : hasUpgrade(gameState, "dark_pool");
   const isRestaurantShift = restaurantState !== null && !bossDay;
+
+  // In multiplayer, use per-player upgrades; in single-player, use shared state
+  const effectiveUpgrades = isMultiplayer ? localUpgrades : gameState.acquiredUpgrades;
+  const effectiveRestaurantUpgrades = isMultiplayer ? localRestaurantUpgrades : gameState.acquiredRestaurantUpgrades;
+  const effectiveHasUpgrade = (id: string) => effectiveUpgrades.includes(id);
+  const effectiveUpgradeCount = (id: string) => effectiveUpgrades.filter((u) => u === id).length;
+  const effectiveRestaurantUpgradeCount = (id: string) => effectiveRestaurantUpgrades.filter((u) => u === id).length;
 
   // Multiplayer lobby overlay — but close it when game starts for peers
   if (showMultiplayerLobby && !(isPeer && mpState.gameStarted)) {
@@ -978,12 +1054,12 @@ function App() {
      {!isRestaurantShift && (
         <header className="game-header">
           <h1>{bossDay ? "⚠️ BOSS DAY: Day Shift!" : "📈 Day Trader"}</h1>
-          {gameState.acquiredUpgrades.length > 0 && (
+          {effectiveUpgrades.length > 0 && (
             <div className="upgrade-icons">
-              {[...new Set(gameState.acquiredUpgrades)].map((id) => {
+              {[...new Set(effectiveUpgrades)].map((id) => {
                 const card = UPGRADE_POOL.find((u) => u.id === id);
                 if (!card) return null;
-                const count = gameState.acquiredUpgrades.filter((u) => u === id).length;
+                const count = effectiveUpgrades.filter((u) => u === id).length;
                 return (
                   <span key={id} className="upgrade-icon" data-tooltip={`${card.name}${count > 1 ? ` x${count}` : ""}: ${card.description}`}>
                     {card.icon}
@@ -1148,7 +1224,7 @@ function App() {
           netWorth={gameState.cash + gameState.portfolio.reduce((sum: number, pos) => { const s = gameState.stocks.find((st) => st.symbol === pos.symbol); return sum + (s ? s.price * pos.shares : 0); }, 0) + gameState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0) - gameState.shorts.reduce((sum: number, sp) => { const s = gameState.stocks.find((st) => st.symbol === sp.symbol); return sum + (s ? s.price * sp.shares : 0); }, 0) + getOptionsValue(gameState)}
           speed={speed}
           onSpeedChange={handleSetSpeed}
-          acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
+          acquiredRestaurantUpgrades={effectiveRestaurantUpgrades}
           activeChallenges={gameState.activeChallenges}
           tickets={gameState.tickets}
           debugFF={debugFF}
@@ -1234,8 +1310,8 @@ function App() {
         )}
         {eodPhase === "restaurant-upgrades" && (
           <div className="end-of-day-overlay">
-            {isPeer ? (
-              <div className="upgrade-draft"><h2>⏳ Waiting for host...</h2><p className="upgrade-draft-sub">Host is choosing a restaurant upgrade</p></div>
+            {eodChoiceMade ? (
+              <div className="upgrade-draft"><h2>⏳ Waiting for other players...</h2><p className="upgrade-draft-sub">You've chosen your upgrade</p></div>
             ) : (
             <div className="upgrade-draft">
               <h2>🍽️ Choose a Restaurant Upgrade</h2>
@@ -1244,7 +1320,7 @@ function App() {
                 {gameState.restaurantUpgradeDraftOptions.map((id) => {
                   const card = RESTAURANT_UPGRADE_POOL.find((upgrade) => upgrade.id === id);
                   if (!card) return null;
-                  const owned = restaurantUpgradeCount(id);
+                  const owned = effectiveRestaurantUpgradeCount(id);
                   return (
                     <button key={id} className="upgrade-draft-card" onClick={() => handleAcquireRestaurantUpgrade(id)}>
                       <div className="upgrade-card-icon">{card.icon}</div>
@@ -1262,8 +1338,8 @@ function App() {
         )}
         {eodPhase === "menu-draft" && (
           <div className="end-of-day-overlay">
-            {isPeer ? (
-              <div className="stock-draft"><h2>⏳ Waiting for host...</h2><p className="stock-draft-sub">Host is choosing a menu item</p></div>
+            {eodChoiceMade ? (
+              <div className="stock-draft"><h2>⏳ Waiting for other players...</h2><p className="stock-draft-sub">You've chosen your recipe</p></div>
             ) : (
             <div className="stock-draft">
               <h2>🧾 Add a New Menu Item</h2>
@@ -1419,7 +1495,7 @@ function App() {
                   {gameState.upgradeDraftOptions.map((id) => {
                     const card = UPGRADE_POOL.find((u) => u.id === id);
                     if (!card) return null;
-                    const owned = upgradeCount(gameState, id);
+                    const owned = effectiveUpgradeCount(id);
                     return (
                       <button key={id} className="upgrade-draft-card" onClick={() => handleAcquireUpgrade(id)}>
                         <div className="upgrade-card-icon">{card.icon}</div>
@@ -1478,7 +1554,7 @@ function App() {
               netWorth={0}
               speed={speed}
               onSpeedChange={handleSetSpeed}
-              acquiredRestaurantUpgrades={gameState.acquiredRestaurantUpgrades}
+              acquiredRestaurantUpgrades={effectiveRestaurantUpgrades}
               isBossDay={true}
               activeChallenges={gameState.activeChallenges}
               tickets={gameState.tickets}

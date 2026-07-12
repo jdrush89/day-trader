@@ -37,7 +37,7 @@ export interface MultiplayerActions {
   sendAction: (action: PeerAction) => void;
   // EOD gate controls (host only)
   resetEodGate: () => void;
-  submitHostChoice: (phase: "upgrades" | "stocks", choice: string) => void;
+  submitHostChoice: (phase: "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft", choice: string) => void;
 }
 
 export function useMultiplayer(
@@ -62,6 +62,8 @@ export function useMultiplayer(
     onChooseStock: (symbol: string) => void;
     onChooseRestaurantUpgrade: (id: string) => void;
     onChooseMenuItem: (name: string) => void;
+    onAllRestaurantUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
+    onAllMenuItemsChosen: (choices: { playerId: string; itemName: string }[]) => void;
     onChangeChannel: (monitorId: number, channel: string) => void;
     onSelectStock: (monitorId: number, symbol: string) => void;
     onPeerStateSync: (sync: GameSync) => void;
@@ -166,6 +168,14 @@ export function useMultiplayer(
       },
       onAllStocksChosen: (choices) => {
         appCallbacksRef.current.onAllStocksChosen(choices);
+        setState((s) => ({ ...s, eodWaitingFor: [] }));
+      },
+      onAllRestaurantUpgradesChosen: (choices) => {
+        appCallbacksRef.current.onAllRestaurantUpgradesChosen(choices);
+        setState((s) => ({ ...s, eodWaitingFor: [] }));
+      },
+      onAllMenuItemsChosen: (choices) => {
+        appCallbacksRef.current.onAllMenuItemsChosen(choices);
         setState((s) => ({ ...s, eodWaitingFor: [] }));
       },
     });
@@ -304,7 +314,7 @@ export function useMultiplayer(
     }
   }, []);
 
-  const submitHostChoice = useCallback((phase: "upgrades" | "stocks", choice: string) => {
+  const submitHostChoice = useCallback((phase: "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft", choice: string) => {
     if (hostRef.current) {
       hostRef.current.submitHostChoice(phase, choice);
       setState((s) => ({ ...s, eodWaitingFor: hostRef.current!.eodWaitingFor }));
