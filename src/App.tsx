@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.32";
+const GAME_VERSION = "0.0.33";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -57,6 +57,7 @@ function App() {
   const [peerActiveOrderId, setPeerActiveOrderId] = useState<number | null>(null); // peer's local active order
   const [localUpgrades, setLocalUpgrades] = useState<string[]>([]); // per-player trading upgrades (MP only)
   const [localRestaurantUpgrades, setLocalRestaurantUpgrades] = useState<string[]>([]); // per-player restaurant upgrades (MP only)
+  const [challengeReadyPlayers, setChallengeReadyPlayers] = useState<Set<string>>(new Set()); // players who clicked "start" on challenge intro
   const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean }) => void>(() => {});
 
   // Multiplayer hook
@@ -83,6 +84,20 @@ function App() {
         }
       },
       onDeclineLoan: () => { setShowLoanOffer(null); setShowChallengeIntro("trading"); },
+      onDismissTransition: () => {
+        setShowTransition(null);
+        setSpeed(1);
+        setMyCounter(0);
+        setRestaurantState(createRestaurantState(gameState, mpState.players.length));
+        setShowChallengeIntro("restaurant");
+      },
+      onDismissChallengeIntro: (playerId: string) => {
+        setChallengeReadyPlayers((prev) => {
+          const next = new Set(prev);
+          next.add(playerId);
+          return next;
+        });
+      },
       onSetSpeed: setSpeed,
       onTogglePause: () => setPaused((p) => !p),
       onChooseUpgrade: (id) => { const nextState = acquireUpgrade(gameState, id); if (nextState.stockDraftOptions.length > 0) { setGameState(nextState); setEodPhase("stocks"); } else { setGameState(nextState); setEodPhase("summary"); } },
@@ -239,6 +254,18 @@ function App() {
     peerMenuDraftGenerated.current = gameState.day;
     setGameState((prev) => generateMenuDraft(prev));
   }, [isPeer, eodPhase, gameState.day]);
+
+  // Challenge intro gate: when all players clicked "start", dismiss the challenge intro
+  useEffect(() => {
+    if (!isMultiplayer || !showChallengeIntro) return;
+    const totalPlayers = mpState.players.length;
+    if (totalPlayers < 2) return;
+    if (challengeReadyPlayers.size >= totalPlayers) {
+      setShowChallengeIntro(null);
+      setPaused(false);
+      setChallengeReadyPlayers(new Set());
+    }
+  }, [challengeReadyPlayers, isMultiplayer, showChallengeIntro, mpState.players.length]);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -1055,6 +1082,11 @@ function App() {
 
   if (showTransition === "restaurant") {
     const startShift = () => {
+      if (isMultiplayer && isPeer) {
+        // Peer sends action to host to dismiss transition
+        mpActions.sendAction({ type: "dismiss_transition" } as any);
+        return;
+      }
       setShowTransition(null);
       setSpeed(1);
       setMyCounter(0);
@@ -1169,7 +1201,7 @@ function App() {
         </header>
       )}
 
-      {paused && !showChallengeIntro && !disconnectedPlayer && (
+      {paused && !showChallengeIntro && !disconnectedPlayer && !showLoanOffer && (
         <div className="pause-overlay">
           {showDebug ? (
             <DebugPanel
@@ -1308,7 +1340,18 @@ function App() {
                   );
                 })}
               </div>
-              <button className="pause-menu-btn resume" onClick={() => setShowChallengeIntro(null)}>Start Cooking →</button>
+              <button className="pause-menu-btn resume" onClick={() => {
+                if (isMultiplayer) {
+                  const myId = mpState.localPlayer?.id ?? "host";
+                  if (isPeer) {
+                    mpActions.sendAction({ type: "dismiss_challenge_intro" } as any);
+                  } else {
+                    setChallengeReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+                  }
+                } else {
+                  setShowChallengeIntro(null);
+                }
+              }}>{isMultiplayer && challengeReadyPlayers.has(mpState.localPlayer?.id ?? "host") ? "Waiting for players..." : "Start Cooking →"}</button>
             </div>
           </div>
         )}
@@ -1719,7 +1762,19 @@ function App() {
                 );
               })}
             </div>
-            <button className="pause-menu-btn resume" onClick={() => { setShowChallengeIntro(null); setPaused(false); }}>Start Trading →</button>
+            <button className="pause-menu-btn resume" onClick={() => {
+              if (isMultiplayer) {
+                const myId = mpState.localPlayer?.id ?? "host";
+                if (isPeer) {
+                  mpActions.sendAction({ type: "dismiss_challenge_intro" } as any);
+                } else {
+                  setChallengeReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+                }
+              } else {
+                setShowChallengeIntro(null);
+                setPaused(false);
+              }
+            }}>{isMultiplayer && challengeReadyPlayers.has(mpState.localPlayer?.id ?? "host") ? "Waiting for players..." : "Start Trading →"}</button>
           </div>
         </div>
       )}

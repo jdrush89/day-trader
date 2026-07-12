@@ -72,6 +72,8 @@ export function useMultiplayer(
     onPlayerDisconnected: (playerName: string) => void;
     onAllUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
     onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
+    onDismissTransition: () => void;
+    onDismissChallengeIntro: (playerId: string) => void;
   },
 ): [MultiplayerState, MultiplayerActions] {
   const [state, setState] = useState<MultiplayerState>({
@@ -182,6 +184,8 @@ export function useMultiplayer(
         appCallbacksRef.current.onAllMenuItemsChosen(choices);
         setState((s) => ({ ...s, eodWaitingFor: [] }));
       },
+      onDismissTransition: () => appCallbacksRef.current.onDismissTransition(),
+      onDismissChallengeIntro: (playerId) => appCallbacksRef.current.onDismissChallengeIntro(playerId),
     });
 
     try {

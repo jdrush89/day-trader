@@ -27,6 +27,8 @@ export interface HostCallbacks {
   onViewInsider: () => void;
   onAcceptLoan: () => void;
   onDeclineLoan: () => void;
+  onDismissTransition: () => void;
+  onDismissChallengeIntro: (playerId: string) => void;
   onSetSpeed: (speed: number) => void;
   onTogglePause: () => void;
   onChooseUpgrade: (id: string) => void;
@@ -332,6 +334,12 @@ export class MultiplayerHost {
         break;
       case "decline_loan":
         this.callbacks.onDeclineLoan();
+        break;
+      case "dismiss_transition":
+        this.callbacks.onDismissTransition();
+        break;
+      case "dismiss_challenge_intro":
+        this.callbacks.onDismissChallengeIntro(player.id);
         break;
       case "set_speed":
         this.callbacks.onSetSpeed(action.speed);
