@@ -771,6 +771,13 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
   let tracker = { ...state.challengeTracker };
   const activeCount = orderSlots.filter((s) => s && !s.failed && !s.served).length;
   if (activeCount > tracker.maxActiveOrders) tracker.maxActiveOrders = activeCount;
+  // Count orders actively cooking on grill/fry (prepStarted, not yet complete)
+  const cookingCount = orderSlots.filter((s) => {
+    if (!s || s.failed || s.served || !s.prepStarted) return false;
+    const step = s.menuItem.steps[s.currentStepIndex];
+    return step && (step.type === "grill" || step.type === "fry") && s.prepProgress < (step as any).duration;
+  }).length;
+  if (cookingCount > tracker.maxCookingOrders) tracker.maxCookingOrders = cookingCount;
   // Check if any order's patience went below 50%
   for (const slot of orderSlots) {
     if (slot && !slot.failed && !slot.served) {

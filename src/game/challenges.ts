@@ -24,6 +24,7 @@ export interface RestaurantChallengeTracker {
   allTipsPositive: boolean; // all completed orders had tip > 0
   clutchCompletions: number; // orders completed with < 2 sec patience left
   maxActiveOrders: number; // max simultaneous non-null, non-failed, non-served orders
+  maxCookingOrders: number; // max simultaneous orders on grill/fry with prepStarted
   subSecondCompletion: boolean; // any order completed in < 1 game-second
   anyTimerBelow50: boolean; // any order's patience went below 50%
 }
@@ -52,6 +53,7 @@ export function createRestaurantTracker(): RestaurantChallengeTracker {
     allTipsPositive: true,
     clutchCompletions: 0,
     maxActiveOrders: 0,
+    maxCookingOrders: 0,
     subSecondCompletion: false,
     anyTimerBelow50: false,
   };
@@ -285,7 +287,7 @@ export const RESTAURANT_CHALLENGES: ChallengeDefinition[] = [
     type: "restaurant",
     tickets: 2,
     icon: "🍳",
-    evaluate: (_t, _gs, rt) => (rt?.maxActiveOrders ?? 0) >= 3,
+    evaluate: (_t, _gs, rt) => (rt?.maxCookingOrders ?? 0) >= 3,
   },
   {
     id: "sub_second",
