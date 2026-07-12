@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, upgradeCount, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft } from "./game/engine";
 import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.15";
+const GAME_VERSION = "0.0.16";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -64,6 +64,7 @@ function App() {
     () => speed,
     () => bossDay,
     () => bossView,
+    () => showTransition,
     {
       onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
@@ -82,8 +83,16 @@ function App() {
       onChangeChannel: (monitorId, channel) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, channel: channel as MonitorChannel } : m) })),
       onSelectStock: (monitorId, symbol) => setGameState((prev) => ({ ...prev, monitors: prev.monitors.map((m) => m.id === monitorId ? { ...m, selectedStock: symbol } : m) })),
       onPeerStateSync: (sync) => {
-        // Apply synced game state directly, preserving local monitors
-        setGameState((prev) => ({ ...sync.gameState, monitors: prev.monitors }));
+        // Apply synced game state directly, preserving local monitors and local draft options during EOD
+        setGameState((prev) => {
+          const merged = { ...sync.gameState, monitors: prev.monitors };
+          // Preserve local draft options during multiplayer EOD picking
+          if (!prev.marketOpen && (prev.upgradeDraftOptions.length > 0 || prev.stockDraftOptions.length > 0)) {
+            merged.upgradeDraftOptions = prev.upgradeDraftOptions;
+            merged.stockDraftOptions = prev.stockDraftOptions;
+          }
+          return merged;
+        });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
         // Don't override local EOD phase during upgrade/stock picking
         setEodPhase((prev) => {
@@ -94,10 +103,17 @@ function App() {
           if (prev !== sync.eodPhase) setEodChoiceMade(false);
           return sync.eodPhase as any;
         });
+        // Sync showTransition so peer sees Shwendy's start screen
+        if (sync.showTransition !== undefined) setShowTransition(sync.showTransition as any);
         setPaused(sync.paused);
         setSpeed(sync.speed);
         setBossDay(sync.bossDay);
         setBossView(sync.bossView as any);
+      },
+      onEodAllReady: () => {
+        // All players have chosen — unblock the peer's EOD state so sync can resume
+        setEodChoiceMade(false);
+        setEodPhase("summary"); // will be overwritten by next sync from host
       },
       onAllUpgradesChosen: (choices) => {
         // Apply all upgrades to shared state
@@ -125,6 +141,17 @@ function App() {
   );
   const isMultiplayer = mpState.role !== "none";
   const isPeer = mpState.role === "peer";
+
+  // Peer: generate local draft options when entering EOD upgrades phase (so each player gets different choices)
+  const peerDraftGenerated = useRef<number>(0); // track which day's draft was generated
+  useEffect(() => {
+    if (!isPeer) return;
+    if (eodPhase !== "upgrades") return;
+    if (peerDraftGenerated.current === gameState.day) return; // already generated for this day
+    peerDraftGenerated.current = gameState.day;
+    // Generate our own random draft options
+    setGameState((prev) => generateDraftOptions(generateUpgradeDraft(prev)));
+  }, [isPeer, eodPhase, gameState.day]);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;

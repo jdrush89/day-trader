@@ -50,6 +50,7 @@ export interface GameSync {
   speed: number;
   bossDay: boolean;
   bossView: string;
+  showTransition: string | null;
   players: Player[];
   recentActions: ActionFeedItem[];
 }

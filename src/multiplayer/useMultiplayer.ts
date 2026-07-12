@@ -50,6 +50,7 @@ export function useMultiplayer(
   getSpeed: () => number,
   getBossDay: () => boolean,
   getBossView: () => string,
+  getShowTransition: () => string | null,
   appCallbacks: {
     onViewInsider: () => void;
     onAcceptLoan: () => void;
@@ -63,6 +64,7 @@ export function useMultiplayer(
     onChangeChannel: (monitorId: number, channel: string) => void;
     onSelectStock: (monitorId: number, symbol: string) => void;
     onPeerStateSync: (sync: GameSync) => void;
+    onEodAllReady: () => void;
     onAllUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
     onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
   },
@@ -106,6 +108,8 @@ export function useMultiplayer(
   getBossDayRef.current = getBossDay;
   const getBossViewRef = useRef(getBossView);
   getBossViewRef.current = getBossView;
+  const getShowTransitionRef = useRef(getShowTransition);
+  getShowTransitionRef.current = getShowTransition;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -130,6 +134,7 @@ export function useMultiplayer(
       getSpeed: () => getSpeedRef.current(),
       getBossDay: () => getBossDayRef.current(),
       getBossView: () => getBossViewRef.current(),
+      getShowTransition: () => getShowTransitionRef.current(),
       onPlayerJoined: (player) => {
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },
@@ -229,6 +234,7 @@ export function useMultiplayer(
       },
       onEodAllReady: () => {
         setState((s) => ({ ...s, eodWaitingFor: [] }));
+        appCallbacksRef.current.onEodAllReady();
       },
     });
 
