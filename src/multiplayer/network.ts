@@ -287,7 +287,6 @@ export class NetworkManager {
 
         case "peer_left":
           console.log("[MP] Peer left:", msg.peerId);
-          this._relayPeers.delete(msg.peerId);
           this.destroyPeerConnection(msg.peerId);
           break;
 

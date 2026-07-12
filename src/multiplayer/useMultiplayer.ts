@@ -161,7 +161,7 @@ export function useMultiplayer(
       onPlayerLeft: (playerId) => {
         const player = stateRef.current.players.find((p) => p.id === playerId);
         setState((s) => ({ ...s, players: s.players.filter((p) => p.id !== playerId) }));
-        if (player) appCallbacksRef.current.onPlayerDisconnected(player.name);
+        if (player && stateRef.current.gameStarted) appCallbacksRef.current.onPlayerDisconnected(player.name);
       },
       onViewInsider: () => appCallbacksRef.current.onViewInsider(),
       onAcceptLoan: () => appCallbacksRef.current.onAcceptLoan(),
@@ -232,7 +232,7 @@ export function useMultiplayer(
       onPlayerLeft: (playerId) => {
         const player = stateRef.current.players.find((p) => p.id === playerId);
         setState((s) => ({ ...s, players: s.players.filter((p) => p.id !== playerId) }));
-        if (player) appCallbacksRef.current.onPlayerDisconnected(player.name);
+        if (player && stateRef.current.gameStarted) appCallbacksRef.current.onPlayerDisconnected(player.name);
       },
       onActionFeed: (item) => {
         setState((s) => ({
@@ -260,11 +260,14 @@ export function useMultiplayer(
       },
       onDisconnected: () => {
         const wasInGame = stateRef.current.gameStarted;
-        setState((s) => ({ ...s, role: "none", roomCode: null, gameStarted: false }));
-        peerRef.current = null;
         if (wasInGame) {
+          // Keep role/players intact so disconnect dialog can save MP game properly
+          setState((s) => ({ ...s, gameStarted: false }));
           appCallbacksRef.current.onPlayerDisconnected("Host");
+        } else {
+          setState((s) => ({ ...s, role: "none", roomCode: null, gameStarted: false, error: "Host disconnected" }));
         }
+        peerRef.current = null;
       },
       onError: (err) => {
         setState((s) => ({ ...s, error: err, connecting: false }));

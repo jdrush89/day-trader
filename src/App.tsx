@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.39";
+const GAME_VERSION = "0.0.40";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
