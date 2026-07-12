@@ -357,16 +357,15 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
 
       // Shift+Number: switch counter
       if (event.shiftKey && state.numCounters > 1) {
-        const counterNum = Number.parseInt(event.key, 10);
-        if (!Number.isNaN(counterNum) && counterNum >= 1 && counterNum <= state.numCounters) {
-          event.preventDefault();
-          if (isPeer && onPeerKey) {
-            // Peer sends switch_counter via onSwitchCounter
+        // event.key gives symbols when shift is held (e.g. '!'), use event.code instead
+        const codeMatch = event.code.match(/^Digit(\d)$/);
+        if (codeMatch) {
+          const counterNum = Number.parseInt(codeMatch[1], 10);
+          if (counterNum >= 1 && counterNum <= state.numCounters) {
+            event.preventDefault();
             onSwitchCounter?.(counterNum - 1);
-          } else {
-            onSwitchCounter?.(counterNum - 1);
+            return;
           }
-          return;
         }
       }
 
@@ -664,7 +663,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         ) : (
           <div className="restaurant-empty-state">
             <h2>{state.shiftOver ? "Shift complete" : "Pick an order"}</h2>
-            <p>{state.shiftOver ? "Cash out and head back to the market." : `Hit 1-${state.orderSlots.length} or click a ticket to start cooking.`}</p>
+            <p>{state.shiftOver ? "Cash out and head back to the market." : `Hit 1-${state.slotsPerCounter} or click a ticket to start cooking.${state.numCounters > 1 ? ` Shift+1-${state.numCounters} to switch counters.` : ""}`}</p>
           </div>
         )}
       </section>
