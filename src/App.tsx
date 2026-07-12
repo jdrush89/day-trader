@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.20";
+const GAME_VERSION = "0.0.21";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -570,7 +570,7 @@ function App() {
     if (!nextState.marketOpen && restaurantState === null && !skipNextRestaurant) {
       const challenges = selectDailyChallenges(nextState.day, false, true);
       setGameState({ ...nextState, activeChallenges: challenges });
-      setShowChallengeIntro("restaurant");
+      setShowTransition("restaurant");
       setEodPhase("summary");
       return;
     }
@@ -832,6 +832,8 @@ function App() {
           setShowMultiplayerLobby(false);
           setShowTitle(false);
           setGameState(createInitialState());
+          setShowChallengeIntro("trading");
+          setPaused(true);
         }}
       />
     );
@@ -908,7 +910,7 @@ function App() {
               RESUME (Day {savedGame.day})
             </button>
           )}
-          <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); setGameState(createInitialState()); setShowTitle(false); }}>
+          <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); const s = createInitialState(); setGameState(s); setShowTitle(false); setShowChallengeIntro("trading"); setPaused(true); }}>
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setTitleTutorial("pick"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>VIEW TUTORIAL</button>
@@ -920,45 +922,13 @@ function App() {
     );
   }
 
-  if (showChallengeIntro === "restaurant") {
-    const startCooking = () => {
-      setShowChallengeIntro(null);
-      setShowTransition("restaurant");
-    };
-    return (
-      <div className="title-screen" onClick={startCooking} onKeyDown={startCooking} tabIndex={0} ref={(el) => el?.focus()}>
-        <img src={shwendysExterior} alt="Shwendy's Restaurant" className="title-screen-bg" />
-        <div className="title-screen-overlay transition-overlay">
-          <h1 className="transition-title">🎯 Daily Challenge</h1>
-          <div className="challenge-intro-list">
-            {gameState.activeChallenges.map((ch) => {
-              const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
-              if (!def) return null;
-              return (
-                <div key={ch.id} className="challenge-intro-item">
-                  <span className="challenge-intro-icon">{def.icon}</span>
-                  <div className="challenge-intro-info">
-                    <span className="challenge-intro-name">{def.name}</span>
-                    <span className="challenge-intro-desc">{def.description}</span>
-                  </div>
-                  <span className="challenge-intro-reward">+{def.tickets} 🎟️</span>
-                </div>
-              );
-            })}
-          </div>
-          <button className="title-start-btn" onClick={startCooking}>START COOKING</button>
-          <p className="title-hint">Press any key to start</p>
-        </div>
-      </div>
-    );
-  }
-
   if (showTransition === "restaurant") {
     const startShift = () => {
       setShowTransition(null);
       setSpeed(1);
       setMyCounter(0);
       setRestaurantState(createRestaurantState(gameState, isMultiplayer ? mpState.players.length : 1));
+      setShowChallengeIntro("restaurant");
     };
     return (
       <div className="title-screen" onClick={startShift} onKeyDown={startShift} tabIndex={0} ref={(el) => el?.focus()}>
@@ -1153,7 +1123,7 @@ function App() {
         <>
         <Restaurant
           day={gameState.day}
-          paused={paused || titleTutorial === "restaurant" || restaurantState.shiftOver}
+          paused={paused || titleTutorial === "restaurant" || restaurantState.shiftOver || showChallengeIntro === "restaurant"}
           state={restaurantState}
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
@@ -1187,6 +1157,30 @@ function App() {
           localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
         />
         {/* Post-shift overlays render on top of restaurant UI */}
+        {showChallengeIntro === "restaurant" && (
+          <div className="end-of-day-overlay">
+            <div className="end-of-day challenge-intro">
+              <h2>🎯 Daily Challenge</h2>
+              <div className="challenge-intro-list">
+                {gameState.activeChallenges.map((ch) => {
+                  const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
+                  if (!def) return null;
+                  return (
+                    <div key={ch.id} className="challenge-intro-item">
+                      <span className="challenge-intro-icon">{def.icon}</span>
+                      <div className="challenge-intro-info">
+                        <span className="challenge-intro-name">{def.name}</span>
+                        <span className="challenge-intro-desc">{def.description}</span>
+                      </div>
+                      <span className="challenge-intro-reward">+{def.tickets} 🎟️</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <button className="pause-menu-btn resume" onClick={() => setShowChallengeIntro(null)}>Start Cooking →</button>
+            </div>
+          </div>
+        )}
         {eodPhase === "challenges" && (
           <div className="end-of-day-overlay">
             <div className="end-of-day challenge-results">
