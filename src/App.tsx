@@ -1043,7 +1043,7 @@ function App() {
         </header>
       )}
 
-      {paused && (
+      {paused && !showChallengeIntro && (
         <div className="pause-overlay">
           {showDebug ? (
             <DebugPanel
