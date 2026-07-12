@@ -39,6 +39,8 @@ export class NetworkManager {
   private _isHost = false;
   private _roomCode: string | null = null; // eslint-disable-line
   private _onFirstPeerConnected: (() => void) | null = null;
+  private _useRelay = false; // Fallback to WebSocket relay when WebRTC fails
+  private _relayPeers: Set<string> = new Set(); // Peers connected via relay
 
   constructor(callbacks: NetworkCallbacks) {
     this.callbacks = callbacks;
@@ -48,7 +50,11 @@ export class NetworkManager {
   get status() { return this._status; }
   get peerId() { return this._peerId; }
   get isHost() { return this._isHost; }
-  get connectedPeers() { return Array.from(this.peers.keys()); }
+  get connectedPeers() { 
+    const webrtcPeers = Array.from(this.peers.keys());
+    const relayOnly = Array.from(this._relayPeers).filter(id => !webrtcPeers.includes(id));
+    return [...webrtcPeers, ...relayOnly];
+  }
 
   // Host: create a room
   async hostRoom(roomCode: string): Promise<void> {
@@ -128,7 +134,7 @@ export class NetworkManager {
     });
   }
 
-  // Send to a specific peer via WebRTC data channel
+  // Send to a specific peer via WebRTC data channel or WebSocket relay
   send(peerId: string, message: NetworkMessage): void {
     const peer = this.peers.get(peerId);
     if (peer && !peer.destroyed && (peer as any).connected) {
@@ -138,6 +144,9 @@ export class NetworkManager {
       } catch (e) {
         console.warn("[MP] Failed to send to", peerId, e);
       }
+    } else if (this._useRelay && this._relayPeers.has(peerId) && this.ws?.readyState === 1) {
+      // Fallback: relay via signaling server
+      this.ws.send(JSON.stringify({ type: "relay", targetPeerId: peerId, data: message }));
     } else if (peer && !peer.destroyed) {
       console.warn("[MP] Peer not yet connected:", peerId);
     } else {
@@ -145,9 +154,10 @@ export class NetworkManager {
     }
   }
 
-  // Broadcast to all connected peers
+  // Broadcast to all connected peers via WebRTC or relay
   broadcast(message: NetworkMessage): void {
     const data = JSON.stringify(message);
+    // Send via WebRTC to directly connected peers
     for (const [id, peer] of this.peers) {
       if (!peer.destroyed && (peer as any).connected) {
         try {
@@ -157,9 +167,19 @@ export class NetworkManager {
         }
       }
     }
+    // Send via relay to relay-only peers
+    if (this._useRelay && this._relayPeers.size > 0 && this.ws?.readyState === 1) {
+      for (const peerId of this._relayPeers) {
+        // Only relay if not already sent via WebRTC
+        const peer = this.peers.get(peerId);
+        if (!peer || peer.destroyed || !(peer as any).connected) {
+          this.ws.send(JSON.stringify({ type: "relay", targetPeerId: peerId, data: message }));
+        }
+      }
+    }
   }
 
-  // Send to host (peer only) — the first connected peer is the host
+  // Send to host (peer only) — via WebRTC or relay
   sendToHost(message: NetworkMessage): void {
     const firstPeer = this.peers.values().next().value;
     if (firstPeer && !firstPeer.destroyed && (firstPeer as any).connected) {
@@ -167,6 +187,12 @@ export class NetworkManager {
         firstPeer.send(JSON.stringify(message));
       } catch (e) {
         console.warn("[MP] Failed to send to host", e);
+      }
+    } else if (this._useRelay && this._relayPeers.size > 0 && this.ws?.readyState === 1) {
+      // Relay to host (first relay peer)
+      const hostId = this._relayPeers.values().next().value;
+      if (hostId) {
+        this.ws.send(JSON.stringify({ type: "relay", targetPeerId: hostId, data: message }));
       }
     }
   }
@@ -176,6 +202,8 @@ export class NetworkManager {
       peer.destroy();
     }
     this.peers.clear();
+    this._relayPeers.clear();
+    this._useRelay = false;
     if (this.ws) {
       console.log("[MP] Disconnecting from room", this._roomCode);
       this.ws.close();
@@ -228,12 +256,33 @@ export class NetworkManager {
 
         case "peer_left":
           console.log("[MP] Peer left:", msg.peerId);
+          this._relayPeers.delete(msg.peerId);
           this.destroyPeerConnection(msg.peerId);
           break;
 
         case "signal":
           // Incoming WebRTC signaling data
           this.handleSignal(msg.fromPeerId, msg.signalData);
+          break;
+
+        case "relay":
+          // Incoming game data relayed via signaling server
+          try {
+            const message = msg.data as NetworkMessage;
+            this.callbacks.onMessage(msg.fromPeerId, message);
+          } catch (err) {
+            console.error("[MP] Failed to parse relay message:", err);
+          }
+          break;
+
+        case "broadcast":
+          // Incoming broadcast via signaling server
+          try {
+            const message = msg.data as NetworkMessage;
+            this.callbacks.onMessage(msg.fromPeerId, message);
+          } catch (err) {
+            console.error("[MP] Failed to parse broadcast message:", err);
+          }
           break;
       }
     };
@@ -307,13 +356,28 @@ export class NetworkManager {
     peer.on("close", () => {
       console.log("[MP] Connection closed with", remotePeerId);
       this.peers.delete(remotePeerId);
-      this.callbacks.onPeerDisconnected(remotePeerId);
+      // If using relay, don't fire disconnect
+      if (!this._relayPeers.has(remotePeerId)) {
+        this.callbacks.onPeerDisconnected(remotePeerId);
+      }
     });
 
     peer.on("error", (err: any) => {
       console.error("[MP] Peer error with", remotePeerId, err.message);
       this.peers.delete(remotePeerId);
-      this.callbacks.onPeerDisconnected(remotePeerId);
+      // Fall back to WebSocket relay instead of disconnecting
+      if (this.ws?.readyState === 1) {
+        console.log("[MP] Falling back to WebSocket relay for", remotePeerId);
+        this._useRelay = true;
+        this._relayPeers.add(remotePeerId);
+        this.callbacks.onPeerConnected(remotePeerId);
+        if (this._onFirstPeerConnected) {
+          this._onFirstPeerConnected();
+          this._onFirstPeerConnected = null;
+        }
+      } else {
+        this.callbacks.onPeerDisconnected(remotePeerId);
+      }
     });
 
     this.peers.set(remotePeerId, peer);
