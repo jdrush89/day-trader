@@ -20,7 +20,7 @@ import { saveGame, loadGame, deleteSave } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.14";
+const GAME_VERSION = "0.0.15";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -50,6 +50,7 @@ function App() {
   const [debugFF, setDebugFF] = useState(false);
   const [showMultiplayerLobby, setShowMultiplayerLobby] = useState(false);
   const [eodChoiceMade, setEodChoiceMade] = useState(false); // local player submitted their EOD choice
+  const [mpUpgradeChoice, setMpUpgradeChoice] = useState<string | null>(null); // track upgrade pick locally in MP
   const beginScheduledDayRef = useRef<(state?: GameState) => void>(() => {});
 
   // Multiplayer hook
@@ -84,8 +85,13 @@ function App() {
         // Apply synced game state directly, preserving local monitors
         setGameState((prev) => ({ ...sync.gameState, monitors: prev.monitors }));
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
+        // Don't override local EOD phase during upgrade/stock picking
         setEodPhase((prev) => {
-          if (prev !== sync.eodPhase) setEodChoiceMade(false); // reset when phase changes
+          const localPicking = prev === "upgrades" || prev === "stocks";
+          const hostPicking = sync.eodPhase === "upgrades" || sync.eodPhase === "stocks";
+          // If peer is locally picking, only accept phase change if host moves to a non-picking phase (e.g., summary = next day started)
+          if (localPicking && hostPicking) return prev;
+          if (prev !== sync.eodPhase) setEodChoiceMade(false);
           return sync.eodPhase as any;
         });
         setPaused(sync.paused);
@@ -94,32 +100,22 @@ function App() {
         setBossView(sync.bossView as any);
       },
       onAllUpgradesChosen: (choices) => {
-        let hasStocks = false;
+        // Apply all upgrades to shared state
         setGameState((prev) => {
           let state = prev;
           for (const { upgradeId } of choices) {
             state = acquireUpgrade(state, upgradeId);
           }
-          hasStocks = state.stockDraftOptions.length > 0;
-          if (!hasStocks) {
-            setTimeout(() => beginScheduledDayRef.current(state), 0);
-          }
           return state;
         });
-        if (hasStocks) {
-          setTimeout(() => {
-            setEodPhase("stocks");
-            setEodChoiceMade(false);
-          }, 0);
-        }
       },
       onAllStocksChosen: (choices) => {
+        // Apply all stocks and advance to next day
         setGameState((prev) => {
           let state = prev;
           for (const { symbol } of choices) {
             state = draftStock(state, symbol);
           }
-          // Trigger next day via the ref
           setTimeout(() => beginScheduledDayRef.current(state), 0);
           return state;
         });
@@ -614,11 +610,12 @@ function App() {
     if (gameState.upgradeDraftOptions.length > 0) {
       setEodPhase("upgrades");
       setEodChoiceMade(false);
-      if (isMultiplayer) mpActions.resetEodGate("upgrades");
+      setMpUpgradeChoice(null);
+      if (isMultiplayer) mpActions.resetEodGate();
     } else if (gameState.stockDraftOptions.length > 0) {
       setEodPhase("stocks");
       setEodChoiceMade(false);
-      if (isMultiplayer) mpActions.resetEodGate("stocks");
+      if (isMultiplayer) mpActions.resetEodGate();
     } else if (gameState.restaurantUpgradeDraftOptions.length > 0) setEodPhase("restaurant-upgrades");
     else if (gameState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
     else {
@@ -634,12 +631,9 @@ function App() {
 
   const handleAcquireUpgrade = useCallback((upgradeId: string) => {
     if (isMultiplayer) {
-      if (isPeer) {
-        mpActions.sendAction({ type: "choose_upgrade", upgradeId });
-      } else {
-        mpActions.submitHostChoice("upgrades", upgradeId);
-      }
-      setEodChoiceMade(true);
+      // Save upgrade choice locally and immediately show stock picker
+      setMpUpgradeChoice(upgradeId);
+      setEodPhase("stocks");
       return;
     }
     const nextState = acquireUpgrade(gameState, upgradeId);
@@ -650,20 +644,25 @@ function App() {
     }
 
     beginScheduledDay(nextState);
-  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
+  }, [beginScheduledDay, gameState, isMultiplayer]);
 
   const handleDraftStock = useCallback((symbol: string) => {
     if (isMultiplayer) {
+      // Submit both upgrade + stock choices together
+      const upgradeId = mpUpgradeChoice;
       if (isPeer) {
+        if (upgradeId) mpActions.sendAction({ type: "choose_upgrade", upgradeId });
         mpActions.sendAction({ type: "choose_stock", symbol });
       } else {
+        if (upgradeId) mpActions.submitHostChoice("upgrades", upgradeId);
         mpActions.submitHostChoice("stocks", symbol);
       }
       setEodChoiceMade(true);
+      setMpUpgradeChoice(null);
       return;
     }
     beginScheduledDay(draftStock(gameState, symbol));
-  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
+  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions, mpUpgradeChoice]);
 
   const handleAcquireRestaurantUpgrade = useCallback((upgradeId: string) => {
     const nextState = acquireRestaurantUpgrade(gameState, upgradeId);
@@ -1236,16 +1235,6 @@ function App() {
 
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "upgrades" && (
             <div className="end-of-day-overlay">
-              {isMultiplayer && eodChoiceMade ? (
-                <div className="upgrade-draft">
-                  <h2>⏳ Waiting for other players...</h2>
-                  <p className="upgrade-draft-sub">
-                    {mpState.eodWaitingFor.length > 0
-                      ? `Still choosing: ${mpState.eodWaitingFor.join(", ")}`
-                      : "Processing..."}
-                  </p>
-                </div>
-              ) : (
               <div className="upgrade-draft">
                 <h2>⬆️ Choose an Upgrade</h2>
                 <p className="upgrade-draft-sub">Pick one upgrade to keep for the rest of the run</p>
@@ -1266,7 +1255,6 @@ function App() {
                   })}
                 </div>
               </div>
-              )}
             </div>
           )}
 

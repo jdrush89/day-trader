@@ -77,10 +77,10 @@ export class MultiplayerHost {
     this._hostPlayer = player;
   }
 
-  // Called when EOD upgrade phase starts — resets tracking
-  resetEodGate(phase: "upgrades" | "stocks"): void {
-    if (phase === "upgrades") this.upgradeChoices.clear();
-    else this.stockChoices.clear();
+  // Called when EOD phase starts — resets tracking
+  resetEodGate(): void {
+    this.upgradeChoices.clear();
+    this.stockChoices.clear();
     this._eodWaitingFor = this.playerList.map((p) => p.name);
   }
 
@@ -89,30 +89,28 @@ export class MultiplayerHost {
     if (!this._hostPlayer) return;
     if (phase === "upgrades") {
       this.upgradeChoices.set(this._hostPlayer.id, choice);
-      this.checkEodGate("upgrades");
     } else {
       this.stockChoices.set(this._hostPlayer.id, choice);
-      this.checkEodGate("stocks");
     }
+    this.checkEodGate();
   }
 
-  private checkEodGate(phase: "upgrades" | "stocks"): void {
-    const choices = phase === "upgrades" ? this.upgradeChoices : this.stockChoices;
+  private checkEodGate(): void {
     const allPlayers = this.playerList;
-    const remaining = allPlayers.filter((p) => !choices.has(p.id));
+    // A player is "done" when they have submitted their stock choice
+    // (upgrade is optional — some rounds may not have upgrades)
+    const remaining = allPlayers.filter((p) => !this.stockChoices.has(p.id));
     this._eodWaitingFor = remaining.map((p) => p.name);
 
     // Broadcast waiting status
     this.network.broadcast({ type: "eod_waiting", waitingFor: this._eodWaitingFor });
 
     if (remaining.length === 0) {
-      // All players have chosen — execute the gate callback
-      const choiceList = Array.from(choices.entries()).map(([playerId, value]) => ({ playerId, ...(phase === "upgrades" ? { upgradeId: value } : { symbol: value }) }));
-      if (phase === "upgrades") {
-        this.callbacks.onAllUpgradesChosen(choiceList.map((c) => ({ playerId: c.playerId, upgradeId: (c as any).upgradeId })));
-      } else {
-        this.callbacks.onAllStocksChosen(choiceList.map((c) => ({ playerId: c.playerId, symbol: (c as any).symbol })));
-      }
+      // All players have chosen — fire combined callback
+      const upgradeList = Array.from(this.upgradeChoices.entries()).map(([playerId, upgradeId]) => ({ playerId, upgradeId }));
+      const stockList = Array.from(this.stockChoices.entries()).map(([playerId, symbol]) => ({ playerId, symbol }));
+      this.callbacks.onAllUpgradesChosen(upgradeList);
+      this.callbacks.onAllStocksChosen(stockList);
       this.network.broadcast({ type: "eod_all_ready" });
     }
   }
@@ -256,16 +254,15 @@ export class MultiplayerHost {
         this.callbacks.onTogglePause();
         break;
       case "choose_upgrade":
-        // EOD gate: track the choice, don't apply immediately
+        // Save upgrade choice (gate fires only after stock is also chosen)
         this.upgradeChoices.set(player.id, action.upgradeId);
         this.addFeedItem(player.id, player.name, `${player.name} chose an upgrade`);
-        this.checkEodGate("upgrades");
         break;
       case "choose_stock":
-        // EOD gate: track the choice, don't apply immediately
+        // Save stock choice and check if all players are done
         this.stockChoices.set(player.id, action.symbol);
         this.addFeedItem(player.id, player.name, `${player.name} chose ${action.symbol}`);
-        this.checkEodGate("stocks");
+        this.checkEodGate();
         break;
       case "choose_restaurant_upgrade":
         this.callbacks.onChooseRestaurantUpgrade(action.upgradeId);

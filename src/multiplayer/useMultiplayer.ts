@@ -36,7 +36,7 @@ export interface MultiplayerActions {
   disconnect: () => void;
   sendAction: (action: PeerAction) => void;
   // EOD gate controls (host only)
-  resetEodGate: (phase: "upgrades" | "stocks") => void;
+  resetEodGate: () => void;
   submitHostChoice: (phase: "upgrades" | "stocks", choice: string) => void;
 }
 
@@ -149,11 +149,6 @@ export function useMultiplayer(
       onSelectStock: (monitorId, symbol) => appCallbacksRef.current.onSelectStock(monitorId, symbol),
       onAllUpgradesChosen: (choices) => {
         appCallbacksRef.current.onAllUpgradesChosen(choices);
-        setState((s) => ({ ...s, eodWaitingFor: [] }));
-        // Auto-reset for stocks phase if it follows
-        setTimeout(() => {
-          if (host) host.resetEodGate("stocks");
-        }, 50);
       },
       onAllStocksChosen: (choices) => {
         appCallbacksRef.current.onAllStocksChosen(choices);
@@ -285,9 +280,9 @@ export function useMultiplayer(
     }
   }, []);
 
-  const resetEodGate = useCallback((phase: "upgrades" | "stocks") => {
+  const resetEodGate = useCallback(() => {
     if (hostRef.current) {
-      hostRef.current.resetEodGate(phase);
+      hostRef.current.resetEodGate();
       setState((s) => ({ ...s, eodWaitingFor: hostRef.current!.eodWaitingFor }));
     }
   }, []);
