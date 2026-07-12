@@ -21,7 +21,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.40";
+const GAME_VERSION = "0.0.41";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -60,6 +60,8 @@ function App() {
   const [localRestaurantUpgrades, setLocalRestaurantUpgrades] = useState<string[]>([]); // per-player restaurant upgrades (MP only)
   const [challengeReadyPlayers, setChallengeReadyPlayers] = useState<Set<string>>(new Set()); // players who clicked "start" on challenge intro
   const [mpSaveId, setMpSaveId] = useState<string | null>(null); // current MP save ID for auto-save
+  const mpSaveIdRef = useRef<string | null>(null);
+  mpSaveIdRef.current = mpSaveId;
   const [mpResumeData, setMpResumeData] = useState<MpSaveData | null>(null); // MP save being resumed (waiting for players)
   const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean }) => void>(() => {});
 
@@ -411,12 +413,15 @@ function App() {
         upgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localUpgrades : [],
         restaurantUpgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localRestaurantUpgrades : [],
       }));
-      const id = saveMpGame(gs, playerSaves, mpSaveId ?? undefined, type);
-      if (!mpSaveId) setMpSaveId(id);
+      const id = saveMpGame(gs, playerSaves, mpSaveIdRef.current ?? undefined, type);
+      if (!mpSaveIdRef.current) {
+        mpSaveIdRef.current = id;
+        setMpSaveId(id);
+      }
     } else {
       saveGame(gs);
     }
-  }, [isMultiplayer, mpState.players, mpState.localPlayer, localUpgrades, localRestaurantUpgrades, mpSaveId]);
+  }, [isMultiplayer, mpState.players, mpState.localPlayer, localUpgrades, localRestaurantUpgrades]);
 
   useEffect(() => {
     if (gameState.marketOpen) setEodPhase("summary");
@@ -959,6 +964,7 @@ function App() {
     setLocalUpgrades([]);
     setLocalRestaurantUpgrades([]);
     setMpSaveId(null);
+    mpSaveIdRef.current = null;
     setMpResumeData(null);
   }, [mpActions]);
 
@@ -1007,6 +1013,7 @@ function App() {
         onResume={async (save, playerName) => {
           setMpResumeData(save);
           setMpSaveId(save.id);
+          mpSaveIdRef.current = save.id;
           await mpActions.hostGame(playerName);
           mpActions.setRequiredNames(save.players.map((p) => p.name));
         }}
