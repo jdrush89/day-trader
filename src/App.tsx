@@ -22,7 +22,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.48";
+const GAME_VERSION = "0.0.49";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -210,7 +210,7 @@ function App() {
         // Upgrades are now stored locally in handleDraftStock — nothing to do here
       },
       onAllStocksChosen: (choices) => {
-        // Apply all stocks, then move to restaurant-upgrades/menu-draft/shop
+        // Apply all stocks, then move to restaurant-upgrades/menu-draft/shop or next phase
         setGameState((prev) => {
           let state = prev;
           for (const { symbol } of choices) {
@@ -220,8 +220,11 @@ function App() {
             setTimeout(() => { setEodPhase("restaurant-upgrades"); mpActions.resetEodGate(); }, 0);
           } else if (state.menuDraftOptions.length > 0) {
             setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
-          } else {
+          } else if (restaurantState !== null && state.tickets > 0) {
             setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
+          } else {
+            setRestaurantState(null);
+            setTimeout(() => beginScheduledDayRef.current(state), 0);
           }
           return state;
         });
@@ -231,14 +234,18 @@ function App() {
         // Restaurant upgrades are now stored locally in handleAcquireRestaurantUpgrade
       },
       onAllMenuItemsChosen: (choices) => {
-        // All menu items get added to shared pool, then go to shop
+        // All menu items get added to shared pool, then go to shop or next day
         setGameState((prev) => {
           let state = prev;
           for (const { itemName } of choices) {
             state = draftMenuItem(state, itemName);
           }
-          setRestaurantState(null);
-          setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
+          if (state.tickets > 0) {
+            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
+          } else {
+            setRestaurantState(null);
+            setTimeout(() => beginScheduledDayRef.current(state, { skipRestaurantTransition: true }), 0);
+          }
           return state;
         });
         setEodChoiceMade(false);
@@ -1088,15 +1095,21 @@ function App() {
   }, [beginScheduledDay, gameState, bossDay, restaurantState]);
 
   const goToShopOrNextDay = useCallback(() => {
-    // Shop is always the last EOD step before starting next day
-    setShopOffering(generateShopOffering());
-    setEodPhase("shop");
-  }, []);
+    // Shop only shows after restaurant/boss day (last phase of the full day) and if player has tickets
+    if ((restaurantState !== null || bossDay) && gameState.tickets > 0) {
+      setShopOffering(generateShopOffering());
+      setEodPhase("shop");
+    } else {
+      // After trading-only EOD or no tickets — proceed to next phase
+      setRestaurantState(null);
+      beginScheduledDay();
+    }
+  }, [restaurantState, bossDay, gameState.tickets, beginScheduledDay]);
 
   const handleShopContinue = useCallback(() => {
-    // Shop is the final EOD step — start the next day
+    // Shop is the final EOD step (after restaurant/boss day) — skip back to trading
     setRestaurantState(null);
-    beginScheduledDay();
+    beginScheduledDay(undefined, { skipRestaurantTransition: true });
   }, [beginScheduledDay]);
 
   const handleChallengesContinue = useCallback(() => {
@@ -1660,8 +1673,8 @@ function App() {
               gameState={gameState}
               setGameState={(updater) => setGameState(updater)}
               onClose={() => setShowDebug(false)}
-              onSkipToDay={(day, cash) => {
-                const updated = { ...gameState, day, cash, marketOpen: false, loans: [], milestonePayment: null };
+              onSkipToDay={(day, cash, tickets) => {
+                const updated = { ...gameState, day, cash, tickets, marketOpen: false, loans: [], milestonePayment: null };
                 const marketState = openMarket(updated);
                 const isBoss = isBossDayCheck(day);
                 const challenges = selectDailyChallenges(day, isBoss, false);

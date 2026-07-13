@@ -10,7 +10,7 @@ interface DebugPanelProps {
   gameState: GameState;
   setGameState: (updater: (prev: GameState) => GameState) => void;
   onClose: () => void;
-  onSkipToDay?: (day: number, cash: number) => void;
+  onSkipToDay?: (day: number, cash: number, tickets: number) => void;
 }
 
 function generateStockFromCandidate(candidate: StockCandidate, day: number) {
@@ -38,14 +38,15 @@ function generateStockFromCandidate(candidate: StockCandidate, day: number) {
 export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: DebugPanelProps) {
   const [skipDay, setSkipDay] = useState(gameState.day + 1);
   const [skipCash, setSkipCash] = useState(gameState.cash);
+  const [skipTickets, setSkipTickets] = useState(gameState.tickets);
   const [tab, setTab] = useState<"skip" | "upgrades" | "stocks" | "recipes">("skip");
 
   const handleSkipToDay = () => {
     if (onSkipToDay) {
-      onSkipToDay(skipDay, skipCash);
+      onSkipToDay(skipDay, skipCash, skipTickets);
     } else {
       setGameState((prev) => {
-        const updated = { ...prev, day: skipDay, cash: skipCash, marketOpen: false, loans: [] };
+        const updated = { ...prev, day: skipDay, cash: skipCash, tickets: skipTickets, marketOpen: false, loans: [] };
         return openMarket(updated);
       });
     }
@@ -128,6 +129,10 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
           <div className="debug-field">
             <label>Cash Amount:</label>
             <input type="number" step={100} value={skipCash} onChange={(e) => setSkipCash(Number(e.target.value))} />
+          </div>
+          <div className="debug-field">
+            <label>Tickets:</label>
+            <input type="number" min={0} value={skipTickets} onChange={(e) => setSkipTickets(Number(e.target.value))} />
           </div>
           <p className="debug-hint">
             Day {skipDay}: {isBossDayCheck(skipDay) ? "⚠️ Boss Day (trading + kitchen)" : "📈 Trading Day"}
