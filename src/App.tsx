@@ -21,8 +21,9 @@ import { saveGame, loadGame, deleteSave, saveMpGame, loadAllMpSaves, deleteMpSav
 import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
+import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.49";
+const GAME_VERSION = "0.0.50";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -98,7 +99,7 @@ function App() {
         const currentTransition = showTransition;
         setShowTransition(null);
         if (currentTransition === "trading") {
-          beginScheduledDayRef.current(gameState, { skipTradingTransition: true });
+          beginScheduledDayRef.current(gameState, { skipTradingTransition: true, skipRestaurantTransition: true });
         } else {
           setSpeed(1);
           setMyCounter(0);
@@ -1530,11 +1531,11 @@ function App() {
         return;
       }
       setShowTransition(null);
-      beginScheduledDayRef.current(gameState, { skipTradingTransition: true });
+      beginScheduledDayRef.current(gameState, { skipTradingTransition: true, skipRestaurantTransition: true });
     };
     return (
       <div className="title-screen" onClick={startTrading} onKeyDown={startTrading} tabIndex={0} ref={(el) => el?.focus()}>
-        <img src="/trading-morning.jpg" alt="Trading desk at sunrise" className="title-screen-bg" />
+        <img src={tradingMorning} alt="Trading desk at sunrise" className="title-screen-bg" />
         <div className="title-screen-overlay transition-overlay">
           <h1 className="transition-title">🏠 Home</h1>
           <p className="transition-sub">Day {gameState.day} — Morning</p>
