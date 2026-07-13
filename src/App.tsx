@@ -23,7 +23,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.50";
+const GAME_VERSION = "0.0.51";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -221,7 +221,7 @@ function App() {
             setTimeout(() => { setEodPhase("restaurant-upgrades"); mpActions.resetEodGate(); }, 0);
           } else if (state.menuDraftOptions.length > 0) {
             setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
-          } else if (restaurantState !== null && state.tickets > 0) {
+          } else if (restaurantState !== null && (state.tradingTickets > 0 || state.restaurantTickets > 0)) {
             setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
           } else {
             setRestaurantState(null);
@@ -241,7 +241,7 @@ function App() {
           for (const { itemName } of choices) {
             state = draftMenuItem(state, itemName);
           }
-          if (state.tickets > 0) {
+          if (state.tradingTickets > 0 || state.restaurantTickets > 0) {
             setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
           } else {
             setRestaurantState(null);
@@ -1001,7 +1001,7 @@ function App() {
     // After boss day EOD (day already incremented by finishRestaurantDay), skip restaurant once
     // After trading (market just closed), go to Shwendy's
     if (!nextState.marketOpen && restaurantState === null && !skipNextRestaurant && !opts?.skipRestaurantTransition) {
-      const challenges = selectDailyChallenges(nextState.day, false, true);
+      const challenges = selectDailyChallenges(nextState.day, false, true, gameState.runSeed);
       setGameState({ ...nextState, activeChallenges: challenges });
       setShowTransition("restaurant");
       setEodPhase("summary");
@@ -1026,7 +1026,7 @@ function App() {
 
     // Check if this is a boss day and select daily challenges
     const isBossDay = isBossDayCheck(marketState.day);
-    const challenges = selectDailyChallenges(marketState.day, isBossDay, false);
+    const challenges = selectDailyChallenges(marketState.day, isBossDay, false, gameState.runSeed);
     setGameState({ ...marketState, activeChallenges: challenges });
     setEodPhase("summary");
 
@@ -1043,23 +1043,38 @@ function App() {
     }
 
     // Offer a loan after day 1, but not on boss days
+    // Always offered if net worth < 0, otherwise 30% chance
     let hasLoanOffer = false;
     if (marketState.day > 1 && !isBossDay) {
-      const milestone = getMilestone(marketState.day);
-      const nextMilestoneDay = milestone?.checkDay ?? marketState.day + 3;
-      const dueDay = nextMilestoneDay <= marketState.day ? nextMilestoneDay + 3 : nextMilestoneDay;
+      const portfolioVal = marketState.portfolio.reduce((sum, pos) => {
+        const s = marketState.stocks.find((st) => st.symbol === pos.symbol);
+        return sum + (s ? s.price * pos.shares : 0);
+      }, 0);
+      const shortCol = marketState.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
+      const shortLiab = marketState.shorts.reduce((sum, pos) => {
+        const s = marketState.stocks.find((st) => st.symbol === pos.symbol);
+        return sum + (s ? s.price * pos.shares : 0);
+      }, 0);
+      const netWorth = marketState.cash + portfolioVal + shortCol - shortLiab;
+      const shouldOffer = netWorth < 0 || Math.random() < 0.3;
 
-      if (marketState.cash < 0) {
-        const amount = Math.abs(marketState.cash) + 500;
-        setShowLoanOffer({ amount: Math.round(amount * 100) / 100, interestRate: 0.35, dueDay, isEmergency: true });
-        hasLoanOffer = true;
-      } else {
-        const milestoneTarget = milestone?.required ?? 2000;
-        const pct = 0.2 + Math.random() * 0.8;
-        const amount = Math.round(milestoneTarget * pct);
-        const interestRate = Math.round((0.05 + Math.random() * 0.25) * 100) / 100;
-        setShowLoanOffer({ amount, interestRate, dueDay, isEmergency: false });
-        hasLoanOffer = true;
+      if (shouldOffer) {
+        const milestone = getMilestone(marketState.day);
+        const nextMilestoneDay = milestone?.checkDay ?? marketState.day + 3;
+        const dueDay = nextMilestoneDay <= marketState.day ? nextMilestoneDay + 3 : nextMilestoneDay;
+
+        if (netWorth < 0) {
+          const amount = Math.abs(netWorth) + 500;
+          setShowLoanOffer({ amount: Math.round(amount * 100) / 100, interestRate: 0.35, dueDay, isEmergency: true });
+          hasLoanOffer = true;
+        } else {
+          const milestoneTarget = milestone?.required ?? 2000;
+          const pct = 0.2 + Math.random() * 0.8;
+          const amount = Math.round(milestoneTarget * pct);
+          const interestRate = Math.round((0.05 + Math.random() * 0.25) * 100) / 100;
+          setShowLoanOffer({ amount, interestRate, dueDay, isEmergency: false });
+          hasLoanOffer = true;
+        }
       }
     }
 
@@ -1090,14 +1105,17 @@ function App() {
     setGameState((prev) => ({
       ...prev,
       activeChallenges: evaluated,
-      tickets: prev.tickets + earned,
+      tickets: prev.tickets + earned.tradingTickets + earned.restaurantTickets,
+      tradingTickets: prev.tradingTickets + earned.tradingTickets,
+      restaurantTickets: prev.restaurantTickets + earned.restaurantTickets,
     }));
     setEodPhase("challenges");
   }, [beginScheduledDay, gameState, bossDay, restaurantState]);
 
   const goToShopOrNextDay = useCallback(() => {
-    // Shop only shows after restaurant/boss day (last phase of the full day) and if player has tickets
-    if ((restaurantState !== null || bossDay) && gameState.tickets > 0) {
+    // Shop only shows after restaurant/boss day (last phase of the full day) and if player has any tickets
+    const hasAnyTickets = gameState.tradingTickets > 0 || gameState.restaurantTickets > 0;
+    if ((restaurantState !== null || bossDay) && hasAnyTickets) {
       setShopOffering(generateShopOffering());
       setEodPhase("shop");
     } else {
@@ -1105,7 +1123,7 @@ function App() {
       setRestaurantState(null);
       beginScheduledDay();
     }
-  }, [restaurantState, bossDay, gameState.tickets, beginScheduledDay]);
+  }, [restaurantState, bossDay, gameState.tradingTickets, gameState.restaurantTickets, beginScheduledDay]);
 
   const handleShopContinue = useCallback(() => {
     // Shop is the final EOD step (after restaurant/boss day) — skip back to trading
@@ -1139,14 +1157,21 @@ function App() {
 
   const handleBuyConsumable = useCallback((itemId: string) => {
     const item = getConsumable(itemId);
-    if (!item || gameState.tickets < item.tier) return;
+    if (!item) return;
+    // Trading items cost tradingTickets, restaurant items cost restaurantTickets
+    const ticketPool = item.phase === "trading" ? gameState.tradingTickets : gameState.restaurantTickets;
+    if (ticketPool < item.tier) return;
     if (isPeer) { mpActions.sendAction({ type: "buy_consumable", consumableId: itemId }); return; }
-    setGameState((prev) => ({
-      ...prev,
-      tickets: prev.tickets - item.tier,
-      consumableInventory: addConsumable(prev.consumableInventory, itemId),
-    }));
-  }, [gameState.tickets, isPeer, mpActions]);
+    setGameState((prev) => {
+      const ticketField = item.phase === "trading" ? "tradingTickets" : "restaurantTickets";
+      return {
+        ...prev,
+        tickets: prev.tickets - item.tier,
+        [ticketField]: prev[ticketField] - item.tier,
+        consumableInventory: addConsumable(prev.consumableInventory, itemId),
+      };
+    });
+  }, [gameState.tradingTickets, gameState.restaurantTickets, isPeer, mpActions]);
 
 
   const handleAcquireUpgrade = useCallback((upgradeId: string) => {
@@ -1255,7 +1280,13 @@ function App() {
       restaurantState?.challengeTracker,
     );
     const earned = getTicketsEarned(evaluated);
-    const challengedState = { ...nextState, activeChallenges: evaluated, tickets: nextState.tickets + earned };
+    const challengedState = {
+      ...nextState,
+      activeChallenges: evaluated,
+      tickets: nextState.tickets + earned.tradingTickets + earned.restaurantTickets,
+      tradingTickets: nextState.tradingTickets + earned.tradingTickets,
+      restaurantTickets: nextState.restaurantTickets + earned.restaurantTickets,
+    };
     setGameState(challengedState);
     if (!isPeer) doSave(challengedState);
     // Don't clear restaurantState yet — keep restaurant UI visible during post-shift phases
@@ -1616,12 +1647,12 @@ function App() {
                 const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
                 if (!def) return null;
                 return (
-                  <span key={ch.id} className={`challenge-pip ${ch.completed ? "done" : ""}`} data-tooltip={`${def.name}: ${def.description} (${def.tickets}🎟️)`}>
+                  <span key={ch.id} className={`challenge-pip ${ch.completed ? "done" : ""}`} data-tooltip={`${def.name}: ${def.description} (${def.tickets}${def.type === "trading" ? "🍔" : "📈"})`}>
                     {def.icon}
                   </span>
                 );
               })}
-              <span className="ticket-count">🎟️ {gameState.tickets}</span>
+              <span className="ticket-count">📈{gameState.tradingTickets} 🍔{gameState.restaurantTickets}</span>
             </div>
           )}
           <div className="header-controls">
@@ -1674,11 +1705,11 @@ function App() {
               gameState={gameState}
               setGameState={(updater) => setGameState(updater)}
               onClose={() => setShowDebug(false)}
-              onSkipToDay={(day, cash, tickets) => {
-                const updated = { ...gameState, day, cash, tickets, marketOpen: false, loans: [], milestonePayment: null };
+              onSkipToDay={(day, cash, tradingTix, restaurantTix) => {
+                const updated = { ...gameState, day, cash, tradingTickets: tradingTix, restaurantTickets: restaurantTix, tickets: tradingTix + restaurantTix, marketOpen: false, loans: [], milestonePayment: null };
                 const marketState = openMarket(updated);
                 const isBoss = isBossDayCheck(day);
-                const challenges = selectDailyChallenges(day, isBoss, false);
+                const challenges = selectDailyChallenges(day, isBoss, false, gameState.runSeed);
                 setGameState({ ...marketState, activeChallenges: challenges });
                 setBossDay(isBoss);
                 setBossView("trading");
@@ -1779,7 +1810,7 @@ function App() {
           onSpeedChange={handleSetSpeed}
           acquiredRestaurantUpgrades={effectiveRestaurantUpgrades}
           activeChallenges={gameState.activeChallenges}
-          tickets={gameState.tickets}
+          tradingTickets={gameState.tradingTickets} restaurantTickets={gameState.restaurantTickets}
           debugFF={debugFF}
           onDebugFF={() => {
             setRestaurantState((prev) => prev ? { ...prev, shiftTimeRemaining: 0, shiftOver: true } : prev);
@@ -1814,7 +1845,7 @@ function App() {
                         <span className="challenge-intro-name">{def.name}</span>
                         <span className="challenge-intro-desc">{def.description}</span>
                       </div>
-                      <span className="challenge-intro-reward">+{def.tickets} 🎟️</span>
+                      <span className="challenge-intro-reward">+{def.tickets} {def.type === "trading" ? "🍔" : "📈"}</span>
                     </div>
                   );
                 })}
@@ -1849,7 +1880,7 @@ function App() {
                         <span className="challenge-desc">{def.description}</span>
                       </div>
                       <span className="challenge-reward">
-                        {ch.completed ? `+${def.tickets} 🎟️` : "—"}
+                        {ch.completed ? `+${def.tickets} ${def.type === "trading" ? "🍔" : "📈"}` : "—"}
                       </span>
                     </div>
                   );
@@ -1857,15 +1888,16 @@ function App() {
               </div>
               {(() => {
                 const earned = getTicketsEarned(gameState.activeChallenges);
-                return earned > 0 ? (
+                const totalEarned = earned.tradingTickets + earned.restaurantTickets;
+                return totalEarned > 0 ? (
                   <div className="challenge-total">
-                    <span>Tickets earned: <strong>+{earned} 🎟️</strong></span>
-                    <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                    <span>Tickets earned: {earned.tradingTickets > 0 && <strong>+{earned.tradingTickets} 📈</strong>} {earned.restaurantTickets > 0 && <strong>+{earned.restaurantTickets} 🍔</strong>}</span>
+                    <span className="challenge-balance">📈 {gameState.tradingTickets} | 🍔 {gameState.restaurantTickets}</span>
                   </div>
                 ) : (
                   <div className="challenge-total">
                     <span>No challenges completed</span>
-                    <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                    <span className="challenge-balance">📈 {gameState.tradingTickets} | 🍔 {gameState.restaurantTickets}</span>
                   </div>
                 );
               })()}
@@ -1876,17 +1908,20 @@ function App() {
         {eodPhase === "shop" && (
           <div className="shop-phase">
             <h2>🎪 Ticket Shop</h2>
-            <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
+            <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
             <div className="shop-items">
-              {shopOffering.map((item) => (
-                <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
+              {shopOffering.map((item) => {
+                const pool = item.phase === "trading" ? gameState.tradingTickets : gameState.restaurantTickets;
+                return (
+                <button key={item.id} className={`shop-item-card ${pool < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={pool < item.tier}>
                   <div className="shop-item-icon">{item.icon}</div>
                   <div className="shop-item-name">{item.name}</div>
                   <div className="shop-item-desc">{item.description}</div>
-                  <div className="shop-item-cost">{item.tier} 🎟️</div>
-                  <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
+                  <div className="shop-item-cost">{item.tier} {item.phase === "trading" ? "📈" : "🍔"}</div>
+                  <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading item" : "🍔 Kitchen item"}</div>
                 </button>
-              ))}
+                );
+              })}
             </div>
             <div className="shop-inventory">
               {gameState.consumableInventory.items.length > 0 && (
@@ -2057,7 +2092,7 @@ function App() {
                           <span className="challenge-desc">{def.description}</span>
                         </div>
                         <span className="challenge-reward">
-                          {ch.completed ? `+${def.tickets} 🎟️` : "—"}
+                          {ch.completed ? `+${def.tickets} ${def.type === "trading" ? "🍔" : "📈"}` : "—"}
                         </span>
                       </div>
                     );
@@ -2065,15 +2100,16 @@ function App() {
                 </div>
                 {(() => {
                   const earned = getTicketsEarned(gameState.activeChallenges);
-                  return earned > 0 ? (
+                  const totalEarned = earned.tradingTickets + earned.restaurantTickets;
+                  return totalEarned > 0 ? (
                     <div className="challenge-total">
-                      <span>Tickets earned: <strong>+{earned} 🎟️</strong></span>
-                      <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                      <span>Tickets earned: {earned.tradingTickets > 0 && <strong>+{earned.tradingTickets} 📈</strong>} {earned.restaurantTickets > 0 && <strong>+{earned.restaurantTickets} 🍔</strong>}</span>
+                      <span className="challenge-balance">📈 {gameState.tradingTickets} | 🍔 {gameState.restaurantTickets}</span>
                     </div>
                   ) : (
                     <div className="challenge-total">
                       <span>No challenges completed</span>
-                      <span className="challenge-balance">Total: {gameState.tickets} 🎟️</span>
+                      <span className="challenge-balance">📈 {gameState.tradingTickets} | 🍔 {gameState.restaurantTickets}</span>
                     </div>
                   );
                 })()}
@@ -2085,17 +2121,20 @@ function App() {
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "shop" && (
             <div className="shop-phase">
               <h2>🎪 Ticket Shop</h2>
-              <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
+              <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
               <div className="shop-items">
-                {shopOffering.map((item) => (
-                  <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
+                {shopOffering.map((item) => {
+                  const pool = item.phase === "trading" ? gameState.tradingTickets : gameState.restaurantTickets;
+                  return (
+                  <button key={item.id} className={`shop-item-card ${pool < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={pool < item.tier}>
                     <div className="shop-item-icon">{item.icon}</div>
                     <div className="shop-item-name">{item.name}</div>
                     <div className="shop-item-desc">{item.description}</div>
-                    <div className="shop-item-cost">{item.tier} 🎟️</div>
-                    <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
+                    <div className="shop-item-cost">{item.tier} {item.phase === "trading" ? "📈" : "🍔"}</div>
+                    <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading item" : "🍔 Kitchen item"}</div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
               <div className="shop-inventory">
                 {gameState.consumableInventory.items.length > 0 && (
@@ -2185,7 +2224,7 @@ function App() {
               acquiredRestaurantUpgrades={effectiveRestaurantUpgrades}
               isBossDay={true}
               activeChallenges={gameState.activeChallenges}
-              tickets={gameState.tickets}
+              tradingTickets={gameState.tradingTickets} restaurantTickets={gameState.restaurantTickets}
               debugFF={debugFF}
               onDebugFF={() => {
                 setGameState((prev) => {
@@ -2301,7 +2340,7 @@ function App() {
                       <span className="challenge-intro-name">{def.name}</span>
                       <span className="challenge-intro-desc">{def.description}</span>
                     </div>
-                    <span className="challenge-intro-reward">+{def.tickets} 🎟️</span>
+                    <span className="challenge-intro-reward">+{def.tickets} {def.type === "trading" ? "🍔" : "📈"}</span>
                   </div>
                 );
               })}

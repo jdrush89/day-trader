@@ -31,7 +31,8 @@ interface RestaurantProps {
   onDebugFF?: () => void;
   isBossDay?: boolean;
   activeChallenges?: ActiveChallenge[];
-  tickets?: number;
+  tradingTickets?: number;
+  restaurantTickets?: number;
   isPeer?: boolean;
   onPeerKey?: (key: string) => void;
   onPeerKeyUp?: (key: string) => void;
@@ -304,7 +305,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
     ...rawState,
@@ -481,12 +482,12 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                 const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
                 if (!def) return null;
                 return (
-                  <span key={ch.id} className={`challenge-pip ${ch.completed ? "done" : ""}`} data-tooltip={`${def.name}: ${def.description} (${def.tickets}🎟️)`}>
+                  <span key={ch.id} className={`challenge-pip ${ch.completed ? "done" : ""}`} data-tooltip={`${def.name}: ${def.description} (${def.tickets}${def.type === "trading" ? "🍔" : "📈"})`}>
                     {def.icon}
                   </span>
                 );
               })}
-              <span className="ticket-count">🎟️ {tickets ?? 0}</span>
+              <span className="ticket-count">📈{tradingTickets ?? 0} 🍔{restaurantTickets ?? 0}</span>
             </div>
           )}
         </div>

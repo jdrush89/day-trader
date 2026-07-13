@@ -174,6 +174,9 @@ export interface GameState {
   challengeTracker: TradingChallengeTracker;
   activeChallenges: ActiveChallenge[];
   tickets: number;
+  tradingTickets: number;
+  restaurantTickets: number;
+  runSeed: number;
   freeNextStock: boolean;
   consumableInventory: ConsumableInventory;
 }

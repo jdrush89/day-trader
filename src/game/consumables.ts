@@ -153,15 +153,43 @@ export function createEmptyInventory(): ConsumableInventory {
 
 /** Generate 3 shop items: one tier-3, one tier-2, one tier-1. Never duplicate. */
 export function generateShopOffering(): ConsumableItem[] {
-  const pool = [...ALL_CONSUMABLES];
-  const pick = (tier: 1 | 2 | 3): ConsumableItem => {
+  // Ensure at least 1 from each phase among the 3 items
+  const tradingPool = [...TRADING_CONSUMABLES];
+  const restaurantPool = [...RESTAURANT_CONSUMABLES];
+  const allPool = [...ALL_CONSUMABLES];
+
+  const pickFromPool = (pool: ConsumableItem[], tier: 1 | 2 | 3): ConsumableItem => {
     const candidates = pool.filter((c) => c.tier === tier);
+    if (candidates.length === 0) {
+      // Fallback to any tier from pool
+      const idx = Math.floor(Math.random() * pool.length);
+      return pool[idx];
+    }
     const idx = Math.floor(Math.random() * candidates.length);
-    const chosen = candidates[idx];
-    pool.splice(pool.indexOf(chosen), 1);
-    return chosen;
+    return candidates[idx];
   };
-  return [pick(3), pick(2), pick(1)];
+
+  // Pick tier 3 from one phase, tier 1 from the other, tier 2 from either
+  const results: ConsumableItem[] = [];
+  const startWithTrading = Math.random() < 0.5;
+
+  // Tier 3: one phase
+  const tier3Pool = startWithTrading ? tradingPool : restaurantPool;
+  const tier3 = pickFromPool(tier3Pool, 3);
+  results.push(tier3);
+
+  // Tier 1: other phase
+  const tier1Pool = startWithTrading ? restaurantPool : tradingPool;
+  const tier1 = pickFromPool(tier1Pool, 1);
+  results.push(tier1);
+
+  // Tier 2: random from remaining (avoid duplicates)
+  const remaining = allPool.filter((c) => c.id !== tier3.id && c.id !== tier1.id);
+  const tier2 = pickFromPool(remaining, 2);
+  results.push(tier2);
+
+  // Sort by tier descending for display
+  return results.sort((a, b) => b.tier - a.tier);
 }
 
 /** Add a consumable to inventory. */

@@ -323,9 +323,11 @@ export function selectDailyChallenges(
   day: number,
   isBossDay: boolean,
   isRestaurantDay: boolean,
+  runSeed: number = 0,
 ): ActiveChallenge[] {
-  // Seeded random for deterministic per-day selection
-  let seed = day * 31337 + 42;
+  // Seeded random using both day and run seed for unique per-run selection
+  let seed = (day * 31337 + runSeed + 42) % 2147483647;
+  if (seed <= 0) seed += 2147483646;
   const rng = () => {
     seed = (seed * 16807 + 0) % 2147483647;
     return seed / 2147483647;
@@ -394,11 +396,22 @@ export function isInBadNewsWindow(
   return currentTick - newsTick <= BAD_NEWS_WINDOW_TICKS;
 }
 
-// Get total tickets earned from completed challenges
-export function getTicketsEarned(challenges: ActiveChallenge[]): number {
-  return challenges.reduce((sum, ch) => {
-    if (!ch.completed) return sum;
+// Get tickets earned from completed challenges, split by type
+// Trading challenges earn restaurant tickets, restaurant challenges earn trading tickets
+export function getTicketsEarned(challenges: ActiveChallenge[]): { tradingTickets: number; restaurantTickets: number } {
+  let tradingTickets = 0;
+  let restaurantTickets = 0;
+  for (const ch of challenges) {
+    if (!ch.completed) continue;
     const def = ALL_CHALLENGES.find((d) => d.id === ch.id);
-    return sum + (def?.tickets ?? 0);
-  }, 0);
+    if (!def) continue;
+    if (def.type === "trading") {
+      // Trading challenge → restaurant item tickets
+      restaurantTickets += def.tickets;
+    } else {
+      // Restaurant challenge → trading item tickets
+      tradingTickets += def.tickets;
+    }
+  }
+  return { tradingTickets, restaurantTickets };
 }

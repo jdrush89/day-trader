@@ -91,8 +91,11 @@ export function createInitialState(): GameState {
     institutionalOrders: [],
     optionsPositions: [],
     challengeTracker: createTradingTracker(),
-    activeChallenges: selectDailyChallenges(1, false, false),
+    activeChallenges: selectDailyChallenges(1, false, false, Math.floor(Math.random() * 2147483647)),
     tickets: 0,
+    tradingTickets: 0,
+    restaurantTickets: 0,
+    runSeed: Math.floor(Math.random() * 2147483647),
     freeNextStock: false,
     consumableInventory: createEmptyInventory(),
   };
