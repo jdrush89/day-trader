@@ -42,7 +42,7 @@ export const TRADING_CONSUMABLES: ConsumableItem[] = [
     id: "stock_ticket",
     name: "Stock Ticket",
     icon: "🎟️",
-    description: "Get 1 free stock of your choice",
+    description: "Your next stock purchase is free",
     phase: "trading",
     tier: 1,
   },

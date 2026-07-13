@@ -92,6 +92,7 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTog
       <div className="quick-buy">
         <div className="quick-buy-header">
           <h3>Quick {actionLabel}</h3>
+          {gameState.freeNextStock && !shortMode && <span style={{ color: "#ffd700", fontWeight: 700, fontSize: "0.85rem" }}>🎟️ Next purchase is FREE!</span>}
           <div className="trade-mode-toggle">
             <button className={`mode-btn ${!shortMode ? "active" : ""}`} onClick={() => setShortMode(false)}>📈 Buy</button>
             <button className={`mode-btn ${shortMode ? "active" : ""}`} onClick={() => setShortMode(true)}>📉 Short</button>

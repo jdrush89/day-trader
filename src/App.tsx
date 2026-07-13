@@ -22,7 +22,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.46";
+const GAME_VERSION = "0.0.47";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -205,13 +205,19 @@ function App() {
         // Upgrades are now stored locally in handleDraftStock — nothing to do here
       },
       onAllStocksChosen: (choices) => {
-        // Apply all stocks and advance to next day
+        // Apply all stocks, then move to restaurant-upgrades/menu-draft/shop
         setGameState((prev) => {
           let state = prev;
           for (const { symbol } of choices) {
             state = draftStock(state, symbol);
           }
-          setTimeout(() => beginScheduledDayRef.current(state), 0);
+          if (state.restaurantUpgradeDraftOptions.length > 0) {
+            setTimeout(() => { setEodPhase("restaurant-upgrades"); mpActions.resetEodGate(); }, 0);
+          } else if (state.menuDraftOptions.length > 0) {
+            setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
+          } else {
+            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
+          }
           return state;
         });
         setEodChoiceMade(false);
@@ -220,14 +226,14 @@ function App() {
         // Restaurant upgrades are now stored locally in handleAcquireRestaurantUpgrade
       },
       onAllMenuItemsChosen: (choices) => {
-        // All menu items get added to shared pool
+        // All menu items get added to shared pool, then go to shop
         setGameState((prev) => {
           let state = prev;
           for (const { itemName } of choices) {
             state = draftMenuItem(state, itemName);
           }
           setRestaurantState(null);
-          setTimeout(() => beginScheduledDayRef.current(state, { skipRestaurantTransition: true }), 0);
+          setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
           return state;
         });
         setEodChoiceMade(false);
@@ -555,7 +561,22 @@ function App() {
 
   const handleBuy = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "buy_stock", symbol, shares }); return; }
-    setGameState((prev) => buyStock(prev, symbol, shares));
+    setGameState((prev) => {
+      if (prev.freeNextStock) {
+        // Free stock: buy 1 share at no cost, clear the flag
+        const stock = prev.stocks.find((s) => s.symbol === symbol);
+        if (!stock) return prev;
+        const existing = prev.portfolio.find((p) => p.symbol === symbol);
+        return {
+          ...prev,
+          freeNextStock: false,
+          portfolio: existing
+            ? prev.portfolio.map((p) => p.symbol === symbol ? { ...p, shares: p.shares + 1, avgCost: (p.avgCost * p.shares + stock.price) / (p.shares + 1) } : p)
+            : [...prev.portfolio, { symbol, shares: 1, avgCost: stock.price, dayAcquired: prev.day }],
+        };
+      }
+      return buyStock(prev, symbol, shares);
+    });
   }, [isPeer, mpActions]);
   const handleSell = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "sell_stock", symbol, shares }); return; }
@@ -622,20 +643,12 @@ function App() {
         break;
       }
       case "stock_ticket": {
-        // Give 1 free stock of the first portfolio stock, or cheapest available
-        const cheapest = [...gameState.stocks].sort((a, b) => a.price - b.price)[0];
-        if (cheapest) {
-          setGameState((prev) => {
-            const existing = prev.portfolio.find((p) => p.symbol === cheapest.symbol);
-            return {
-              ...prev,
-              portfolio: existing
-                ? prev.portfolio.map((p) => p.symbol === cheapest.symbol ? { ...p, shares: p.shares + 1, avgCost: (p.avgCost * p.shares + cheapest.price) / (p.shares + 1) } : p)
-                : [...prev.portfolio, { symbol: cheapest.symbol, shares: 1, avgCost: cheapest.price, dayAcquired: prev.day }],
-              consumableInventory: removeConsumable(prev.consumableInventory, itemId),
-            };
-          });
-        }
+        // Make the next stock purchase free
+        setGameState((prev) => ({
+          ...prev,
+          freeNextStock: true,
+          consumableInventory: removeConsumable(prev.consumableInventory, itemId),
+        }));
         break;
       }
       case "quantum_encryption": {
@@ -1059,8 +1072,20 @@ function App() {
     setEodPhase("challenges");
   }, [beginScheduledDay, gameState, bossDay, restaurantState]);
 
+  const goToShopOrNextDay = useCallback(() => {
+    // Shop is always the last EOD step before starting next day
+    setShopOffering(generateShopOffering());
+    setEodPhase("shop");
+  }, []);
+
   const handleShopContinue = useCallback(() => {
-    // After shop, proceed to upgrades/stocks/restaurant-upgrades/menu-draft or next day
+    // Shop is the final EOD step — start the next day
+    setRestaurantState(null);
+    beginScheduledDay();
+  }, [beginScheduledDay]);
+
+  const handleChallengesContinue = useCallback(() => {
+    // After challenges, go to upgrades/stocks/restaurant-upgrades/menu-draft or shop
     if (gameState.upgradeDraftOptions.length > 0) {
       setEodPhase("upgrades");
       setEodChoiceMade(false);
@@ -1079,21 +1104,9 @@ function App() {
       setEodChoiceMade(false);
       if (isMultiplayer) mpActions.resetEodGate();
     } else {
-      setRestaurantState(null);
-      beginScheduledDay();
+      goToShopOrNextDay();
     }
-  }, [beginScheduledDay, gameState, isMultiplayer, mpActions]);
-
-  const handleChallengesContinue = useCallback(() => {
-    // After challenges, go to shop (if player has any tickets)
-    if (gameState.tickets > 0) {
-      setShopOffering(generateShopOffering());
-      setEodPhase("shop");
-      return;
-    }
-    // Skip shop, go straight to upgrades flow
-    handleShopContinue();
-  }, [gameState.tickets, handleShopContinue]);
+  }, [gameState, isMultiplayer, mpActions, goToShopOrNextDay]);
 
   const handleBuyConsumable = useCallback((itemId: string) => {
     const item = getConsumable(itemId);
@@ -1120,9 +1133,15 @@ function App() {
       setEodPhase("stocks");
       return;
     }
-
-    beginScheduledDay(nextState);
-  }, [beginScheduledDay, gameState, isMultiplayer]);
+    setGameState(nextState);
+    if (nextState.restaurantUpgradeDraftOptions.length > 0) {
+      setEodPhase("restaurant-upgrades");
+    } else if (nextState.menuDraftOptions.length > 0) {
+      setEodPhase("menu-draft");
+    } else {
+      goToShopOrNextDay();
+    }
+  }, [gameState, isMultiplayer, goToShopOrNextDay]);
 
   const handleDraftStock = useCallback((symbol: string) => {
     if (isMultiplayer) {
@@ -1150,8 +1169,16 @@ function App() {
       setMpUpgradeChoice(null);
       return;
     }
-    beginScheduledDay(draftStock(gameState, symbol));
-  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions, mpUpgradeChoice]);
+    const nextState = draftStock(gameState, symbol);
+    setGameState(nextState);
+    if (nextState.restaurantUpgradeDraftOptions.length > 0) {
+      setEodPhase("restaurant-upgrades");
+    } else if (nextState.menuDraftOptions.length > 0) {
+      setEodPhase("menu-draft");
+    } else {
+      goToShopOrNextDay();
+    }
+  }, [gameState, isMultiplayer, isPeer, mpActions, mpUpgradeChoice, goToShopOrNextDay]);
 
   const handleAcquireRestaurantUpgrade = useCallback((upgradeId: string) => {
     if (isMultiplayer) {
@@ -1169,10 +1196,9 @@ function App() {
     setGameState(nextState);
     if (nextState.menuDraftOptions.length > 0) setEodPhase("menu-draft");
     else {
-      setRestaurantState(null);
-      beginScheduledDay(nextState);
+      goToShopOrNextDay();
     }
-  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
+  }, [gameState, isMultiplayer, isPeer, mpActions, goToShopOrNextDay]);
 
   const handleDraftMenuItem = useCallback((itemName: string) => {
     if (isMultiplayer) {
@@ -1184,9 +1210,11 @@ function App() {
       setEodChoiceMade(true);
       return;
     }
+    const nextState = draftMenuItem(gameState, itemName);
+    setGameState(nextState);
     setRestaurantState(null);
-    beginScheduledDay(draftMenuItem(gameState, itemName));
-  }, [beginScheduledDay, gameState, isMultiplayer, isPeer, mpActions]);
+    goToShopOrNextDay();
+  }, [gameState, isMultiplayer, isPeer, mpActions, goToShopOrNextDay]);
 
   const handleRestaurantFinish = useCallback((earnings: number) => {
     const nextState = finishRestaurantDay(gameState, earnings);
@@ -1795,36 +1823,34 @@ function App() {
           </div>
         )}
         {eodPhase === "shop" && (
-          <div className="end-of-day-overlay">
-            <div className="end-of-day shop-phase">
-              <h2>🎪 Ticket Shop</h2>
-              <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
-              <div className="shop-items">
-                {shopOffering.map((item) => (
-                  <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
-                    <div className="shop-item-icon">{item.icon}</div>
-                    <div className="shop-item-name">{item.name}</div>
-                    <div className="shop-item-desc">{item.description}</div>
-                    <div className="shop-item-cost">{item.tier} 🎟️</div>
-                    <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
-                  </button>
-                ))}
-              </div>
-              <div className="shop-inventory">
-                {gameState.consumableInventory.items.length > 0 && (
-                  <div className="shop-owned">
-                    <span className="shop-owned-label">🎒 Inventory:</span>
-                    {[...new Set(gameState.consumableInventory.items)].map((id) => {
-                      const c = getConsumable(id);
-                      if (!c) return null;
-                      const count = gameState.consumableInventory.items.filter((i) => i === id).length;
-                      return <span key={id} className="shop-owned-item" title={c.description}>{c.icon} {c.name}{count > 1 ? ` x${count}` : ""}</span>;
-                    })}
-                  </div>
-                )}
-              </div>
-              <button onClick={handleShopContinue}>Continue →</button>
+          <div className="shop-phase">
+            <h2>🎪 Ticket Shop</h2>
+            <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
+            <div className="shop-items">
+              {shopOffering.map((item) => (
+                <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
+                  <div className="shop-item-icon">{item.icon}</div>
+                  <div className="shop-item-name">{item.name}</div>
+                  <div className="shop-item-desc">{item.description}</div>
+                  <div className="shop-item-cost">{item.tier} 🎟️</div>
+                  <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
+                </button>
+              ))}
             </div>
+            <div className="shop-inventory">
+              {gameState.consumableInventory.items.length > 0 && (
+                <div className="shop-owned">
+                  <span className="shop-owned-label">🎒 Inventory:</span>
+                  {[...new Set(gameState.consumableInventory.items)].map((id) => {
+                    const c = getConsumable(id);
+                    if (!c) return null;
+                    const count = gameState.consumableInventory.items.filter((i) => i === id).length;
+                    return <span key={id} className="shop-owned-item" title={c.description}>{c.icon} {c.name}{count > 1 ? ` x${count}` : ""}</span>;
+                  })}
+                </div>
+              )}
+            </div>
+            <button onClick={handleShopContinue}>Continue →</button>
           </div>
         )}
         {eodPhase === "restaurant-upgrades" && (
@@ -2006,36 +2032,34 @@ function App() {
           )}
 
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "shop" && (
-            <div className="end-of-day-overlay">
-              <div className="end-of-day shop-phase">
-                <h2>🎪 Ticket Shop</h2>
-                <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
-                <div className="shop-items">
-                  {shopOffering.map((item) => (
-                    <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
-                      <div className="shop-item-icon">{item.icon}</div>
-                      <div className="shop-item-name">{item.name}</div>
-                      <div className="shop-item-desc">{item.description}</div>
-                      <div className="shop-item-cost">{item.tier} 🎟️</div>
-                      <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
-                    </button>
-                  ))}
-                </div>
-                <div className="shop-inventory">
-                  {gameState.consumableInventory.items.length > 0 && (
-                    <div className="shop-owned">
-                      <span className="shop-owned-label">🎒 Inventory:</span>
-                      {[...new Set(gameState.consumableInventory.items)].map((id) => {
-                        const c = getConsumable(id);
-                        if (!c) return null;
-                        const count = gameState.consumableInventory.items.filter((i) => i === id).length;
-                        return <span key={id} className="shop-owned-item" title={c.description}>{c.icon} {c.name}{count > 1 ? ` x${count}` : ""}</span>;
-                      })}
-                    </div>
-                  )}
-                </div>
-                <button onClick={handleShopContinue}>Continue →</button>
+            <div className="shop-phase">
+              <h2>🎪 Ticket Shop</h2>
+              <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
+              <div className="shop-items">
+                {shopOffering.map((item) => (
+                  <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
+                    <div className="shop-item-icon">{item.icon}</div>
+                    <div className="shop-item-name">{item.name}</div>
+                    <div className="shop-item-desc">{item.description}</div>
+                    <div className="shop-item-cost">{item.tier} 🎟️</div>
+                    <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
+                  </button>
+                ))}
               </div>
+              <div className="shop-inventory">
+                {gameState.consumableInventory.items.length > 0 && (
+                  <div className="shop-owned">
+                    <span className="shop-owned-label">🎒 Inventory:</span>
+                    {[...new Set(gameState.consumableInventory.items)].map((id) => {
+                      const c = getConsumable(id);
+                      if (!c) return null;
+                      const count = gameState.consumableInventory.items.filter((i) => i === id).length;
+                      return <span key={id} className="shop-owned-item" title={c.description}>{c.icon} {c.name}{count > 1 ? ` x${count}` : ""}</span>;
+                    })}
+                  </div>
+                )}
+              </div>
+              <button onClick={handleShopContinue}>Continue →</button>
             </div>
           )}
 

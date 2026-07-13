@@ -29,6 +29,7 @@ function backfillGameState(gs: GameState): GameState {
   if (!gs.challengeTracker) gs.challengeTracker = createTradingTracker();
   if (!gs.activeChallenges) gs.activeChallenges = [];
   if (gs.tickets == null) gs.tickets = 0;
+  if (gs.freeNextStock == null) gs.freeNextStock = false;
   if (!gs.consumableInventory) gs.consumableInventory = createEmptyInventory();
   return gs;
 }

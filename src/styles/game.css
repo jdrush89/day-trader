@@ -3651,103 +3651,136 @@ body {
 
 /* --- Shop Phase --- */
 .shop-phase {
-  max-width: 600px;
-  margin: 0 auto;
+  position: fixed;
+  inset: 0;
+  background: #0d1117;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.shop-phase h2 {
+  font-size: 2rem;
+  color: #fff;
+  margin-bottom: 0.5rem;
 }
 
 .shop-balance {
   text-align: center;
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  color: #ddd;
+  font-size: 1.4rem;
+  margin-bottom: 1.5rem;
+  color: #fff;
 }
 
 .shop-items {
   display: flex;
-  gap: 0.75rem;
+  gap: 1.5rem;
   justify-content: center;
-  margin-bottom: 1rem;
+  margin-bottom: 2rem;
 }
 
 .shop-item-card {
-  background: #1a2230;
-  border: 2px solid #333;
-  border-radius: 12px;
-  padding: 1rem;
-  width: 170px;
+  background: #1c2433;
+  border: 2px solid #3a4a5c;
+  border-radius: 14px;
+  padding: 1.5rem 1.25rem;
+  width: 210px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.6rem;
   cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s;
-  color: #eee;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+  color: #fff;
 }
 
 .shop-item-card:hover:not(.disabled) {
   border-color: #ffd700;
-  transform: translateY(-3px);
+  transform: translateY(-4px);
+  box-shadow: 0 4px 20px rgba(255, 215, 0, 0.15);
 }
 
 .shop-item-card.disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 
 .shop-item-icon {
-  font-size: 2rem;
+  font-size: 2.5rem;
 }
 
 .shop-item-name {
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
+  color: #fff;
 }
 
 .shop-item-desc {
-  font-size: 0.75rem;
-  color: #aaa;
+  font-size: 0.9rem;
+  color: #c8d0dc;
   text-align: center;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
 .shop-item-cost {
   font-weight: 700;
   color: #ffd700;
-  font-size: 1rem;
+  font-size: 1.2rem;
+  margin-top: 0.3rem;
 }
 
 .shop-item-phase {
-  font-size: 0.7rem;
-  color: #888;
+  font-size: 0.8rem;
+  color: #8899aa;
 }
 
 .shop-inventory {
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .shop-owned {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
   flex-wrap: wrap;
   justify-content: center;
-  padding: 0.5rem;
-  background: #141c28;
-  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  background: #161e2a;
+  border-radius: 10px;
+  border: 1px solid #2a3a4a;
 }
 
 .shop-owned-label {
   font-weight: 600;
-  color: #aaa;
-  font-size: 0.85rem;
+  color: #c8d0dc;
+  font-size: 0.95rem;
 }
 
 .shop-owned-item {
   background: #1e2a3a;
-  padding: 0.2rem 0.5rem;
+  padding: 0.3rem 0.6rem;
   border-radius: 6px;
-  font-size: 0.8rem;
-  color: #ddd;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.shop-phase button:not(.shop-item-card) {
+  margin-top: 1rem;
+  padding: 0.75rem 2rem;
+  font-size: 1.1rem;
+  background: #2a6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.shop-phase button:not(.shop-item-card):hover {
+  background: #3b7;
 }
 
 /* --- Items Monitor Channel --- */

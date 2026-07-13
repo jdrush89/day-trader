@@ -93,6 +93,7 @@ export function createInitialState(): GameState {
     challengeTracker: createTradingTracker(),
     activeChallenges: selectDailyChallenges(1, false, false),
     tickets: 0,
+    freeNextStock: false,
     consumableInventory: createEmptyInventory(),
   };
 }
