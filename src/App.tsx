@@ -22,7 +22,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.47";
+const GAME_VERSION = "0.0.48";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -39,7 +39,7 @@ function App() {
   const [eodPhase, setEodPhase] = useState<"summary" | "challenges" | "shop" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
   const [activeMonitorId, setActiveMonitorId] = useState(0);
-  const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
+  const [showTransition, setShowTransition] = useState<"restaurant" | "trading" | null>(null);
   const [showChallengeIntro, setShowChallengeIntro] = useState<"trading" | "restaurant" | null>(null);
   const [titleTutorial, setTitleTutorial] = useState<"pick" | "trading" | "restaurant" | null>(null);
   const [menuFocusIndex, setMenuFocusIndex] = useState(-1);
@@ -66,7 +66,7 @@ function App() {
   mpSaveIdRef.current = mpSaveId;
   const [mpResumeData, setMpResumeData] = useState<MpSaveData | null>(null); // MP save being resumed (waiting for players)
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
-  const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean }) => void>(() => {});
+  const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean; skipTradingTransition?: boolean }) => void>(() => {});
 
   // Multiplayer hook
   const [mpState, mpActions] = useMultiplayer(
@@ -95,11 +95,16 @@ function App() {
       },
       onDeclineLoan: () => { setShowLoanOffer(null); setShowChallengeIntro("trading"); },
       onDismissTransition: () => {
+        const currentTransition = showTransition;
         setShowTransition(null);
-        setSpeed(1);
-        setMyCounter(0);
-        setRestaurantState(createRestaurantState(gameState, mpState.players.length));
-        setShowChallengeIntro("restaurant");
+        if (currentTransition === "trading") {
+          beginScheduledDayRef.current(gameState, { skipTradingTransition: true });
+        } else {
+          setSpeed(1);
+          setMyCounter(0);
+          setRestaurantState(createRestaurantState(gameState, mpState.players.length));
+          setShowChallengeIntro("restaurant");
+        }
       },
       onDismissChallengeIntro: (playerId: string) => {
         setChallengeReadyPlayers((prev) => {
@@ -941,7 +946,7 @@ function App() {
     }
   }, []);
 
-  const beginScheduledDay = useCallback((stateOverride?: GameState, opts?: { skipRestaurantTransition?: boolean }) => {
+  const beginScheduledDay = useCallback((stateOverride?: GameState, opts?: { skipRestaurantTransition?: boolean; skipTradingTransition?: boolean }) => {
     const nextState = stateOverride ?? gameState;
 
     // Boss day: when market closes, day is done (restaurant was running alongside)
@@ -995,10 +1000,20 @@ function App() {
       return;
     }
 
-    // After Shwendy's (or starting a new day), open the market
+    // After Shwendy's (or starting a new day), show trading morning screen (day > 1, non-boss)
     setRestaurantState(null);
     setSkipNextRestaurant(false);
     setSpeed(1);
+
+    // Show morning transition on day 2+ (non-boss). Day 1 goes straight to market.
+    const pendingDay = nextState.day ?? (gameState.day + 1);
+    if (pendingDay > 1 && !isBossDayCheck(pendingDay) && !opts?.skipTradingTransition) {
+      setGameState(nextState);
+      setShowTransition("trading");
+      setEodPhase("summary");
+      return;
+    }
+
     const marketState = openMarket(nextState);
 
     // Check if this is a boss day and select daily challenges
@@ -1491,6 +1506,28 @@ function App() {
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setShowOptions("title"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>OPTIONS</button>
         </div>
         <div className="title-version">v{GAME_VERSION}</div>
+      </div>
+    );
+  }
+
+  if (showTransition === "trading") {
+    const startTrading = () => {
+      if (isMultiplayer && isPeer) {
+        mpActions.sendAction({ type: "dismiss_transition" } as any);
+        return;
+      }
+      setShowTransition(null);
+      beginScheduledDayRef.current(gameState, { skipTradingTransition: true });
+    };
+    return (
+      <div className="title-screen" onClick={startTrading} onKeyDown={startTrading} tabIndex={0} ref={(el) => el?.focus()}>
+        <img src="/trading-morning.jpg" alt="Trading desk at sunrise" className="title-screen-bg" />
+        <div className="title-screen-overlay transition-overlay">
+          <h1 className="transition-title">🏠 Home</h1>
+          <p className="transition-sub">Day {gameState.day} — Morning</p>
+          <button className="title-start-btn" onClick={startTrading}>START TRADING</button>
+          <p className="title-hint">Press any key to start</p>
+        </div>
       </div>
     );
   }
