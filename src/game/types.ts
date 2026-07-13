@@ -1,5 +1,6 @@
 import type { MenuItem } from "./restaurant-types";
 import type { TradingChallengeTracker, ActiveChallenge } from "./challenges";
+import type { ConsumableInventory } from "./consumables";
 
 export type HistoryRange = "1D" | "5D" | "1M" | "6M" | "1Y" | "5Y" | "MAX";
 
@@ -71,7 +72,8 @@ export type MonitorChannel =
   | "global_news"
   | "social_media"
   | "stock_ticker"
-  | "insider";
+  | "insider"
+  | "items";
 
 export interface Monitor {
   id: number;
@@ -172,4 +174,5 @@ export interface GameState {
   challengeTracker: TradingChallengeTracker;
   activeChallenges: ActiveChallenge[];
   tickets: number;
+  consumableInventory: ConsumableInventory;
 }

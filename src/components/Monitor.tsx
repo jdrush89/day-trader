@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Monitor as MonitorType, MonitorChannel, GameState, NewsItem } from "../game/types";
 import { getBuyingPower } from "../game/engine";
+import { getConsumable, getPhaseItems } from "../game/consumables";
 import { StockChart } from "./StockChart";
 import { NewsFeed, InsiderFeed } from "./NewsFeed";
 
@@ -20,14 +21,15 @@ interface MonitorProps {
   onSell: (symbol: string, shares: number) => void;
   onShort: (symbol: string, shares: number) => void;
   onCover: (symbol: string, shares: number) => void;
+  onUseItem?: (itemId: string) => void;
 }
 
-const CHANNEL_LABELS: Record<MonitorChannel, string> = { business_news: "📊 Biz News", global_news: "🌍 Global", social_media: "💬 Social", stock_ticker: "📈 Stocks", insider: "🤫 Insider" };
+const CHANNEL_LABELS: Record<MonitorChannel, string> = { business_news: "📊 Biz News", global_news: "🌍 Global", social_media: "💬 Social", stock_ticker: "📈 Stocks", insider: "🤫 Insider", items: "🎒 Items" };
 
 function getAnalystRating(symbol: string, stockTags: string[], news: NewsItem[]): "bullish" | "bearish" | "neutral" { let bullish = 0; let bearish = 0; for (const item of news) { if (!item.impact || item.impact.ticksRemaining <= 0 || item.impact.ticksRemaining > item.impact.duration) continue; for (const effect of item.impact.effects) { const matches = effect.symbol ? effect.symbol === symbol : effect.tag ? stockTags.includes(effect.tag) : false; if (!matches) continue; if (effect.direction === "up") bullish += 1; else bearish += 1; } } if (bullish > bearish) return "bullish"; if (bearish > bullish) return "bearish"; return "neutral"; }
 
-export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameState, paused, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover }: MonitorProps) {
-  const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
+export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameState, paused, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover, onUseItem }: MonitorProps) {
+  const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider", "items"];
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const stockTabsRef = useRef<HTMLDivElement>(null);
@@ -230,6 +232,37 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
             {monitor.channel === "global_news" && <NewsFeed news={gameState.news} category="global" paused={paused} />}
             {monitor.channel === "social_media" && <NewsFeed news={gameState.news} category="social" paused={paused} />}
             {monitor.channel === "insider" && <InsiderFeed tip={gameState.insiderTip} tip2={gameState.insiderTip2} viewed={gameState.insiderViewed} onView={onViewInsider} />}
+            {monitor.channel === "items" && (() => {
+              const tradingItems = getPhaseItems(gameState.consumableInventory, "trading");
+              if (tradingItems.length === 0) return (
+                <div className="items-channel-empty">
+                  <div className="items-empty-icon">🎒</div>
+                  <p>No trading items available</p>
+                  <p className="items-empty-hint">Complete daily challenges to earn tickets, then visit the shop to buy consumables!</p>
+                </div>
+              );
+              const grouped = [...new Set(tradingItems)].map((id) => ({
+                id,
+                item: getConsumable(id)!,
+                count: tradingItems.filter((i) => i === id).length,
+              }));
+              return (
+                <div className="items-channel">
+                  <div className="items-list">
+                    {grouped.map(({ id, item, count }) => (
+                      <button key={id} className="item-use-btn" onClick={() => onUseItem?.(id)}>
+                        <span className="item-use-icon">{item.icon}</span>
+                        <div className="item-use-info">
+                          <span className="item-use-name">{item.name}{count > 1 ? ` x${count}` : ""}</span>
+                          <span className="item-use-desc">{item.description}</span>
+                        </div>
+                        <span className="item-use-action">Use</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
         <div className="monitor-controls">

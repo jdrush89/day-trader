@@ -1,5 +1,6 @@
 import { GameState } from "./types";
 import { createTradingTracker } from "./challenges";
+import { createEmptyInventory } from "./consumables";
 
 const SAVE_KEY = "rogue-day-trader-save";
 const MP_SAVES_KEY = "rogue-day-trader-mp-saves";
@@ -28,6 +29,7 @@ function backfillGameState(gs: GameState): GameState {
   if (!gs.challengeTracker) gs.challengeTracker = createTradingTracker();
   if (!gs.activeChallenges) gs.activeChallenges = [];
   if (gs.tickets == null) gs.tickets = 0;
+  if (!gs.consumableInventory) gs.consumableInventory = createEmptyInventory();
   return gs;
 }
 

@@ -41,7 +41,9 @@ export type PeerAction =
   | { type: "resume_ready" }
   | { type: "set_speed"; speed: number }
   | { type: "toggle_pause" }
-  | { type: "view_insider" };
+  | { type: "view_insider" }
+  | { type: "use_consumable"; consumableId: string }
+  | { type: "buy_consumable"; consumableId: string };
 
 // --- Messages sent from host → peer ---
 

@@ -7,6 +7,7 @@ import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
 import { selectDailyChallenges, evaluateChallenges, getTicketsEarned, ALL_CHALLENGES } from "./game/challenges";
+import { generateShopOffering, getConsumable, addConsumable, removeConsumable, activateBuff, hasActiveBuff, tickBuffs, type ConsumableItem } from "./game/consumables";
 import { useMultiplayer } from "./multiplayer";
 import { MultiplayerLobby } from "./components/MultiplayerLobby";
 import { Monitor } from "./components/Monitor";
@@ -21,7 +22,7 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 
-const GAME_VERSION = "0.0.45";
+const GAME_VERSION = "0.0.46";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -35,7 +36,7 @@ function App() {
   });
 
   const [ordersOpen, setOrdersOpen] = useState(false);
-  const [eodPhase, setEodPhase] = useState<"summary" | "challenges" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
+  const [eodPhase, setEodPhase] = useState<"summary" | "challenges" | "shop" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
   const [activeMonitorId, setActiveMonitorId] = useState(0);
   const [showTransition, setShowTransition] = useState<"restaurant" | null>(null);
@@ -64,6 +65,7 @@ function App() {
   const mpSaveIdRef = useRef<string | null>(null);
   mpSaveIdRef.current = mpSaveId;
   const [mpResumeData, setMpResumeData] = useState<MpSaveData | null>(null); // MP save being resumed (waiting for players)
+  const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
   const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean }) => void>(() => {});
 
   // Multiplayer hook
@@ -112,6 +114,16 @@ function App() {
           next.add(playerId);
           return next;
         });
+      },
+      onUseConsumable: (consumableId: string) => {
+        // Determine which handler based on the item's phase
+        const c = getConsumable(consumableId);
+        if (!c) return;
+        if (c.phase === "trading") handleUseTradingItem(consumableId);
+        else handleUseRestaurantItem(consumableId);
+      },
+      onBuyConsumable: (consumableId: string) => {
+        handleBuyConsumable(consumableId);
       },
       onSetSpeed: setSpeed,
       onTogglePause: () => {
@@ -298,7 +310,47 @@ function App() {
   useEffect(() => {
     if (isPeer) return; // Peers don't tick - host sends state
     if (gameState.gameOver || !gameState.marketOpen || paused || titleTutorial || showLoanOffer || showBossIntro) return;
-    const interval = setInterval(() => setGameState((prev) => tick(prev)), 1000 / speed);
+    const interval = setInterval(() => setGameState((prev) => {
+      let next = tick(prev);
+      // Apply Scale buff: double stock movement
+      if (hasActiveBuff(prev.consumableInventory, "scale")) {
+        next = {
+          ...next,
+          stocks: next.stocks.map((s, i) => {
+            const prevPrice = prev.stocks[i]?.price ?? s.price;
+            const delta = s.price - prevPrice;
+            return { ...s, price: Math.max(0.01, prevPrice + delta * 2) };
+          }),
+        };
+      }
+      // Apply Bubble buffs
+      next = {
+        ...next,
+        stocks: next.stocks.map((s) => {
+          const riseKey = `bubble_rise_${s.symbol}`;
+          const crashKey = `bubble_crash_${s.symbol}`;
+          if (hasActiveBuff(prev.consumableInventory, riseKey)) {
+            return { ...s, price: s.price * 1.02 }; // 2% rise per tick
+          }
+          if (hasActiveBuff(prev.consumableInventory, crashKey)) {
+            return { ...s, price: Math.max(0.01, s.price * 0.97) }; // 3% crash per tick
+          }
+          return s;
+        }),
+      };
+      // Tick consumable buffs
+      const tickedInv = tickBuffs(next.consumableInventory);
+      // Check if a bubble rise just expired → start crash phase
+      const newBuffs = [...tickedInv.activeBuffs];
+      for (const b of prev.consumableInventory.activeBuffs) {
+        if (b.consumableId.startsWith("bubble_rise_") && b.remainingTicks <= 1) {
+          const sym = b.consumableId.replace("bubble_rise_", "");
+          newBuffs.push({ consumableId: `bubble_crash_${sym}`, remainingTicks: 50 });
+        }
+      }
+      next = { ...next, consumableInventory: { ...tickedInv, activeBuffs: newBuffs } };
+      return next;
+    }), 1000 / speed);
     return () => clearInterval(interval);
   }, [gameState.marketOpen, gameState.gameOver, speed, paused, titleTutorial, showLoanOffer, showBossIntro, isPeer]);
 
@@ -310,7 +362,8 @@ function App() {
     const interval = setInterval(() => {
       setRestaurantState((prev) => {
         if (!prev) return prev;
-        const next = restaurantTick(prev, 0.05 * speed);
+        const buffIds = gameState.consumableInventory.activeBuffs.map((b) => b.consumableId);
+        const next = restaurantTick(prev, 0.05 * speed, buffIds);
         // Sync restaurant earnings to cash in real-time during boss day
         const earningsDelta = next.totalEarnings - lastBossEarningsRef.current;
         if (earningsDelta > 0) {
@@ -323,7 +376,19 @@ function App() {
     return () => clearInterval(interval);
   }, [bossDay, restaurantState, paused, gameState.marketOpen, speed, showBossIntro, isPeer]);
 
-  const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider"];
+  // Tick consumable buffs during restaurant shifts (standalone, not boss day)
+  useEffect(() => {
+    if (isPeer) return;
+    const isRestaurant = restaurantState !== null && !bossDay;
+    if (!isRestaurant || paused || restaurantState.shiftOver) return;
+    if (gameState.consumableInventory.activeBuffs.length === 0) return;
+    const interval = setInterval(() => {
+      setGameState((prev) => ({ ...prev, consumableInventory: tickBuffs(prev.consumableInventory) }));
+    }, 50);
+    return () => clearInterval(interval);
+  }, [restaurantState, bossDay, paused, isPeer, gameState.consumableInventory.activeBuffs.length]);
+
+  const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider", "items"];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -494,7 +559,15 @@ function App() {
   }, [isPeer, mpActions]);
   const handleSell = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "sell_stock", symbol, shares }); return; }
-    setGameState((prev) => sellStock(prev, symbol, shares));
+    setGameState((prev) => {
+      const next = sellStock(prev, symbol, shares);
+      // Golden Coin: negate loss
+      if (hasActiveBuff(prev.consumableInventory, "golden_coin") && next.cash < prev.cash) {
+        const negated = { ...next, cash: prev.cash, consumableInventory: { ...next.consumableInventory, activeBuffs: next.consumableInventory.activeBuffs.filter((b) => b.consumableId !== "golden_coin") } };
+        return negated;
+      }
+      return next;
+    });
   }, [isPeer, mpActions]);
   const handleShort = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "short_stock", symbol, shares }); return; }
@@ -502,10 +575,172 @@ function App() {
   }, [isPeer, mpActions]);
   const handleCover = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "cover_short", symbol, shares }); return; }
-    setGameState((prev) => coverShort(prev, symbol, shares));
+    setGameState((prev) => {
+      const next = coverShort(prev, symbol, shares);
+      // Golden Coin: negate loss
+      if (hasActiveBuff(prev.consumableInventory, "golden_coin") && next.cash < prev.cash) {
+        const negated = { ...next, cash: prev.cash, consumableInventory: { ...next.consumableInventory, activeBuffs: next.consumableInventory.activeBuffs.filter((b) => b.consumableId !== "golden_coin") } };
+        return negated;
+      }
+      return next;
+    });
   }, [isPeer, mpActions]);
   const handleTogglePin = useCallback((symbol: string) => setGameState((prev) => togglePinStock(prev, symbol)), []);
   const handleToggleStopLoss = useCallback(() => setGameState((prev) => ({ ...prev, stopLossEnabled: !prev.stopLossEnabled })), []);
+
+  const handleUseTradingItem = useCallback((itemId: string) => {
+    const item = getConsumable(itemId);
+    if (!item || !gameState.consumableInventory.items.includes(itemId)) return;
+    if (isPeer) { mpActions.sendAction({ type: "use_consumable", consumableId: itemId } as any); return; }
+
+    const TICKS_PER_SEC = 10; // game runs at ~10 ticks/sec at 1x speed
+
+    switch (itemId) {
+      case "scale": {
+        // Double stock movement for 10 seconds
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 10 * TICKS_PER_SEC),
+        }));
+        break;
+      }
+      case "rewinder": {
+        // Rewind time by 10 seconds (move timeOfDay back)
+        setGameState((prev) => ({
+          ...prev,
+          timeOfDay: Math.max(0, prev.timeOfDay - 10 * TICKS_PER_SEC),
+          consumableInventory: removeConsumable(prev.consumableInventory, itemId),
+        }));
+        break;
+      }
+      case "golden_coin": {
+        // Activate buff that negates loss on next sell/cover
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 9999),
+        }));
+        break;
+      }
+      case "stock_ticket": {
+        // Give 1 free stock of the first portfolio stock, or cheapest available
+        const cheapest = [...gameState.stocks].sort((a, b) => a.price - b.price)[0];
+        if (cheapest) {
+          setGameState((prev) => {
+            const existing = prev.portfolio.find((p) => p.symbol === cheapest.symbol);
+            return {
+              ...prev,
+              portfolio: existing
+                ? prev.portfolio.map((p) => p.symbol === cheapest.symbol ? { ...p, shares: p.shares + 1, avgCost: (p.avgCost * p.shares + cheapest.price) / (p.shares + 1) } : p)
+                : [...prev.portfolio, { symbol: cheapest.symbol, shares: 1, avgCost: cheapest.price, dayAcquired: prev.day }],
+              consumableInventory: removeConsumable(prev.consumableInventory, itemId),
+            };
+          });
+        }
+        break;
+      }
+      case "quantum_encryption": {
+        // View insider without SEC risk — activate buff, then trigger view
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 9999),
+        }));
+        // Auto-view insider tip
+        handleViewInsider();
+        break;
+      }
+      case "bubble": {
+        // Pick a random stock and create a bubble effect (rapid rise then crash)
+        const stocks = gameState.stocks.filter((s) => s.price > 5);
+        const target = stocks[Math.floor(Math.random() * stocks.length)];
+        if (target) {
+          setGameState((prev) => ({
+            ...prev,
+            consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), `bubble_rise_${target.symbol}`, 5 * TICKS_PER_SEC),
+          }));
+        }
+        break;
+      }
+      case "upvote_bots": {
+        // Boost the most recent social media post
+        setGameState((prev) => {
+          const socialNews = prev.news.filter((n) => n.category === "social" && n.impact && n.impact.ticksRemaining > 0);
+          if (socialNews.length === 0) return prev;
+          const latest = socialNews[socialNews.length - 1];
+          return {
+            ...prev,
+            news: prev.news.map((n) => n.id === latest.id ? {
+              ...n,
+              upvotes: (n.upvotes ?? 0) + 500,
+              impact: n.impact ? { ...n.impact, duration: n.impact.duration * 2, ticksRemaining: n.impact.ticksRemaining + n.impact.duration } : n.impact,
+            } : n),
+            consumableInventory: removeConsumable(prev.consumableInventory, itemId),
+          };
+        });
+        break;
+      }
+    }
+  }, [gameState, isPeer, mpActions]);
+
+  const handleUseRestaurantItem = useCallback((itemId: string) => {
+    const item = getConsumable(itemId);
+    if (!item || !gameState.consumableInventory.items.includes(itemId)) return;
+    if (isPeer) { mpActions.sendAction({ type: "use_consumable", consumableId: itemId } as any); return; }
+
+    const TICKS_PER_SEC = 20; // restaurant ticks at 50ms = 20 ticks/sec
+
+    switch (itemId) {
+      case "tablet":
+        // 50% patience loss rate for 25 sec
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 25 * TICKS_PER_SEC),
+        }));
+        break;
+      case "live_band":
+        // 50% more tips for 25 sec
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 25 * TICKS_PER_SEC),
+        }));
+        break;
+      case "birthday_chant":
+        // Stop patience loss for 10 sec
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 10 * TICKS_PER_SEC),
+        }));
+        break;
+      case "ad_buy":
+        // Increase customer rate for 20 sec
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 20 * TICKS_PER_SEC),
+        }));
+        break;
+      case "lighter":
+        // Cook twice as fast for 30 sec
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 30 * TICKS_PER_SEC),
+        }));
+        break;
+      case "assistant":
+        // All prep handled for 25 sec
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 25 * TICKS_PER_SEC),
+        }));
+        break;
+      case "new_hire":
+        // All chores handled for 25 sec
+        setGameState((prev) => ({
+          ...prev,
+          consumableInventory: activateBuff(removeConsumable(prev.consumableInventory, itemId), itemId, 25 * TICKS_PER_SEC),
+        }));
+        break;
+    }
+  }, [gameState, isPeer, mpActions]);
+
   const handlePlaceOrder = useCallback((symbol: string, side: OrderSide, shares: number, orderType: OrderType, limitPrice?: number, stopPrice?: number) => {
     if (isPeer) { mpActions.sendAction({ type: "place_order", symbol, side, shares, orderType, limitPrice, stopPrice }); return; }
     setGameState((prev) => placeOrder(prev, symbol, side, shares, orderType, limitPrice, stopPrice));
@@ -824,8 +1059,8 @@ function App() {
     setEodPhase("challenges");
   }, [beginScheduledDay, gameState, bossDay, restaurantState]);
 
-  const handleChallengesContinue = useCallback(() => {
-    // After challenges, proceed to upgrades/stocks/restaurant-upgrades/menu-draft or next day
+  const handleShopContinue = useCallback(() => {
+    // After shop, proceed to upgrades/stocks/restaurant-upgrades/menu-draft or next day
     if (gameState.upgradeDraftOptions.length > 0) {
       setEodPhase("upgrades");
       setEodChoiceMade(false);
@@ -848,6 +1083,28 @@ function App() {
       beginScheduledDay();
     }
   }, [beginScheduledDay, gameState, isMultiplayer, mpActions]);
+
+  const handleChallengesContinue = useCallback(() => {
+    // After challenges, go to shop (if player has any tickets)
+    if (gameState.tickets > 0) {
+      setShopOffering(generateShopOffering());
+      setEodPhase("shop");
+      return;
+    }
+    // Skip shop, go straight to upgrades flow
+    handleShopContinue();
+  }, [gameState.tickets, handleShopContinue]);
+
+  const handleBuyConsumable = useCallback((itemId: string) => {
+    const item = getConsumable(itemId);
+    if (!item || gameState.tickets < item.tier) return;
+    if (isPeer) { mpActions.sendAction({ type: "buy_consumable", consumableId: itemId }); return; }
+    setGameState((prev) => ({
+      ...prev,
+      tickets: prev.tickets - item.tier,
+      consumableInventory: addConsumable(prev.consumableInventory, itemId),
+    }));
+  }, [gameState.tickets, isPeer, mpActions]);
 
 
   const handleAcquireUpgrade = useCallback((upgradeId: string) => {
@@ -952,6 +1209,11 @@ function App() {
   const handleViewInsider = useCallback(() => {
     setGameState((prev) => {
       if (prev.insiderViewed) return prev;
+      // Quantum Encryption: view insider without SEC risk (no position snapshots)
+      if (hasActiveBuff(prev.consumableInventory, "quantum_encryption")) {
+        const inv = { ...prev.consumableInventory, activeBuffs: prev.consumableInventory.activeBuffs.filter((b) => b.consumableId !== "quantum_encryption") };
+        return { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, consumableInventory: inv };
+      }
       return {
         ...prev,
         insiderViewed: true,
@@ -1454,6 +1716,8 @@ function App() {
             if (isPeer) mpActions.sendAction({ type: "switch_counter", counter: c });
           }}
           localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
+          consumableInventory={gameState.consumableInventory}
+          onUseRestaurantItem={handleUseRestaurantItem}
         />
         {/* Post-shift overlays render on top of restaurant UI */}
         {showChallengeIntro === "restaurant" && (
@@ -1527,6 +1791,39 @@ function App() {
                 );
               })()}
               <button onClick={handleChallengesContinue}>Continue →</button>
+            </div>
+          </div>
+        )}
+        {eodPhase === "shop" && (
+          <div className="end-of-day-overlay">
+            <div className="end-of-day shop-phase">
+              <h2>🎪 Ticket Shop</h2>
+              <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
+              <div className="shop-items">
+                {shopOffering.map((item) => (
+                  <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
+                    <div className="shop-item-icon">{item.icon}</div>
+                    <div className="shop-item-name">{item.name}</div>
+                    <div className="shop-item-desc">{item.description}</div>
+                    <div className="shop-item-cost">{item.tier} 🎟️</div>
+                    <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
+                  </button>
+                ))}
+              </div>
+              <div className="shop-inventory">
+                {gameState.consumableInventory.items.length > 0 && (
+                  <div className="shop-owned">
+                    <span className="shop-owned-label">🎒 Inventory:</span>
+                    {[...new Set(gameState.consumableInventory.items)].map((id) => {
+                      const c = getConsumable(id);
+                      if (!c) return null;
+                      const count = gameState.consumableInventory.items.filter((i) => i === id).length;
+                      return <span key={id} className="shop-owned-item" title={c.description}>{c.icon} {c.name}{count > 1 ? ` x${count}` : ""}</span>;
+                    })}
+                  </div>
+                )}
+              </div>
+              <button onClick={handleShopContinue}>Continue →</button>
             </div>
           </div>
         )}
@@ -1708,6 +2005,40 @@ function App() {
             </div>
           )}
 
+          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "shop" && (
+            <div className="end-of-day-overlay">
+              <div className="end-of-day shop-phase">
+                <h2>🎪 Ticket Shop</h2>
+                <p className="shop-balance">Your tickets: <strong>{gameState.tickets} 🎟️</strong></p>
+                <div className="shop-items">
+                  {shopOffering.map((item) => (
+                    <button key={item.id} className={`shop-item-card ${gameState.tickets < item.tier ? "disabled" : ""}`} onClick={() => handleBuyConsumable(item.id)} disabled={gameState.tickets < item.tier}>
+                      <div className="shop-item-icon">{item.icon}</div>
+                      <div className="shop-item-name">{item.name}</div>
+                      <div className="shop-item-desc">{item.description}</div>
+                      <div className="shop-item-cost">{item.tier} 🎟️</div>
+                      <div className="shop-item-phase">{item.phase === "trading" ? "📈 Trading" : "🍔 Kitchen"}</div>
+                    </button>
+                  ))}
+                </div>
+                <div className="shop-inventory">
+                  {gameState.consumableInventory.items.length > 0 && (
+                    <div className="shop-owned">
+                      <span className="shop-owned-label">🎒 Inventory:</span>
+                      {[...new Set(gameState.consumableInventory.items)].map((id) => {
+                        const c = getConsumable(id);
+                        if (!c) return null;
+                        const count = gameState.consumableInventory.items.filter((i) => i === id).length;
+                        return <span key={id} className="shop-owned-item" title={c.description}>{c.icon} {c.name}{count > 1 ? ` x${count}` : ""}</span>;
+                      })}
+                    </div>
+                  )}
+                </div>
+                <button onClick={handleShopContinue}>Continue →</button>
+              </div>
+            </div>
+          )}
+
           {!gameState.marketOpen && !gameState.gameOver && eodPhase === "upgrades" && (
             <div className="end-of-day-overlay">
               <div className="upgrade-draft">
@@ -1802,6 +2133,8 @@ function App() {
                 if (isPeer) mpActions.sendAction({ type: "switch_counter", counter: c });
               }}
               localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
+              consumableInventory={gameState.consumableInventory}
+              onUseRestaurantItem={handleUseRestaurantItem}
             />
             </div>
           ) : (
@@ -1825,6 +2158,7 @@ function App() {
                   onSell={handleSell}
                   onShort={handleShort}
                   onCover={handleCover}
+                  onUseItem={handleUseTradingItem}
                 />
               ))}
             </div>

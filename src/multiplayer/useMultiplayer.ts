@@ -78,6 +78,8 @@ export function useMultiplayer(
     onDismissTransition: () => void;
     onDismissChallengeIntro: (playerId: string) => void;
     onResumeReady: (playerId: string) => void;
+    onUseConsumable: (consumableId: string) => void;
+    onBuyConsumable: (consumableId: string) => void;
   },
 ): [MultiplayerState, MultiplayerActions] {
   const [state, setState] = useState<MultiplayerState>({
@@ -197,6 +199,8 @@ export function useMultiplayer(
       onDismissTransition: () => appCallbacksRef.current.onDismissTransition(),
       onDismissChallengeIntro: (playerId) => appCallbacksRef.current.onDismissChallengeIntro(playerId),
       onResumeReady: (playerId) => appCallbacksRef.current.onResumeReady(playerId),
+      onUseConsumable: (consumableId) => appCallbacksRef.current.onUseConsumable(consumableId),
+      onBuyConsumable: (consumableId) => appCallbacksRef.current.onBuyConsumable(consumableId),
     });
 
     try {

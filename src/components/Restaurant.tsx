@@ -11,6 +11,7 @@ import {
 import { ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
 import { ALL_CHALLENGES, type ActiveChallenge } from "../game/challenges";
+import { getConsumable, getPhaseItems, type ConsumableInventory } from "../game/consumables";
 
 const TICK_MS = 50;
 
@@ -39,6 +40,8 @@ interface RestaurantProps {
   currentCounter?: number;
   onSwitchCounter?: (counter: number) => void;
   localActiveOrderId?: number | null; // peer's local active order (separate from state.activeOrderId)
+  consumableInventory?: ConsumableInventory;
+  onUseRestaurantItem?: (itemId: string) => void;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -301,7 +304,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
     ...rawState,
@@ -339,13 +342,21 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
     return others;
   }, [state.orderSlots, state.numCounters, state.slotsPerCounter, currentCounter]);
 
+  // Compute active buff IDs for restaurant engine
+  const activeBuffIds = useMemo(() => 
+    consumableInventory?.activeBuffs.map((b) => b.consumableId) ?? [],
+    [consumableInventory?.activeBuffs]
+  );
+
+  const tipMultiplier = activeBuffIds.includes("live_band") ? 1.5 : 1;
+
   useEffect(() => {
     if (isPeer || paused || state.shiftOver) return; // Peers don't tick — they receive state from host
     const interval = window.setInterval(() => {
-      setRestaurantState((prev) => (prev ? restaurantTick(prev, (TICK_MS / 1000) * speed) : prev));
+      setRestaurantState((prev) => (prev ? restaurantTick(prev, (TICK_MS / 1000) * speed, activeBuffIds) : prev));
     }, TICK_MS);
     return () => window.clearInterval(interval);
-  }, [isPeer, paused, setRestaurantState, state.shiftOver, speed]);
+  }, [isPeer, paused, setRestaurantState, state.shiftOver, speed, activeBuffIds]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -385,7 +396,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           if (!prev) return prev;
           const order = prev.orderSlots[globalIndex];
           if (!order) return prev;
-          return order.completed ? serveOrder(prev, globalIndex) : acceptOrder(prev, globalIndex);
+          return order.completed ? serveOrder(prev, globalIndex, tipMultiplier) : acceptOrder(prev, globalIndex);
         });
         return;
       }
@@ -402,7 +413,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           if (!prev) return prev;
           const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
           const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
-          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex);
+          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex, tipMultiplier);
           return handleKeyPress(prev, event.key);
         });
         return;
@@ -510,6 +521,28 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         </div>
       </header>
 
+      {/* Restaurant consumable items bar */}
+      {consumableInventory && (() => {
+        const restaurantItems = getPhaseItems(consumableInventory, "restaurant");
+        if (restaurantItems.length === 0) return null;
+        const grouped = [...new Set(restaurantItems)].map((id) => ({
+          id,
+          item: getConsumable(id)!,
+          count: restaurantItems.filter((i) => i === id).length,
+        }));
+        return (
+          <div className="restaurant-items-bar">
+            <span className="items-bar-label">🎒 Items:</span>
+            {grouped.map(({ id, item, count }) => (
+              <button key={id} className="restaurant-item-btn" onClick={() => onUseRestaurantItem?.(id)} title={item.description}>
+                <span>{item.icon}</span>
+                <span className="restaurant-item-name">{item.name}{count > 1 ? ` x${count}` : ""}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })()}
+
       <section className="restaurant-queue">
         {state.numCounters > 1 && (
           <div className="counter-tabs">
@@ -552,7 +585,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                       if (!prev) return prev;
                       const currentOrder = prev.orderSlots[globalIndex];
                       if (!currentOrder) return prev;
-                      return currentOrder.completed ? serveOrder(prev, globalIndex) : acceptOrder(prev, globalIndex);
+                      return currentOrder.completed ? serveOrder(prev, globalIndex, tipMultiplier) : acceptOrder(prev, globalIndex);
                     })
               }
             >

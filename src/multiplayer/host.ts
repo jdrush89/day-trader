@@ -45,6 +45,8 @@ export interface HostCallbacks {
   onAllMenuItemsChosen: (choices: { playerId: string; itemName: string }[]) => void;
   getPlayerSaves?: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined;
   getMpSaveId?: () => string | undefined;
+  onUseConsumable: (consumableId: string) => void;
+  onBuyConsumable: (consumableId: string) => void;
 }
 
 export class MultiplayerHost {
@@ -350,6 +352,12 @@ export class MultiplayerHost {
         break;
       case "view_insider":
         this.callbacks.onViewInsider();
+        break;
+      case "use_consumable":
+        this.callbacks.onUseConsumable(action.consumableId);
+        break;
+      case "buy_consumable":
+        this.callbacks.onBuyConsumable(action.consumableId);
         break;
       case "accept_loan":
         this.callbacks.onAcceptLoan();

@@ -641,12 +641,12 @@ function markRhythmResult(order: ActiveOrder, index: number, result: "hit" | "mi
   return { ...order, rhythmResults };
 }
 
-function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[]): ActiveOrder {
+function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], patienceMultiplier = 1, cookSpeedMultiplier = 1): ActiveOrder {
   if (order.served) return order;
   if (order.failed) return { ...order, failedTimer: order.failedTimer - dt * TICKS_PER_SECOND };
   if (order.completed) return order;
 
-  const patienceRemaining = Math.max(0, order.patienceRemaining - dt);
+  const patienceRemaining = Math.max(0, order.patienceRemaining - dt * patienceMultiplier);
   let updatedOrder: ActiveOrder = { ...order, patienceRemaining };
   if (patienceRemaining <= 0) return { ...updatedOrder, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
 
@@ -654,7 +654,7 @@ function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[]): Ac
   if (!step) return updatedOrder;
 
   if ((step.type === "grill" || step.type === "fry") && updatedOrder.prepStarted) {
-    const prepProgress = updatedOrder.prepProgress + dt * TICKS_PER_SECOND;
+    const prepProgress = updatedOrder.prepProgress + dt * TICKS_PER_SECOND * cookSpeedMultiplier;
     updatedOrder = { ...updatedOrder, prepProgress };
 
     if (
@@ -736,16 +736,18 @@ export function createRestaurantState(state: GameState, numPlayers = 1): Restaur
   return spawnOrder(baseState);
 }
 
-export function restaurantTick(state: RestaurantState, dt: number): RestaurantState {
+export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds: string[] = []): RestaurantState {
   if (!state.shiftActive || state.shiftOver) return state;
 
   const shiftTimeRemaining = Math.max(0, state.shiftTimeRemaining - dt);
   const shiftOver = shiftTimeRemaining <= 0;
   let failureOccurred = false;
   let newFailures = 0;
+  const patienceMultiplier = activeBuffIds.includes("birthday_chant") ? 0 : activeBuffIds.includes("tablet") ? 0.5 : 1;
+  const cookSpeedMultiplier = activeBuffIds.includes("lighter") ? 2 : 1;
   const orderSlots = state.orderSlots.map((slot) => {
     if (!slot) return null;
-    const updated = updateOrderTick(slot, dt, state.acquiredUpgrades);
+    const updated = updateOrderTick(slot, dt, state.acquiredUpgrades, patienceMultiplier, cookSpeedMultiplier);
     if (!slot.failed && updated.failed) { failureOccurred = true; newFailures++; }
     if (updated.failed && updated.failedTimer <= 0) return null;
     return updated;
@@ -787,7 +789,13 @@ export function restaurantTick(state: RestaurantState, dt: number): RestaurantSt
   }
   nextState = { ...nextState, challengeTracker: tracker };
 
-  if (!shiftOver && hasEmptySlot && nextState.nextOrderTimer <= 0) nextState = spawnOrder(nextState);
+  if (!shiftOver && hasEmptySlot && nextState.nextOrderTimer <= 0) {
+    nextState = spawnOrder(nextState);
+    // Ad Buy: faster customer arrivals
+    if (activeBuffIds.includes("ad_buy")) {
+      nextState = { ...nextState, nextOrderTimer: nextState.nextOrderTimer * 0.5 };
+    }
+  }
   return nextState;
 }
 
@@ -1005,11 +1013,11 @@ export function calculateTip(order: ActiveOrder, upgrades: string[] = []): numbe
   return Math.round(order.menuItem.basePay * 0.6 * patienceRatio * charmMultiplier * 100) / 100;
 }
 
-export function serveOrder(state: RestaurantState, slotIndex: number): RestaurantState {
+export function serveOrder(state: RestaurantState, slotIndex: number, tipMultiplier = 1): RestaurantState {
   const order = state.orderSlots[slotIndex];
   if (!order || !order.completed || order.failed) return state;
 
-  const tip = calculateTip(order, state.acquiredUpgrades);
+  const tip = calculateTip(order, state.acquiredUpgrades) * tipMultiplier;
   const basePay = getOrderBasePay(order, state.acquiredUpgrades);
   const nextComboStreak = state.comboStreak + 1;
   const comboBonus = hasRestaurantUpgrade(state.acquiredUpgrades, "combo_bonus") && nextComboStreak % 3 === 0 ? 3 : 0;
