@@ -46,7 +46,7 @@ export interface HostCallbacks {
   onAllMenuItemsChosen: (choices: { playerId: string; itemName: string }[]) => void;
   getPlayerSaves?: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined;
   getMpSaveId?: () => string | undefined;
-  onUseConsumable: (consumableId: string) => void;
+  getShopOffering?: () => Array<{ id: string; name: string; phase: string; tier: number }>;  onUseConsumable: (consumableId: string) => void;
   onBuyConsumable: (consumableId: string) => void;
   onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover" | "buy_option" | "sell_option" | "close_option", symbol: string, shares: number, price: number, timestamp: number) => void;
 }
@@ -247,6 +247,7 @@ export class MultiplayerHost {
       playerActiveOrders: activeOrders,
       playerSaves: this.callbacks.getPlayerSaves?.(),
       mpSaveId: this.callbacks.getMpSaveId?.(),
+      shopOffering: this.callbacks.getShopOffering?.(),
     };
     this.network.broadcast(sync);
   }

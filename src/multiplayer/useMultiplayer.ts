@@ -56,6 +56,7 @@ export function useMultiplayer(
   getShowLoanOffer: () => { amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null,
   getPlayerSaves: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined,
   getMpSaveId: () => string | undefined,
+  getShopOffering: () => Array<{ id: string; name: string; phase: string; tier: number }>,
   appCallbacks: {
     onViewInsider: () => void;
     onAcceptLoan: () => void;
@@ -135,6 +136,8 @@ export function useMultiplayer(
   getPlayerSavesRef.current = getPlayerSaves;
   const getMpSaveIdRef = useRef(getMpSaveId);
   getMpSaveIdRef.current = getMpSaveId;
+  const getShopOfferingRef = useRef(getShopOffering);
+  getShopOfferingRef.current = getShopOffering;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -164,6 +167,7 @@ export function useMultiplayer(
       getShowLoanOffer: () => getShowLoanOfferRef.current(),
       getPlayerSaves: () => getPlayerSavesRef.current(),
       getMpSaveId: () => getMpSaveIdRef.current(),
+      getShopOffering: () => getShopOfferingRef.current(),
       onPlayerJoined: (player) => {
         setState((s) => ({ ...s, players: [...s.players, player] }));
       },

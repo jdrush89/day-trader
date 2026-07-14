@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.72";
+const GAME_VERSION = "0.0.73";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -94,6 +94,7 @@ function App() {
     () => showLoanOffer,
     () => mpResumeData?.players,
     () => mpSaveIdRef.current ?? undefined,
+    () => shopOffering.map((item) => ({ id: item.id, name: item.name, phase: item.phase, tier: item.tier })),
     {
       onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
@@ -206,7 +207,13 @@ function App() {
           // When host syncs shop phase and local step is null (post-picks), set local step to shop
           if (sync.eodPhase === "shop" && localEodInfoStep === null) {
             setLocalEodInfoStep("shop");
-            setShopOffering(generateShopOffering());
+            // Use host's shop offering so all players see the same items
+            if (sync.shopOffering && sync.shopOffering.length > 0) {
+              const fullItems = sync.shopOffering.map((s) => getConsumable(s.id)).filter(Boolean) as ConsumableItem[];
+              setShopOffering(fullItems.length > 0 ? fullItems : generateShopOffering());
+            } else {
+              setShopOffering(generateShopOffering());
+            }
             setEodInfoReadyPlayers(new Set());
           }
           if (prev !== sync.eodPhase) setEodChoiceMade(false);
@@ -421,12 +428,21 @@ function App() {
         setEodChoiceMade(false);
         mpActions.resetEodGate();
       } else {
-        // Shop was already shown locally via localEodInfoStep — go to next day
-        setRestaurantState(null);
-        beginScheduledDayRef.current(undefined, restaurantState !== null ? { skipRestaurantTransition: true } : undefined);
+        // No picks needed — check if shop should show (only if not already shown)
+        const hasAnyTickets = gameState.tradingTickets > 0 || gameState.restaurantTickets > 0;
+        if (eodPhase !== "shop" && (restaurantState !== null || bossDay) && hasAnyTickets) {
+          const offering = generateShopOffering();
+          setShopOffering(offering);
+          setEodPhase("shop");
+          setLocalEodInfoStep("shop");
+          setEodInfoReadyPlayers(new Set());
+        } else {
+          setRestaurantState(null);
+          beginScheduledDayRef.current(undefined, restaurantState !== null ? { skipRestaurantTransition: true } : undefined);
+        }
       }
     }
-  }, [eodInfoReadyPlayers, isMultiplayer, mpState.players.length]);
+  }, [eodInfoReadyPlayers, isMultiplayer, mpState.players.length, eodPhase]);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -1384,18 +1400,11 @@ function App() {
       }
       setLocalEodInfoStep("challenges");
     } else if (localEodInfoStep === "challenges") {
-      // Check if shop should show (has tickets + restaurant or boss day)
-      const hasAnyTickets = gameState.tradingTickets > 0 || gameState.restaurantTickets > 0;
-      if ((restaurantState !== null || bossDay) && hasAnyTickets) {
-        setShopOffering(generateShopOffering());
-        setLocalEodInfoStep("shop");
-      } else {
-        setLocalEodInfoStep("waiting");
-        // Signal readiness
-        const myId = mpState.localPlayer?.id ?? "host";
-        setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
-        if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
-      }
+      // After challenges, go straight to waiting — shop shows after picks (if any)
+      setLocalEodInfoStep("waiting");
+      const myId = mpState.localPlayer?.id ?? "host";
+      setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+      if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     } else if (localEodInfoStep === "shop") {
       setLocalEodInfoStep("waiting");
       // Signal readiness
@@ -1403,7 +1412,7 @@ function App() {
       setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
       if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     }
-  }, [localEodInfoStep, gameState.tradingTickets, gameState.restaurantTickets, restaurantState, bossDay, isPeer, mpActions, mpState.localPlayer]);
+  }, [localEodInfoStep, bossDay, isPeer, mpActions, mpState.localPlayer]);
 
   const handleBuyConsumable = useCallback((itemId: string) => {
     const item = getConsumable(itemId);
