@@ -3,7 +3,7 @@ import type { RestaurantState } from "../game/restaurant-types";
 import type { PeerAction, Player, ActionFeedItem, GameSync, NetworkMessage } from "./types";
 import { NetworkManager, generateRoomCode, getPlayerColor } from "./network";
 import { buyStock, sellStock, shortStock, coverShort, placeOrder, cancelOrder, buyOption, sellOption, closeOption, togglePinStock } from "../game/engine";
-import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder } from "../game/restaurant-engine";
+import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder, recordOrderContributor } from "../game/restaurant-engine";
 import { handleChopKey } from "../game/restaurant-engine";
 
 const MAX_FEED_ITEMS = 20;
@@ -474,24 +474,28 @@ export class MultiplayerHost {
             const globalIndex = playerCounterIdx * prev.slotsPerCounter + (slotNumber - 1);
             const order = prev.orderSlots[globalIndex];
             if (!order) return prev;
-            const result = order.completed ? serveOrder(withPlayerActive, globalIndex) : acceptOrder(withPlayerActive, globalIndex);
+            let result = order.completed ? serveOrder(withPlayerActive, globalIndex, 1, player.id) : acceptOrder(withPlayerActive, globalIndex);
+            if (!order.completed && result.activeOrderId != null) result = recordOrderContributor(result, result.activeOrderId, player.id);
             this.setPlayerActiveOrder(player.id, result.activeOrderId);
             return { ...result, activeOrderId: prev.activeOrderId };
           }
           if (key === "ArrowLeft" || key === "ArrowRight") {
-            const result = handleChopKey(withPlayerActive, key === "ArrowLeft" ? "left" : "right");
+            let result = handleChopKey(withPlayerActive, key === "ArrowLeft" ? "left" : "right");
+            if (playerActiveId != null) result = recordOrderContributor(result, playerActiveId, player.id);
             this.setPlayerActiveOrder(player.id, result.activeOrderId);
             return { ...result, activeOrderId: prev.activeOrderId };
           }
           if (key === "Enter") {
             const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === playerActiveId);
             const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
-            const result = currentOrder?.completed ? serveOrder(withPlayerActive, activeSlotIndex) : handleKeyPress(withPlayerActive, key);
+            let result = currentOrder?.completed ? serveOrder(withPlayerActive, activeSlotIndex, 1, player.id) : handleKeyPress(withPlayerActive, key);
+            if (!currentOrder?.completed && playerActiveId != null) result = recordOrderContributor(result, playerActiveId, player.id);
             this.setPlayerActiveOrder(player.id, result.activeOrderId);
             return { ...result, activeOrderId: prev.activeOrderId };
           }
           if (/^[a-zA-Z]$/.test(key) || key === " ") {
-            const result = handleKeyPress(withPlayerActive, key);
+            let result = handleKeyPress(withPlayerActive, key);
+            if (playerActiveId != null) result = recordOrderContributor(result, playerActiveId, player.id);
             this.setPlayerActiveOrder(player.id, result.activeOrderId);
             return { ...result, activeOrderId: prev.activeOrderId };
           }

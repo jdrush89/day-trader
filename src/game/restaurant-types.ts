@@ -107,6 +107,15 @@ export interface ActiveOrder {
   orderCorrect: boolean;
 }
 
+export interface RestaurantOrderLog {
+  timestamp: number; // seconds elapsed (shiftDuration - shiftTimeRemaining)
+  orderId: number;
+  orderName: string;
+  orderIcon: string;
+  payout: number;
+  contributors: string[]; // playerIds who worked on this order
+}
+
 export interface RestaurantState {
   shiftActive: boolean;
   orderSlots: (ActiveOrder | null)[];
@@ -127,4 +136,9 @@ export interface RestaurantState {
   numCounters: number; // 1 for single player, N for multiplayer
   slotsPerCounter: number; // typically 5 (or 6 with upgrade)
   playerFocus: Record<string, number | null>; // playerId → activeOrderId they're focused on
+  // Per-order contributor tracking: orderId → set of playerIds who worked on it
+  orderContributors: Record<number, string[]>;
+  // Completed order log for graphing
+  orderLog: RestaurantOrderLog[];
+  shiftDuration: number; // total shift length in seconds (for graph x-axis)
 }

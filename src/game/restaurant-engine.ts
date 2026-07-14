@@ -7,6 +7,7 @@ import {
   MemorizeStep,
   MenuItem,
   OrderStep,
+  RestaurantOrderLog,
   RestaurantState,
   RhythmHit,
   RhythmStep,
@@ -712,6 +713,7 @@ function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], pat
 export function createRestaurantState(state: GameState, numPlayers = 1): RestaurantState {
   const slotsPerCounter = hasRestaurantUpgrade(state, "sixth_slot") ? 6 : 5;
   const numCounters = numPlayers;
+  const shiftDuration = SHIFT_DURATION_SECONDS + restaurantUpgradeCount(state, "longer_shift") * 30;
   const baseState: RestaurantState = {
     shiftActive: true,
     orderSlots: Array.from({ length: slotsPerCounter * numCounters }, () => null),
@@ -720,7 +722,7 @@ export function createRestaurantState(state: GameState, numPlayers = 1): Restaur
     failedOrders: 0,
     totalEarnings: 0,
     totalTips: 0,
-    shiftTimeRemaining: SHIFT_DURATION_SECONDS + restaurantUpgradeCount(state, "longer_shift") * 30,
+    shiftTimeRemaining: shiftDuration,
     nextOrderTimer: randomOrderInterval(state.acquiredRestaurantUpgrades, numCounters),
     orderIdCounter: 1,
     shiftOver: false,
@@ -731,6 +733,9 @@ export function createRestaurantState(state: GameState, numPlayers = 1): Restaur
     numCounters,
     slotsPerCounter,
     playerFocus: {},
+    orderContributors: {},
+    orderLog: [],
+    shiftDuration,
   };
 
   return spawnOrder(baseState);
@@ -1013,7 +1018,7 @@ export function calculateTip(order: ActiveOrder, upgrades: string[] = []): numbe
   return Math.round(order.menuItem.basePay * 0.6 * patienceRatio * charmMultiplier * 100) / 100;
 }
 
-export function serveOrder(state: RestaurantState, slotIndex: number, tipMultiplier = 1): RestaurantState {
+export function serveOrder(state: RestaurantState, slotIndex: number, tipMultiplier = 1, servingPlayerId?: string): RestaurantState {
   const order = state.orderSlots[slotIndex];
   if (!order || !order.completed || order.failed) return state;
 
@@ -1033,6 +1038,28 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
   if (order.patienceRemaining < 2) tracker.clutchCompletions++;
   if (tip <= 0) tracker.allTipsPositive = false;
 
+  // Log the completed order for graphing
+  const contributors = state.orderContributors[order.id] ?? [];
+  // Add serving player if not already a contributor
+  if (servingPlayerId && !contributors.includes(servingPlayerId)) {
+    contributors.push(servingPlayerId);
+  }
+  // Fallback: if no contributors tracked, use "player" for solo
+  const finalContributors = contributors.length > 0 ? contributors : ["player"];
+
+  const logEntry: RestaurantOrderLog = {
+    timestamp: state.shiftDuration - state.shiftTimeRemaining,
+    orderId: order.id,
+    orderName: order.menuItem.name,
+    orderIcon: order.menuItem.icon,
+    payout,
+    contributors: finalContributors,
+  };
+
+  // Clean up contributor tracking for this order
+  const newContributors = { ...state.orderContributors };
+  delete newContributors[order.id];
+
   return {
     ...state,
     orderSlots,
@@ -1042,6 +1069,18 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
     totalTips: Math.round((state.totalTips + tip) * 100) / 100,
     comboStreak: nextComboStreak,
     challengeTracker: tracker,
+    orderContributors: newContributors,
+    orderLog: [...state.orderLog, logEntry],
+  };
+}
+
+/** Record that a player contributed to an order (worked on a step) */
+export function recordOrderContributor(state: RestaurantState, orderId: number, playerId: string): RestaurantState {
+  const existing = state.orderContributors[orderId] ?? [];
+  if (existing.includes(playerId)) return state;
+  return {
+    ...state,
+    orderContributors: { ...state.orderContributors, [orderId]: [...existing, playerId] },
   };
 }
 

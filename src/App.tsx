@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.61";
+const GAME_VERSION = "0.0.62";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1946,6 +1946,9 @@ function App() {
           localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
           consumableInventory={gameState.consumableInventory}
           onUseRestaurantItem={handleUseRestaurantItem}
+          localPlayerId={mpState.localPlayer?.id ?? "player"}
+          localPlayerName={mpState.localPlayer?.name ?? "You"}
+          players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
         />
         {/* Post-shift overlays render on top of restaurant UI */}
         {showChallengeIntro === "restaurant" && (
@@ -2390,6 +2393,9 @@ function App() {
               localActiveOrderId={isPeer ? peerActiveOrderId : undefined}
               consumableInventory={gameState.consumableInventory}
               onUseRestaurantItem={handleUseRestaurantItem}
+              localPlayerId={mpState.localPlayer?.id ?? "player"}
+              localPlayerName={mpState.localPlayer?.name ?? "You"}
+              players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
             />
             </div>
           ) : (

@@ -5,6 +5,7 @@ import {
   handleKeyPress,
   handleKeyUp,
   handleMouseMove as handleRestaurantMouseMove,
+  recordOrderContributor,
   restaurantTick,
   serveOrder,
 } from "../game/restaurant-engine";
@@ -12,6 +13,8 @@ import { ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/r
 import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
 import { ALL_CHALLENGES, type ActiveChallenge } from "../game/challenges";
 import { getConsumable, getPhaseItems, type ConsumableInventory } from "../game/consumables";
+import { PnLGraph } from "./PnLGraph";
+import type { PlayerPnLSeries, PnLDataPoint } from "../game/trade-log";
 
 const TICK_MS = 50;
 
@@ -43,6 +46,10 @@ interface RestaurantProps {
   localActiveOrderId?: number | null; // peer's local active order (separate from state.activeOrderId)
   consumableInventory?: ConsumableInventory;
   onUseRestaurantItem?: (itemId: string) => void;
+  // Player info for order contributor tracking and graph
+  localPlayerId?: string;
+  localPlayerName?: string;
+  players?: Array<{ id: string; name: string; color: string }>;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -305,7 +312,7 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
-export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
     ...rawState,
@@ -366,6 +373,8 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
   currentCounterRef.current = currentCounter;
   const tipMultiplierRef = useRef(tipMultiplier);
   tipMultiplierRef.current = tipMultiplier;
+  const localPlayerIdRef = useRef(localPlayerId);
+  localPlayerIdRef.current = localPlayerId;
 
   useEffect(() => {
     if (isPeer || paused || state.shiftOver) return; // Peers don't tick — they receive state from host
@@ -413,14 +422,20 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           if (!prev) return prev;
           const order = prev.orderSlots[globalIndex];
           if (!order) return prev;
-          return order.completed ? serveOrder(prev, globalIndex, tipMultiplierRef.current) : acceptOrder(prev, globalIndex);
+          if (order.completed) return serveOrder(prev, globalIndex, tipMultiplierRef.current, localPlayerIdRef.current);
+          const next = acceptOrder(prev, globalIndex);
+          return next.activeOrderId != null ? recordOrderContributor(next, next.activeOrderId, localPlayerIdRef.current) : next;
         });
         return;
       }
 
       if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
         event.preventDefault();
-        setRestaurantState((prev) => (prev ? handleChopKey(prev, event.key === "ArrowLeft" ? "left" : "right") : prev));
+        setRestaurantState((prev) => {
+          if (!prev) return prev;
+          const next = handleChopKey(prev, event.key === "ArrowLeft" ? "left" : "right");
+          return prev.activeOrderId != null ? recordOrderContributor(next, prev.activeOrderId, localPlayerIdRef.current) : next;
+        });
         return;
       }
 
@@ -430,15 +445,20 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           if (!prev) return prev;
           const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
           const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
-          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex, tipMultiplierRef.current);
-          return handleKeyPress(prev, event.key);
+          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex, tipMultiplierRef.current, localPlayerIdRef.current);
+          const next = handleKeyPress(prev, event.key);
+          return prev.activeOrderId != null ? recordOrderContributor(next, prev.activeOrderId, localPlayerIdRef.current) : next;
         });
         return;
       }
 
       if (/^[a-zA-Z]$/.test(event.key) || event.key === " ") {
         event.preventDefault();
-        setRestaurantState((prev) => (prev ? handleKeyPress(prev, event.key) : prev));
+        setRestaurantState((prev) => {
+          if (!prev) return prev;
+          const next = handleKeyPress(prev, event.key);
+          return prev.activeOrderId != null ? recordOrderContributor(next, prev.activeOrderId, localPlayerIdRef.current) : next;
+        });
       }
     };
 
@@ -602,7 +622,9 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                       if (!prev) return prev;
                       const currentOrder = prev.orderSlots[globalIndex];
                       if (!currentOrder) return prev;
-                      return currentOrder.completed ? serveOrder(prev, globalIndex, tipMultiplier) : acceptOrder(prev, globalIndex);
+                      if (currentOrder.completed) return serveOrder(prev, globalIndex, tipMultiplier, localPlayerId);
+                      const next = acceptOrder(prev, globalIndex);
+                      return next.activeOrderId != null ? recordOrderContributor(next, next.activeOrderId, localPlayerId) : next;
                     })
               }
             >
@@ -724,19 +746,80 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         <div className="restaurant-summary-chip"><span>Tips</span><strong>${state.totalTips.toFixed(2)}</strong></div>
       </footer>
 
-      {state.shiftOver && (
-        <div className="restaurant-shift-over">
-          <div className="restaurant-shift-card">
-            <h2>🏁 Shift Over</h2>
-            <div className="shift-over-stats">
-              <div><span>Orders served</span><strong>{state.completedOrders}</strong></div>
-              <div><span>Food sales + tips</span><strong>${state.totalEarnings.toFixed(2)}</strong></div>
-              <div><span>Tips earned</span><strong>${state.totalTips.toFixed(2)}</strong></div>
+      {state.shiftOver && (() => {
+        // Build P&L series from order log
+        const playerList = players && players.length > 0
+          ? players
+          : [{ id: localPlayerId, name: localPlayerName, color: "#ffbb66" }];
+
+        const seriesMap: Record<string, PnLDataPoint[]> = {};
+        const cumulative: Record<string, number> = {};
+        for (const p of playerList) {
+          seriesMap[p.id] = [{ time: 0, value: 0 }];
+          cumulative[p.id] = 0;
+        }
+
+        for (const entry of state.orderLog) {
+          const numContributors = entry.contributors.length || 1;
+          const share = entry.payout / numContributors;
+          for (const pid of entry.contributors) {
+            if (cumulative[pid] === undefined) continue;
+            cumulative[pid] += share;
+            seriesMap[pid].push({
+              time: entry.timestamp,
+              value: cumulative[pid],
+              entry: {
+                timestamp: entry.timestamp,
+                playerId: pid,
+                playerName: playerList.find((p) => p.id === pid)?.name ?? "",
+                action: "buy",
+                symbol: "",
+                shares: 1,
+                price: entry.payout,
+                realizedPnL: share,
+                label: `${entry.orderIcon} ${entry.orderName} ($${entry.payout.toFixed(2)}${numContributors > 1 ? `, split ${numContributors} ways` : ""})`,
+              },
+            });
+          }
+        }
+
+        // Add final point at shift end
+        for (const p of playerList) {
+          const series = seriesMap[p.id];
+          if (series.length > 0 && series[series.length - 1].time < state.shiftDuration) {
+            series.push({ time: state.shiftDuration, value: cumulative[p.id] });
+          }
+        }
+
+        const restaurantSeries: PlayerPnLSeries[] = playerList.map((p) => ({
+          playerId: p.id,
+          playerName: p.name,
+          playerColor: p.color,
+          data: seriesMap[p.id] || [{ time: 0, value: 0 }],
+        }));
+
+        const hasData = restaurantSeries.some((s) => s.data.length > 1);
+
+        return (
+          <div className="restaurant-shift-over">
+            <div className="restaurant-shift-card">
+              <h2>🏁 Shift Over</h2>
+              <div className="shift-over-stats">
+                <div><span>Orders served</span><strong>{state.completedOrders}</strong></div>
+                <div><span>Food sales + tips</span><strong>${state.totalEarnings.toFixed(2)}</strong></div>
+                <div><span>Tips earned</span><strong>${state.totalTips.toFixed(2)}</strong></div>
+              </div>
+              {hasData && (
+                <div className="eod-pnl-graph-section" style={{ margin: "12px 0" }}>
+                  <h3 className="eod-graph-title">📊 Shift Earnings</h3>
+                  <PnLGraph series={restaurantSeries} width={400} height={160} />
+                </div>
+              )}
+              <button type="button" onClick={() => onFinish(state.totalEarnings)}>Continue</button>
             </div>
-            <button type="button" onClick={() => onFinish(state.totalEarnings)}>Continue</button>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
