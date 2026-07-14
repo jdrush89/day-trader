@@ -5,11 +5,14 @@ import {
   handleKeyPress,
   handleKeyUp,
   handleMouseMove as handleRestaurantMouseMove,
+  handleChoreMouseMove,
+  handleChoreClick,
+  handleChoreKeyPress,
   recordOrderContributor,
   restaurantTick,
   serveOrder,
 } from "../game/restaurant-engine";
-import { ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
+import { ActiveChore, ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
 import { ALL_CHALLENGES, type ActiveChallenge } from "../game/challenges";
 import { getConsumable, getPhaseItems, type ConsumableInventory } from "../game/consumables";
@@ -312,6 +315,123 @@ function renderStepInstruction(order: ActiveOrder) {
   );
 }
 
+const CHORE_NAMES: Record<string, string> = {
+  wash_dishes: "🍽️ Wash the Dishes",
+  take_out_trash: "🗑️ Take Out the Trash",
+  mop_floor: "🧹 Mop the Floor",
+  stack_plates: "🥞 Stack the Plates",
+  break_down_recycling: "♻️ Break Down Recycling",
+};
+
+function renderChoreInstruction(chore: ActiveChore) {
+  switch (chore.type) {
+    case "wash_dishes":
+      return (
+        <div className="restaurant-step-card chore-card">
+          <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
+          <div className="restaurant-step-copy">Scrub the spots off the plate! Move your mouse over the dirty spots.</div>
+          <div className="chore-interactive chore-dish">
+            <div className="dish-plate">
+              {chore.dishSpots.map((spot, i) => (
+                <div key={i} className={`dish-spot ${spot.scrubbed ? "clean" : ""}`} style={{ left: `${spot.x * 100}%`, top: `${spot.y * 100}%` }} />
+              ))}
+            </div>
+          </div>
+          <div className="cook-meta">
+            <span>{chore.dishSpots.filter((s) => s.scrubbed).length}/{chore.dishSpots.length} spots cleaned</span>
+            <span>⏱️ {chore.timer.toFixed(1)}s</span>
+          </div>
+        </div>
+      );
+
+    case "take_out_trash":
+      return (
+        <div className="restaurant-step-card chore-card">
+          <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
+          <div className="restaurant-step-copy">Click the trash bags to take them out!</div>
+          <div className="chore-interactive chore-trash">
+            {chore.trashBags.map((bag, i) => (
+              <div key={i} className={`trash-bag ${bag.removed ? "removed" : ""}`} style={{ left: `${bag.x * 100}%`, top: `${bag.y * 100}%` }} />
+            ))}
+          </div>
+          <div className="cook-meta">
+            <span>{chore.trashBags.filter((b) => b.removed).length}/{chore.trashBags.length} bags removed</span>
+            <span>⏱️ {chore.timer.toFixed(1)}s</span>
+          </div>
+        </div>
+      );
+
+    case "mop_floor": {
+      const phaseLabel = chore.mopPhase === "dunk" ? "Press ↓ to dunk the mop" : chore.mopPhase === "squeeze" ? `Press Space to squeeze (${chore.mopSqueezeCount}/3)` : `Alternate ← → to mop (${chore.mopSwipeCount}/6)`;
+      return (
+        <div className="restaurant-step-card chore-card">
+          <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
+          <div className="restaurant-step-copy">{phaseLabel}</div>
+          <div className="chore-interactive chore-mop">
+            <div className={`mop-bucket ${chore.mopPhase === "dunk" ? "active" : ""}`}>🪣</div>
+            <div className={`mop-handle ${chore.mopPhase === "mop" ? "mopping" : ""}`}>🧹</div>
+            <div className="mop-phase-indicators">
+              <span className={chore.mopPhase === "dunk" ? "active" : ""}>↓ Dunk</span>
+              <span className={chore.mopPhase === "squeeze" ? "active" : ""}>⎵ Squeeze</span>
+              <span className={chore.mopPhase === "mop" ? "active" : ""}>←→ Mop</span>
+            </div>
+          </div>
+          <div className="cook-meta">
+            <span>Cycle {chore.mopCycles}/{chore.mopCyclesNeeded}</span>
+            <span>⏱️ {chore.timer.toFixed(1)}s</span>
+          </div>
+        </div>
+      );
+    }
+
+    case "stack_plates":
+      return (
+        <div className="restaurant-step-card chore-card">
+          <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
+          <div className="restaurant-step-copy">Press Space to stack the plate when it's aligned! {chore.plateMissed && "❌ Missed! Try again."}</div>
+          <div className="chore-interactive chore-plates">
+            <div className="plate-track">
+              <div className="plate-target" style={{ left: `${chore.lastPlatePosition * 100}%` }} />
+              <div className={`plate-moving ${chore.plateMissed ? "missed" : ""}`} style={{ left: `${chore.platePosition * 100}%` }} />
+            </div>
+            <div className="plate-stack-count">
+              {Array.from({ length: chore.platesNeeded }, (_, i) => (
+                <span key={i} className={`plate-icon ${i < chore.platesStacked ? "stacked" : ""}`}>🍽️</span>
+              ))}
+            </div>
+          </div>
+          <div className="cook-meta">
+            <span>{chore.platesStacked}/{chore.platesNeeded} plates stacked</span>
+            <span>⏱️ {chore.timer.toFixed(1)}s</span>
+          </div>
+        </div>
+      );
+
+    case "break_down_recycling": {
+      const phaseLabel = chore.recyclePhase === "click" ? `Click to dismantle boxes (${chore.recycleClicks}/${chore.recycleClicksNeeded})` : `Press arrow keys to flatten (${chore.recycleArrows}/${chore.recycleArrowsNeeded})`;
+      return (
+        <div className="restaurant-step-card chore-card">
+          <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
+          <div className="restaurant-step-copy">{phaseLabel}</div>
+          <div className="chore-interactive chore-recycle">
+            <div className={`recycle-box ${chore.recyclePhase}`}>
+              {chore.recyclePhase === "click" ? "📦" : "📦→📄"}
+            </div>
+            <div className="recycle-phase-indicators">
+              <span className={chore.recyclePhase === "click" ? "active" : ""}>🖱️ Click</span>
+              <span className={chore.recyclePhase === "arrows" ? "active" : ""}>⬆⬇⬅➡ Flatten</span>
+            </div>
+          </div>
+          <div className="cook-meta">
+            <span>Cycle {chore.recycleCycles}/{chore.recycleCyclesNeeded}</span>
+            <span>⏱️ {chore.timer.toFixed(1)}s</span>
+          </div>
+        </div>
+      );
+    }
+  }
+}
+
 export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
@@ -375,6 +495,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
   tipMultiplierRef.current = tipMultiplier;
   const localPlayerIdRef = useRef(localPlayerId);
   localPlayerIdRef.current = localPlayerId;
+  const choreContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isPeer || paused || state.shiftOver) return; // Peers don't tick — they receive state from host
@@ -412,6 +533,15 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         onPeerKeyRef.current(event.key);
         return;
       }
+
+      // Handle chore interactions (chores take priority when active)
+      setRestaurantState((prev) => {
+        if (!prev?.activeChore || prev.activeChore.completed) return prev;
+        const updated = handleChoreKeyPress(prev.activeChore, event.key);
+        if (updated === prev.activeChore) return prev;
+        event.preventDefault();
+        return { ...prev, activeChore: updated, servingBlocked: updated.timerExpired && !updated.completed };
+      });
 
       const slotNumber = Number.parseInt(event.key, 10);
       if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= state.slotsPerCounter) {
@@ -479,16 +609,45 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         onPeerMouseRef.current(event.clientX, event.clientY);
         return;
       }
-      setRestaurantState((prev) => (prev ? handleRestaurantMouseMove(prev, event.clientX, event.clientY) : prev));
+      // Handle dish scrubbing chore
+      setRestaurantState((prev) => {
+        if (!prev) return prev;
+        if (prev.activeChore && !prev.activeChore.completed && prev.activeChore.type === "wash_dishes") {
+          const container = choreContainerRef.current;
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const updated = handleChoreMouseMove(prev.activeChore, event.clientX, event.clientY, rect);
+            if (updated !== prev.activeChore) {
+              return { ...prev, activeChore: updated };
+            }
+          }
+        }
+        return handleRestaurantMouseMove(prev, event.clientX, event.clientY);
+      });
+    };
+
+    const handleClick = (event: MouseEvent) => {
+      if (paused || state.shiftOver) return;
+      setRestaurantState((prev) => {
+        if (!prev?.activeChore || prev.activeChore.completed) return prev;
+        const container = choreContainerRef.current;
+        if (!container) return prev;
+        const rect = container.getBoundingClientRect();
+        const updated = handleChoreClick(prev.activeChore, event.clientX, event.clientY, rect);
+        if (updated === prev.activeChore) return prev;
+        return { ...prev, activeChore: updated };
+      });
     };
 
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleGlobalKeyUp);
     window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("click", handleClick);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleGlobalKeyUp);
       window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("click", handleClick);
     };
   }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver, state.numCounters, state.slotsPerCounter]);
 
@@ -695,8 +854,25 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         )}
       </section>
 
+      {/* Chore alert banner */}
+      {state.activeChore && !state.activeChore.completed && (
+        <div className={`chore-banner ${state.servingBlocked ? "blocked" : ""}`}>
+          <span className="chore-banner-icon">🧹</span>
+          <span className="chore-banner-text">
+            {state.servingBlocked
+              ? `⚠️ CHORE OVERDUE — Orders can't be served! Complete the chore first!`
+              : `Chore incoming: ${CHORE_NAMES[state.activeChore.type]} (${state.activeChore.timer.toFixed(0)}s)`}
+          </span>
+        </div>
+      )}
+
       <section className="restaurant-work-area">
-        {activeOrder ? (
+        {/* Active chore takes over the work area */}
+        {state.activeChore && !state.activeChore.completed ? (
+          <div className="chore-work-area" ref={choreContainerRef}>
+            {renderChoreInstruction(state.activeChore)}
+          </div>
+        ) : activeOrder ? (
           <>
             <div className="ticket-panel">
               <div className="ticket-header">

@@ -1093,3 +1093,271 @@
 .order-slot {
   position: relative;
 }
+
+/* ====== Chore system styles ====== */
+
+.chore-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(255, 165, 0, 0.15);
+  border: 1px solid rgba(255, 165, 0, 0.4);
+  border-radius: 8px;
+  margin: 0 12px;
+  animation: chore-pulse 2s ease-in-out infinite;
+}
+
+.chore-banner.blocked {
+  background: rgba(255, 50, 50, 0.2);
+  border-color: rgba(255, 50, 50, 0.6);
+  animation: chore-blocked-pulse 0.8s ease-in-out infinite;
+}
+
+.chore-banner-icon {
+  font-size: 1.2rem;
+}
+
+.chore-banner-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ffd;
+}
+
+.chore-banner.blocked .chore-banner-text {
+  color: #f88;
+}
+
+@keyframes chore-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+@keyframes chore-blocked-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.01); }
+}
+
+.chore-work-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chore-card {
+  border: 2px solid rgba(255, 165, 0, 0.5) !important;
+  background: rgba(255, 165, 0, 0.08) !important;
+}
+
+.chore-interactive {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  margin: 8px 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Wash dishes */
+.chore-dish {
+  background: radial-gradient(ellipse, #e8e0d0 60%, #c8b8a0 100%);
+}
+
+.dish-plate {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.dish-spot {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(60, 30, 0, 0.7);
+  transform: translate(-50%, -50%);
+  transition: opacity 0.3s, transform 0.3s;
+  box-shadow: 0 0 6px rgba(60, 30, 0, 0.5);
+}
+
+.dish-spot.clean {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+}
+
+/* Take out trash */
+.chore-trash {
+  background: linear-gradient(to bottom, #3a3a3a, #2a2a2a);
+}
+
+.trash-bag {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  transition: opacity 0.3s, transform 0.3s;
+  font-size: 0;
+}
+
+.trash-bag::before {
+  content: "🗑️";
+  font-size: 28px;
+}
+
+.trash-bag.removed {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+  pointer-events: none;
+}
+
+/* Mop floor */
+.chore-mop {
+  background: linear-gradient(to bottom, #5a5a5a, #4a4a4a);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.mop-bucket {
+  font-size: 48px;
+  opacity: 0.5;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.mop-bucket.active {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.mop-handle {
+  font-size: 48px;
+  transition: transform 0.2s;
+}
+
+.mop-handle.mopping {
+  animation: mop-sway 0.4s ease-in-out infinite alternate;
+}
+
+@keyframes mop-sway {
+  from { transform: rotate(-15deg); }
+  to { transform: rotate(15deg); }
+}
+
+.mop-phase-indicators {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.mop-phase-indicators span.active {
+  color: #ffcc00;
+  font-weight: bold;
+}
+
+/* Stack plates */
+.chore-plates {
+  background: linear-gradient(to bottom, #4a4a5a, #3a3a4a);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.plate-track {
+  position: relative;
+  width: 80%;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.plate-target {
+  position: absolute;
+  top: 50%;
+  width: 30px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 200, 0, 0.3);
+  border: 2px solid rgba(0, 200, 0, 0.6);
+  border-radius: 50%;
+}
+
+.plate-moving {
+  position: absolute;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  background: #ddd;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  transition: none;
+}
+
+.plate-moving.missed {
+  background: #f66;
+  border-color: #f44;
+}
+
+.plate-stack-count {
+  display: flex;
+  gap: 4px;
+  font-size: 1.2rem;
+}
+
+.plate-icon {
+  opacity: 0.3;
+  transition: opacity 0.3s;
+}
+
+.plate-icon.stacked {
+  opacity: 1;
+}
+
+/* Break down recycling */
+.chore-recycle {
+  background: linear-gradient(to bottom, #3a4a3a, #2a3a2a);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.recycle-box {
+  font-size: 56px;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.recycle-box:active {
+  transform: scale(0.9);
+}
+
+.recycle-box.arrows {
+  animation: recycle-shake 0.15s ease-in-out infinite alternate;
+}
+
+@keyframes recycle-shake {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(3deg); }
+}
+
+.recycle-phase-indicators {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+.recycle-phase-indicators span.active {
+  color: #4f4;
+  font-weight: bold;
+}

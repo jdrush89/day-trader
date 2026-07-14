@@ -1,8 +1,11 @@
 import { GameState } from "./types";
 import { createRestaurantTracker } from "./challenges";
 import {
+  ActiveChore,
   ActiveOrder,
   AssembleIngredient,
+  ChoreType,
+  DishSpot,
   HoldStep,
   MemorizeStep,
   MenuItem,
@@ -11,6 +14,7 @@ import {
   RestaurantState,
   RhythmHit,
   RhythmStep,
+  TrashBag,
 } from "./restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./restaurant-upgrades";
 import { getNetWorth } from "./engine";
@@ -710,10 +714,226 @@ function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], pat
   return updatedOrder;
 }
 
+// --- Chore system ---
+
+const CHORE_TYPES: ChoreType[] = ["wash_dishes", "take_out_trash", "mop_floor", "stack_plates", "break_down_recycling"];
+const CHORE_TIMER = 30; // seconds before chore blocks serving
+
+function createChore(id: number): ActiveChore {
+  const type = CHORE_TYPES[Math.floor(Math.random() * CHORE_TYPES.length)];
+  const base: ActiveChore = {
+    id,
+    type,
+    timer: CHORE_TIMER,
+    timerExpired: false,
+    completed: false,
+    dishSpots: [],
+    trashBags: [],
+    mopPhase: "dunk",
+    mopCycles: 0,
+    mopCyclesNeeded: 3,
+    mopSqueezeCount: 0,
+    mopSwipeCount: 0,
+    mopLastDirection: null,
+    platePosition: 0,
+    plateDirection: 1,
+    plateSpeed: 0.02,
+    platesStacked: 0,
+    platesNeeded: 6,
+    lastPlatePosition: 0.5,
+    plateMissed: false,
+    recyclePhase: "click",
+    recycleClicks: 0,
+    recycleClicksNeeded: 8,
+    recycleArrows: 0,
+    recycleArrowsNeeded: 8,
+    recycleCycles: 0,
+    recycleCyclesNeeded: 3,
+  };
+
+  switch (type) {
+    case "wash_dishes": {
+      const spots: DishSpot[] = [];
+      for (let i = 0; i < 5 + Math.floor(Math.random() * 3); i++) {
+        spots.push({ x: 0.15 + Math.random() * 0.7, y: 0.15 + Math.random() * 0.7, scrubbed: false });
+      }
+      base.dishSpots = spots;
+      break;
+    }
+    case "take_out_trash": {
+      const bags: TrashBag[] = [];
+      for (let i = 0; i < 4 + Math.floor(Math.random() * 3); i++) {
+        bags.push({ x: 0.1 + Math.random() * 0.8, y: 0.1 + Math.random() * 0.8, removed: false });
+      }
+      base.trashBags = bags;
+      break;
+    }
+    case "stack_plates":
+      base.platePosition = Math.random();
+      break;
+    default:
+      break;
+  }
+
+  return base;
+}
+
+function choreTimerTick(chore: ActiveChore, dt: number): ActiveChore {
+  if (chore.completed) return chore;
+  const timer = Math.max(0, chore.timer - dt);
+  return { ...chore, timer, timerExpired: timer <= 0 };
+}
+
+function updatePlatePosition(chore: ActiveChore, dt: number): ActiveChore {
+  if (chore.type !== "stack_plates" || chore.completed) return chore;
+  let pos = chore.platePosition + chore.plateDirection * chore.plateSpeed * dt * 20;
+  let dir = chore.plateDirection;
+  if (pos >= 1) { pos = 1; dir = -1; }
+  if (pos <= 0) { pos = 0; dir = 1; }
+  return { ...chore, platePosition: pos, plateDirection: dir };
+}
+
+function isChoreComplete(chore: ActiveChore): boolean {
+  switch (chore.type) {
+    case "wash_dishes":
+      return chore.dishSpots.every((s) => s.scrubbed);
+    case "take_out_trash":
+      return chore.trashBags.every((b) => b.removed);
+    case "mop_floor":
+      return chore.mopCycles >= chore.mopCyclesNeeded;
+    case "stack_plates":
+      return chore.platesStacked >= chore.platesNeeded;
+    case "break_down_recycling":
+      return chore.recycleCycles >= chore.recycleCyclesNeeded;
+  }
+}
+
+export function handleChoreMouseMove(chore: ActiveChore, x: number, y: number, containerRect: DOMRect): ActiveChore {
+  if (chore.completed || chore.type !== "wash_dishes") return chore;
+  const nx = (x - containerRect.left) / containerRect.width;
+  const ny = (y - containerRect.top) / containerRect.height;
+  const SCRUB_RADIUS = 0.08;
+  let changed = false;
+  const spots = chore.dishSpots.map((s) => {
+    if (s.scrubbed) return s;
+    const dx = nx - s.x;
+    const dy = ny - s.y;
+    if (Math.sqrt(dx * dx + dy * dy) < SCRUB_RADIUS) {
+      changed = true;
+      return { ...s, scrubbed: true };
+    }
+    return s;
+  });
+  if (!changed) return chore;
+  const updated = { ...chore, dishSpots: spots };
+  return isChoreComplete(updated) ? { ...updated, completed: true } : updated;
+}
+
+export function handleChoreClick(chore: ActiveChore, x: number, y: number, containerRect: DOMRect): ActiveChore {
+  if (chore.completed) return chore;
+  if (chore.type === "take_out_trash") {
+    const nx = (x - containerRect.left) / containerRect.width;
+    const ny = (y - containerRect.top) / containerRect.height;
+    const CLICK_RADIUS = 0.1;
+    let closest = -1;
+    let closestDist = Infinity;
+    chore.trashBags.forEach((b, i) => {
+      if (b.removed) return;
+      const d = Math.sqrt((nx - b.x) ** 2 + (ny - b.y) ** 2);
+      if (d < CLICK_RADIUS && d < closestDist) { closest = i; closestDist = d; }
+    });
+    if (closest < 0) return chore;
+    const bags = chore.trashBags.map((b, i) => (i === closest ? { ...b, removed: true } : b));
+    const updated = { ...chore, trashBags: bags };
+    return isChoreComplete(updated) ? { ...updated, completed: true } : updated;
+  }
+  if (chore.type === "break_down_recycling" && chore.recyclePhase === "click") {
+    const clicks = chore.recycleClicks + 1;
+    if (clicks >= chore.recycleClicksNeeded) {
+      return { ...chore, recycleClicks: 0, recyclePhase: "arrows" };
+    }
+    return { ...chore, recycleClicks: clicks };
+  }
+  return chore;
+}
+
+export function handleChoreKeyPress(chore: ActiveChore, key: string): ActiveChore {
+  if (chore.completed) return chore;
+  const k = key.toLowerCase();
+
+  if (chore.type === "mop_floor") {
+    if (chore.mopPhase === "dunk" && k === "arrowdown") {
+      return { ...chore, mopPhase: "squeeze", mopSqueezeCount: 0 };
+    }
+    if (chore.mopPhase === "squeeze" && k === " ") {
+      const count = chore.mopSqueezeCount + 1;
+      if (count >= 3) {
+        return { ...chore, mopPhase: "mop", mopSqueezeCount: 0, mopSwipeCount: 0, mopLastDirection: null };
+      }
+      return { ...chore, mopSqueezeCount: count };
+    }
+    if (chore.mopPhase === "mop" && (k === "arrowleft" || k === "arrowright")) {
+      const dir = k === "arrowleft" ? "left" : "right";
+      if (chore.mopLastDirection === dir) return chore;
+      const swipes = chore.mopSwipeCount + 1;
+      if (swipes >= 6) {
+        const cycles = chore.mopCycles + 1;
+        const updated = { ...chore, mopCycles: cycles, mopSwipeCount: 0, mopLastDirection: null, mopPhase: "dunk" as const };
+        return isChoreComplete(updated) ? { ...updated, completed: true } : updated;
+      }
+      return { ...chore, mopSwipeCount: swipes, mopLastDirection: dir };
+    }
+    return chore;
+  }
+
+  if (chore.type === "stack_plates" && k === " ") {
+    const distance = Math.abs(chore.platePosition - chore.lastPlatePosition);
+    if (distance < 0.15) {
+      const stacked = chore.platesStacked + 1;
+      const updated = { ...chore, platesStacked: stacked, lastPlatePosition: chore.platePosition, plateMissed: false, plateSpeed: chore.plateSpeed + 0.003 };
+      return isChoreComplete(updated) ? { ...updated, completed: true } : updated;
+    }
+    return { ...chore, plateMissed: true };
+  }
+
+  if (chore.type === "break_down_recycling" && chore.recyclePhase === "arrows") {
+    if (["arrowleft", "arrowup", "arrowright", "arrowdown"].includes(k)) {
+      const arrows = chore.recycleArrows + 1;
+      if (arrows >= chore.recycleArrowsNeeded) {
+        const cycles = chore.recycleCycles + 1;
+        const updated = { ...chore, recycleCycles: cycles, recycleArrows: 0, recycleClicks: 0, recyclePhase: "click" as const };
+        return isChoreComplete(updated) ? { ...updated, completed: true } : updated;
+      }
+      return { ...chore, recycleArrows: arrows };
+    }
+  }
+
+  return chore;
+}
+
+function scheduleChoreTimers(shiftDuration: number, count: number): number[] {
+  // Spread chores throughout the shift, avoiding first 15s and last 15s
+  const earliest = 15;
+  const latest = shiftDuration - 15;
+  const window = latest - earliest;
+  if (count === 1) return [earliest + Math.random() * window];
+  // For 2 chores, space them apart
+  const first = earliest + Math.random() * (window * 0.4);
+  const second = first + window * 0.3 + Math.random() * (window * 0.3);
+  return [first, Math.min(second, latest)];
+}
+
 export function createRestaurantState(state: GameState, numPlayers = 1): RestaurantState {
   const slotsPerCounter = hasRestaurantUpgrade(state, "sixth_slot") ? 6 : 5;
   const numCounters = numPlayers;
   const shiftDuration = SHIFT_DURATION_SECONDS + restaurantUpgradeCount(state, "longer_shift") * 30;
+
+  // Chores start appearing on day 2+, 1-2 per shift
+  const choreCount = state.day >= 2 ? (Math.random() < 0.5 ? 1 : 2) : 0;
+  const choreTimers = choreCount > 0 ? scheduleChoreTimers(shiftDuration, choreCount) : [];
+  // nextChoreTimer = seconds until first chore spawns (from shift start)
+  const nextChoreTimer = choreTimers.length > 0 ? choreTimers[0] : Infinity;
+
   const baseState: RestaurantState = {
     shiftActive: true,
     orderSlots: Array.from({ length: slotsPerCounter * numCounters }, () => null),
@@ -736,6 +956,11 @@ export function createRestaurantState(state: GameState, numPlayers = 1): Restaur
     orderContributors: {},
     orderLog: [],
     shiftDuration,
+    activeChore: null,
+    nextChoreTimer,
+    choresCompleted: 0,
+    choresScheduled: choreCount,
+    servingBlocked: false,
   };
 
   return spawnOrder(baseState);
@@ -801,6 +1026,45 @@ export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds
       nextState = { ...nextState, nextOrderTimer: nextState.nextOrderTimer * 0.5 };
     }
   }
+
+  // Chore system tick
+  let { activeChore, nextChoreTimer, choresCompleted, choresScheduled, servingBlocked } = nextState;
+  const elapsed = nextState.shiftDuration - shiftTimeRemaining;
+
+  // Spawn a new chore if timer is up and no active chore
+  if (!activeChore && choresCompleted < choresScheduled && elapsed >= nextChoreTimer && !shiftOver) {
+    activeChore = createChore(nextState.orderIdCounter + 1000);
+    // Schedule next chore (if there's another one)
+    if (choresCompleted + 1 < choresScheduled) {
+      // Next chore: at least 30s from now, random within remaining shift
+      const remaining = shiftTimeRemaining - 30;
+      nextChoreTimer = elapsed + 30 + Math.random() * Math.max(0, remaining - 30);
+    } else {
+      nextChoreTimer = Infinity;
+    }
+  }
+
+  // Tick active chore
+  if (activeChore && !activeChore.completed) {
+    // New Hire buff auto-completes chores
+    if (activeBuffIds.includes("new_hire")) {
+      activeChore = { ...activeChore, completed: true };
+    } else {
+      activeChore = choreTimerTick(activeChore, dt);
+      activeChore = updatePlatePosition(activeChore, dt);
+    }
+    servingBlocked = activeChore.timerExpired && !activeChore.completed;
+  } else if (activeChore?.completed) {
+    // Clear completed chore after a brief moment
+    choresCompleted = choresCompleted + 1;
+    activeChore = null;
+    servingBlocked = false;
+  } else {
+    servingBlocked = false;
+  }
+
+  nextState = { ...nextState, activeChore, nextChoreTimer, choresCompleted, choresScheduled, servingBlocked };
+
   return nextState;
 }
 
@@ -1021,6 +1285,8 @@ export function calculateTip(order: ActiveOrder, upgrades: string[] = []): numbe
 export function serveOrder(state: RestaurantState, slotIndex: number, tipMultiplier = 1, servingPlayerId?: string): RestaurantState {
   const order = state.orderSlots[slotIndex];
   if (!order || !order.completed || order.failed) return state;
+  // Can't serve while a chore is blocking
+  if (state.servingBlocked) return state;
 
   const tip = calculateTip(order, state.acquiredUpgrades) * tipMultiplier;
   const basePay = getOrderBasePay(order, state.acquiredUpgrades);

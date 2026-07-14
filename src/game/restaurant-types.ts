@@ -116,6 +116,57 @@ export interface RestaurantOrderLog {
   contributors: string[]; // playerIds who worked on this order
 }
 
+// --- Chore system ---
+
+export type ChoreType = "wash_dishes" | "take_out_trash" | "mop_floor" | "stack_plates" | "break_down_recycling";
+
+export interface DishSpot {
+  x: number; // 0-1 normalized position
+  y: number;
+  scrubbed: boolean;
+}
+
+export interface TrashBag {
+  x: number;
+  y: number;
+  removed: boolean;
+}
+
+export interface ActiveChore {
+  id: number;
+  type: ChoreType;
+  timer: number; // seconds remaining before it blocks serving
+  timerExpired: boolean;
+  completed: boolean;
+  // Wash dishes state
+  dishSpots: DishSpot[];
+  // Take out trash state
+  trashBags: TrashBag[];
+  // Mop floor state
+  mopPhase: "dunk" | "squeeze" | "mop"; // current phase of the mop cycle
+  mopCycles: number; // how many full cycles completed
+  mopCyclesNeeded: number; // target cycles to complete
+  mopSqueezeCount: number; // space bar presses during squeeze phase
+  mopSwipeCount: number; // left/right alternations during mop phase
+  mopLastDirection: "left" | "right" | null;
+  // Stack plates state
+  platePosition: number; // 0-1, oscillates back and forth
+  plateDirection: 1 | -1;
+  plateSpeed: number;
+  platesStacked: number;
+  platesNeeded: number;
+  lastPlatePosition: number; // where the last plate landed (for stacking check)
+  plateMissed: boolean; // true if last plate missed (resets on next attempt)
+  // Break down recycling state
+  recyclePhase: "click" | "arrows"; // click to dismantle, arrows to flatten
+  recycleClicks: number;
+  recycleClicksNeeded: number;
+  recycleArrows: number;
+  recycleArrowsNeeded: number;
+  recycleCycles: number;
+  recycleCyclesNeeded: number;
+}
+
 export interface RestaurantState {
   shiftActive: boolean;
   orderSlots: (ActiveOrder | null)[];
@@ -141,4 +192,10 @@ export interface RestaurantState {
   // Completed order log for graphing
   orderLog: RestaurantOrderLog[];
   shiftDuration: number; // total shift length in seconds (for graph x-axis)
+  // Chore system
+  activeChore: ActiveChore | null;
+  nextChoreTimer: number; // seconds until next chore spawns
+  choresCompleted: number;
+  choresScheduled: number; // how many chores this shift (1-2)
+  servingBlocked: boolean; // true when a chore timer has expired
 }

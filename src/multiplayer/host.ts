@@ -3,7 +3,7 @@ import type { RestaurantState } from "../game/restaurant-types";
 import type { PeerAction, Player, ActionFeedItem, GameSync, NetworkMessage } from "./types";
 import { NetworkManager, generateRoomCode, getPlayerColor } from "./network";
 import { buyStock, sellStock, shortStock, coverShort, placeOrder, cancelOrder, buyOption, sellOption, closeOption, togglePinStock } from "../game/engine";
-import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder, recordOrderContributor } from "../game/restaurant-engine";
+import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder, recordOrderContributor, handleChoreKeyPress } from "../game/restaurant-engine";
 import { handleChopKey } from "../game/restaurant-engine";
 
 const MAX_FEED_ITEMS = 20;
@@ -464,6 +464,15 @@ export class MultiplayerHost {
         const key = action.key;
         this.callbacks.setRestaurantState((prev) => {
           if (!prev || prev.shiftOver) return prev;
+
+          // Handle chore interactions first (any player can do chores)
+          if (prev.activeChore && !prev.activeChore.completed) {
+            const updatedChore = handleChoreKeyPress(prev.activeChore, key);
+            if (updatedChore !== prev.activeChore) {
+              return { ...prev, activeChore: updatedChore, servingBlocked: updatedChore.timerExpired && !updatedChore.completed };
+            }
+          }
+
           const playerActiveId = this.getPlayerActiveOrder(player.id);
           const playerCounterIdx = this.getPlayerCounter(player.id);
           const withPlayerActive = { ...prev, activeOrderId: playerActiveId };
