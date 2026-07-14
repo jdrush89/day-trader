@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.69";
+const GAME_VERSION = "0.0.70";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1493,7 +1493,8 @@ function App() {
         mpActions.sendAction({ type: "choose_restaurant_upgrade", upgradeId });
       }
       setEodPhase("menu-draft");
-      if (isMultiplayer) mpActions.resetEodGate();
+      // Don't resetEodGate here — a fast peer may have already submitted their menu choice.
+      // The menu-draft gate is set up naturally when players submit choices.
       return;
     }
     const nextState = acquireRestaurantUpgrade(gameState, upgradeId);
