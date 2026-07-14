@@ -43,7 +43,8 @@ export type PeerAction =
   | { type: "toggle_pause" }
   | { type: "view_insider" }
   | { type: "use_consumable"; consumableId: string }
-  | { type: "buy_consumable"; consumableId: string };
+  | { type: "buy_consumable"; consumableId: string }
+  | { type: "restaurant_chore_click"; nx: number; ny: number };
 
 // --- Messages sent from host → peer ---
 

@@ -3,7 +3,7 @@ import type { RestaurantState } from "../game/restaurant-types";
 import type { PeerAction, Player, ActionFeedItem, GameSync, NetworkMessage } from "./types";
 import { NetworkManager, generateRoomCode, getPlayerColor } from "./network";
 import { buyStock, sellStock, shortStock, coverShort, placeOrder, cancelOrder, buyOption, sellOption, closeOption, togglePinStock } from "../game/engine";
-import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder, recordOrderContributor, handleChoreKeyPress } from "../game/restaurant-engine";
+import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder, recordOrderContributor, handleChoreKeyPress, handleChoreClick, handleChoreMouseMove } from "../game/restaurant-engine";
 import { handleChopKey } from "../game/restaurant-engine";
 
 const MAX_FEED_ITEMS = 20;
@@ -539,6 +539,21 @@ export class MultiplayerHost {
           const withPlayerActive = { ...prev, activeOrderId: playerActiveId };
           const result = handleRestaurantMouseMove(withPlayerActive, action.x, action.y);
           return { ...result, activeOrderId: prev.activeOrderId };
+        });
+        break;
+      case "restaurant_chore_click":
+        this.callbacks.setRestaurantState((prev) => {
+          if (!prev?.activeChore || prev.activeChore.completed || !prev.choreFocused) return prev;
+          // Peer sends normalized coordinates (0-1), create a unit rect
+          const unitRect = { left: 0, top: 0, width: 1, height: 1 } as DOMRect;
+          // Try click handler (trash, recycling)
+          let updated = handleChoreClick(prev.activeChore, action.nx, action.ny, unitRect);
+          // Also try mouse scrub handler (dish washing)
+          if (updated === prev.activeChore) {
+            updated = handleChoreMouseMove(prev.activeChore, action.nx, action.ny, unitRect);
+          }
+          if (updated === prev.activeChore) return prev;
+          return { ...prev, activeChore: updated };
         });
         break;
       case "join_request":

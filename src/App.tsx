@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.67";
+const GAME_VERSION = "0.0.68";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1938,6 +1938,7 @@ function App() {
           onPeerKey={(key) => mpActions.sendAction({ type: "restaurant_key", key })}
           onPeerKeyUp={(key) => mpActions.sendAction({ type: "restaurant_key_up", key })}
           onPeerMouse={(x, y) => mpActions.sendAction({ type: "restaurant_mouse", x, y })}
+          onPeerChoreClick={(nx, ny) => mpActions.sendAction({ type: "restaurant_chore_click", nx, ny })}
           currentCounter={myCounter}
           onSwitchCounter={(c) => {
             setMyCounter(c);
@@ -2385,6 +2386,7 @@ function App() {
               onPeerKey={(key) => mpActions.sendAction({ type: "restaurant_key", key })}
               onPeerKeyUp={(key) => mpActions.sendAction({ type: "restaurant_key_up", key })}
               onPeerMouse={(x, y) => mpActions.sendAction({ type: "restaurant_mouse", x, y })}
+              onPeerChoreClick={(nx, ny) => mpActions.sendAction({ type: "restaurant_chore_click", nx, ny })}
               currentCounter={myCounter}
               onSwitchCounter={(c) => {
                 setMyCounter(c);

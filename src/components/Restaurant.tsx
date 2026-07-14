@@ -43,6 +43,7 @@ interface RestaurantProps {
   onPeerKey?: (key: string) => void;
   onPeerKeyUp?: (key: string) => void;
   onPeerMouse?: (x: number, y: number) => void;
+  onPeerChoreClick?: (nx: number, ny: number) => void;
   // Multiplayer counter props
   currentCounter?: number;
   onSwitchCounter?: (counter: number) => void;
@@ -432,7 +433,7 @@ function renderChoreInstruction(chore: ActiveChore) {
   }
 }
 
-export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, onPeerChoreClick, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
     ...rawState,
@@ -487,6 +488,8 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
   onPeerKeyUpRef.current = onPeerKeyUp;
   const onPeerMouseRef = useRef(onPeerMouse);
   onPeerMouseRef.current = onPeerMouse;
+  const onPeerChoreClickRef = useRef(onPeerChoreClick);
+  onPeerChoreClickRef.current = onPeerChoreClick;
   const onSwitchCounterRef = useRef(onSwitchCounter);
   onSwitchCounterRef.current = onSwitchCounter;
   const currentCounterRef = useRef(currentCounter);
@@ -608,6 +611,16 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
     const handleMouseMove = (event: MouseEvent) => {
       if (paused || state.shiftOver) return;
       if (isPeerRef.current && onPeerMouseRef.current) {
+        // For dish scrubbing, send normalized coords via chore click action
+        if (state.choreFocused && state.activeChore && !state.activeChore.completed && state.activeChore.type === "wash_dishes" && onPeerChoreClickRef.current) {
+          const container = choreContainerRef.current?.querySelector(".chore-interactive");
+          if (container) {
+            const rect = container.getBoundingClientRect();
+            const nx = (event.clientX - rect.left) / rect.width;
+            const ny = (event.clientY - rect.top) / rect.height;
+            onPeerChoreClickRef.current(nx, ny);
+          }
+        }
         onPeerMouseRef.current(event.clientX, event.clientY);
         return;
       }
@@ -630,6 +643,16 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
 
     const handleClick = (event: MouseEvent) => {
       if (paused || state.shiftOver) return;
+      // Peers send chore clicks to host with normalized coordinates
+      if (isPeerRef.current && onPeerChoreClickRef.current) {
+        const container = choreContainerRef.current?.querySelector(".chore-interactive");
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+        const nx = (event.clientX - rect.left) / rect.width;
+        const ny = (event.clientY - rect.top) / rect.height;
+        onPeerChoreClickRef.current(nx, ny);
+        return;
+      }
       setRestaurantState((prev) => {
         if (!prev?.activeChore || prev.activeChore.completed || !prev.choreFocused) return prev;
         const container = choreContainerRef.current?.querySelector(".chore-interactive");
