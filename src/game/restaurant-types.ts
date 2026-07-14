@@ -194,6 +194,8 @@ export interface RestaurantState {
   shiftDuration: number; // total shift length in seconds (for graph x-axis)
   // Chore system
   activeChore: ActiveChore | null;
+  choreSlotIndex: number; // which global slot the chore occupies (-1 if none)
+  choreFocused: boolean; // whether the player is currently focused on the chore
   nextChoreTimer: number; // seconds until next chore spawns
   choresCompleted: number;
   choresScheduled: number; // how many chores this shift (1-2)

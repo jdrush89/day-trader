@@ -1094,6 +1094,33 @@
   position: relative;
 }
 
+.chore-slot {
+  border-color: rgba(255, 165, 0, 0.5) !important;
+  background: rgba(255, 165, 0, 0.08) !important;
+}
+
+.chore-slot.active {
+  border-color: rgba(255, 165, 0, 0.9) !important;
+  background: rgba(255, 165, 0, 0.15) !important;
+  box-shadow: 0 0 12px rgba(255, 165, 0, 0.3) !important;
+}
+
+.chore-slot.chore-expired {
+  border-color: rgba(255, 50, 50, 0.7) !important;
+  background: rgba(255, 50, 50, 0.12) !important;
+  animation: chore-blocked-pulse 0.8s ease-in-out infinite;
+}
+
+.slot-ready.chore-overdue {
+  color: #f66;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.chore-timer-bar .patience-fill {
+  background: linear-gradient(90deg, #f90, #fc0) !important;
+}
+
 /* ====== Chore system styles ====== */
 
 .chore-banner {

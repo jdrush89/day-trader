@@ -465,8 +465,8 @@ export class MultiplayerHost {
         this.callbacks.setRestaurantState((prev) => {
           if (!prev || prev.shiftOver) return prev;
 
-          // Handle chore interactions first (any player can do chores)
-          if (prev.activeChore && !prev.activeChore.completed) {
+          // Handle chore interactions (any player can do chores when focused)
+          if (prev.choreFocused && prev.activeChore && !prev.activeChore.completed) {
             const updatedChore = handleChoreKeyPress(prev.activeChore, key);
             if (updatedChore !== prev.activeChore) {
               return { ...prev, activeChore: updatedChore, servingBlocked: updatedChore.timerExpired && !updatedChore.completed };
@@ -481,10 +481,18 @@ export class MultiplayerHost {
           if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= prev.slotsPerCounter) {
             // Map local slot number to global index based on player's current counter
             const globalIndex = playerCounterIdx * prev.slotsPerCounter + (slotNumber - 1);
+            // acceptOrder handles chore slot focus
+            let result = acceptOrder(withPlayerActive, globalIndex);
+            if (result.choreFocused) {
+              return { ...result, activeOrderId: prev.activeOrderId };
+            }
             const order = prev.orderSlots[globalIndex];
             if (!order) return prev;
-            let result = order.completed ? serveOrder(withPlayerActive, globalIndex, 1, player.id) : acceptOrder(withPlayerActive, globalIndex);
-            if (!order.completed && result.activeOrderId != null) result = recordOrderContributor(result, result.activeOrderId, player.id);
+            if (order.completed) {
+              result = serveOrder(withPlayerActive, globalIndex, 1, player.id);
+            } else if (result.activeOrderId != null) {
+              result = recordOrderContributor(result, result.activeOrderId, player.id);
+            }
             this.setPlayerActiveOrder(player.id, result.activeOrderId);
             return { ...result, activeOrderId: prev.activeOrderId };
           }

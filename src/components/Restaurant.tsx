@@ -534,9 +534,9 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         return;
       }
 
-      // Handle chore interactions (chores take priority when active)
+      // Handle chore interactions (only when chore is focused)
       setRestaurantState((prev) => {
-        if (!prev?.activeChore || prev.activeChore.completed) return prev;
+        if (!prev?.activeChore || prev.activeChore.completed || !prev.choreFocused) return prev;
         const updated = handleChoreKeyPress(prev.activeChore, event.key);
         if (updated === prev.activeChore) return prev;
         event.preventDefault();
@@ -550,10 +550,12 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         const globalIndex = currentCounterRef.current * state.slotsPerCounter + (slotNumber - 1);
         setRestaurantState((prev) => {
           if (!prev) return prev;
+          // acceptOrder handles chore slot focus too
+          const next = acceptOrder(prev, globalIndex);
+          if (next.choreFocused) return next;
           const order = prev.orderSlots[globalIndex];
           if (!order) return prev;
           if (order.completed) return serveOrder(prev, globalIndex, tipMultiplierRef.current, localPlayerIdRef.current);
-          const next = acceptOrder(prev, globalIndex);
           return next.activeOrderId != null ? recordOrderContributor(next, next.activeOrderId, localPlayerIdRef.current) : next;
         });
         return;
@@ -609,10 +611,10 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         onPeerMouseRef.current(event.clientX, event.clientY);
         return;
       }
-      // Handle dish scrubbing chore
       setRestaurantState((prev) => {
         if (!prev) return prev;
-        if (prev.activeChore && !prev.activeChore.completed && prev.activeChore.type === "wash_dishes") {
+        // Handle dish scrubbing chore (only when focused)
+        if (prev.choreFocused && prev.activeChore && !prev.activeChore.completed && prev.activeChore.type === "wash_dishes") {
           const container = choreContainerRef.current;
           if (container) {
             const rect = container.getBoundingClientRect();
@@ -629,7 +631,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
     const handleClick = (event: MouseEvent) => {
       if (paused || state.shiftOver) return;
       setRestaurantState((prev) => {
-        if (!prev?.activeChore || prev.activeChore.completed) return prev;
+        if (!prev?.activeChore || prev.activeChore.completed || !prev.choreFocused) return prev;
         const container = choreContainerRef.current;
         if (!container) return prev;
         const rect = container.getBoundingClientRect();
@@ -755,6 +757,48 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         )}
         {counterSlots.map((order, localIndex) => {
           const globalIndex = counterStart + localIndex;
+
+          // Chore slot rendering
+          if (globalIndex === state.choreSlotIndex && state.activeChore && !state.activeChore.completed) {
+            const chore = state.activeChore;
+            const timerPct = Math.max(0, Math.min(100, (chore.timer / 30) * 100));
+            return (
+              <button
+                key={`slot-${globalIndex}`}
+                type="button"
+                className={`order-slot chore-slot ${state.choreFocused ? "active" : ""} ${chore.timerExpired ? "chore-expired" : ""}`}
+                onClick={() =>
+                  isPeer && onPeerKey
+                    ? onPeerKey(String(localIndex + 1))
+                    : setRestaurantState((prev) => {
+                        if (!prev) return prev;
+                        return { ...prev, choreFocused: true, activeOrderId: null };
+                      })
+                }
+              >
+                <div className="slot-number">{localIndex + 1}</div>
+                <div className="slot-main">
+                  <div className="slot-title-row">
+                    <span className="slot-item">🧹 {CHORE_NAMES[chore.type]}</span>
+                    {chore.timerExpired && <span className="slot-ready chore-overdue">⚠️ OVERDUE</span>}
+                  </div>
+                  <div className="slot-step">
+                    {chore.type === "wash_dishes" && `Scrub spots (${chore.dishSpots.filter((s) => s.scrubbed).length}/${chore.dishSpots.length})`}
+                    {chore.type === "take_out_trash" && `Remove bags (${chore.trashBags.filter((b) => b.removed).length}/${chore.trashBags.length})`}
+                    {chore.type === "mop_floor" && `Mop cycle ${chore.mopCycles}/${chore.mopCyclesNeeded}`}
+                    {chore.type === "stack_plates" && `Stack ${chore.platesStacked}/${chore.platesNeeded}`}
+                    {chore.type === "break_down_recycling" && `Recycle cycle ${chore.recycleCycles}/${chore.recycleCyclesNeeded}`}
+                  </div>
+                  {!chore.timerExpired && (
+                    <div className="patience-bar chore-timer-bar">
+                      <div className="patience-fill" style={{ width: `${timerPct}%` }} />
+                    </div>
+                  )}
+                </div>
+              </button>
+            );
+          }
+
           if (!order) {
             return (
               <div key={`slot-${globalIndex}`} className="order-slot empty">
@@ -854,21 +898,19 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         )}
       </section>
 
-      {/* Chore alert banner */}
-      {state.activeChore && !state.activeChore.completed && (
-        <div className={`chore-banner ${state.servingBlocked ? "blocked" : ""}`}>
+      {/* Chore alert banner - only show when timer expired and not focused */}
+      {state.activeChore && !state.activeChore.completed && state.servingBlocked && !state.choreFocused && (
+        <div className="chore-banner blocked">
           <span className="chore-banner-icon">🧹</span>
           <span className="chore-banner-text">
-            {state.servingBlocked
-              ? `⚠️ CHORE OVERDUE — Orders can't be served! Complete the chore first!`
-              : `Chore incoming: ${CHORE_NAMES[state.activeChore.type]} (${state.activeChore.timer.toFixed(0)}s)`}
+            ⚠️ CHORE OVERDUE — Orders can't be served! Select the chore (slot {state.choreSlotIndex - counterStart + 1}) to complete it!
           </span>
         </div>
       )}
 
       <section className="restaurant-work-area">
-        {/* Active chore takes over the work area */}
-        {state.activeChore && !state.activeChore.completed ? (
+        {/* Show chore instructions when chore is focused */}
+        {state.choreFocused && state.activeChore && !state.activeChore.completed ? (
           <div className="chore-work-area" ref={choreContainerRef}>
             {renderChoreInstruction(state.activeChore)}
           </div>
@@ -901,7 +943,11 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
               ) : activeOrder.completed ? (
                 <div className="restaurant-step-card success-card">
                   <div className="restaurant-step-title">Order ready!</div>
-                  <div className="restaurant-step-copy">Press Enter, {state.orderSlots.findIndex((slot) => slot?.id === activeOrder.id) + 1}, or click the ticket to serve.</div>
+                  <div className="restaurant-step-copy">
+                    {state.servingBlocked
+                      ? "⚠️ Complete the chore before serving!"
+                      : `Press Enter, ${state.orderSlots.findIndex((slot) => slot?.id === activeOrder.id) + 1}, or click the ticket to serve.`}
+                  </div>
                 </div>
               ) : (
                 renderStepInstruction(activeOrder)

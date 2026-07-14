@@ -537,7 +537,7 @@ function spawnOrder(state: RestaurantState): RestaurantState {
     for (let c = 0; c < state.numCounters; c++) {
       const start = c * state.slotsPerCounter;
       const end = start + state.slotsPerCounter;
-      const emptyCount = state.orderSlots.slice(start, end).filter((s) => s === null).length;
+      const emptyCount = state.orderSlots.slice(start, end).filter((s, i) => s === null && (start + i) !== state.choreSlotIndex).length;
       // Weight: empties + 1 random factor to create imbalance
       counterWeights.push(emptyCount > 0 ? emptyCount + Math.random() * 2 : 0);
     }
@@ -549,14 +549,14 @@ function spawnOrder(state: RestaurantState): RestaurantState {
       roll -= counterWeights[c];
       if (roll <= 0) { targetCounter = c; break; }
     }
-    // Find first empty slot in target counter
+    // Find first empty slot in target counter (skip chore slot)
     const start = targetCounter * state.slotsPerCounter;
     const end = start + state.slotsPerCounter;
     for (let i = start; i < end; i++) {
-      if (state.orderSlots[i] === null) { emptyIndex = i; break; }
+      if (state.orderSlots[i] === null && i !== state.choreSlotIndex) { emptyIndex = i; break; }
     }
   } else {
-    emptyIndex = state.orderSlots.findIndex((slot) => slot === null);
+    emptyIndex = state.orderSlots.findIndex((slot, i) => slot === null && i !== state.choreSlotIndex);
   }
 
   if (emptyIndex === -1) return state;
@@ -957,6 +957,8 @@ export function createRestaurantState(state: GameState, numPlayers = 1): Restaur
     orderLog: [],
     shiftDuration,
     activeChore: null,
+    choreSlotIndex: -1,
+    choreFocused: false,
     nextChoreTimer,
     choresCompleted: 0,
     choresScheduled: choreCount,
@@ -985,7 +987,7 @@ export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds
   const activeStillValid = orderSlots.some(
     (slot) => slot && slot.id === state.activeOrderId && !slot.failed && !slot.served,
   );
-  const hasEmptySlot = orderSlots.some((slot) => slot === null);
+  const hasEmptySlot = orderSlots.some((slot, i) => slot === null && i !== state.choreSlotIndex);
 
   let nextState: RestaurantState = {
     ...state,
@@ -1028,15 +1030,22 @@ export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds
   }
 
   // Chore system tick
-  let { activeChore, nextChoreTimer, choresCompleted, choresScheduled, servingBlocked } = nextState;
+  let { activeChore, choreSlotIndex, choreFocused, nextChoreTimer, choresCompleted, choresScheduled, servingBlocked } = nextState;
   const elapsed = nextState.shiftDuration - shiftTimeRemaining;
 
   // Spawn a new chore if timer is up and no active chore
   if (!activeChore && choresCompleted < choresScheduled && elapsed >= nextChoreTimer && !shiftOver) {
-    activeChore = createChore(nextState.orderIdCounter + 1000);
+    // Find an empty slot to place the chore
+    const emptyIdx = nextState.orderSlots.findIndex((s) => s === null);
+    if (emptyIdx >= 0) {
+      activeChore = createChore(nextState.orderIdCounter + 1000);
+      choreSlotIndex = emptyIdx;
+      choreFocused = false;
+      // Mark the slot as occupied by putting a placeholder order (null stays, chore is separate)
+      // Actually we just track choreSlotIndex — the slot stays null but we render the chore there
+    }
     // Schedule next chore (if there's another one)
     if (choresCompleted + 1 < choresScheduled) {
-      // Next chore: at least 30s from now, random within remaining shift
       const remaining = shiftTimeRemaining - 30;
       nextChoreTimer = elapsed + 30 + Math.random() * Math.max(0, remaining - 30);
     } else {
@@ -1055,25 +1064,31 @@ export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds
     }
     servingBlocked = activeChore.timerExpired && !activeChore.completed;
   } else if (activeChore?.completed) {
-    // Clear completed chore after a brief moment
+    // Clear completed chore
     choresCompleted = choresCompleted + 1;
     activeChore = null;
+    choreSlotIndex = -1;
+    choreFocused = false;
     servingBlocked = false;
   } else {
     servingBlocked = false;
   }
 
-  nextState = { ...nextState, activeChore, nextChoreTimer, choresCompleted, choresScheduled, servingBlocked };
+  nextState = { ...nextState, activeChore, choreSlotIndex, choreFocused, nextChoreTimer, choresCompleted, choresScheduled, servingBlocked };
 
   return nextState;
 }
 
 export function acceptOrder(state: RestaurantState, slotIndex: number): RestaurantState {
+  // If selecting the chore slot, focus the chore instead
+  if (slotIndex === state.choreSlotIndex && state.activeChore && !state.activeChore.completed) {
+    return { ...state, choreFocused: true, activeOrderId: null };
+  }
   const order = state.orderSlots[slotIndex];
   if (!order || order.failed || order.served) return state;
   if (state.activeOrderId === order.id) return state;
 
-  return replaceOrder(state, { ...order, lastMousePos: null }, order.id);
+  return { ...replaceOrder(state, { ...order, lastMousePos: null }, order.id), choreFocused: false };
 }
 
 export function handleKeyPress(state: RestaurantState, key: string): RestaurantState {
