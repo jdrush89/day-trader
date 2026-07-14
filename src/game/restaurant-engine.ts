@@ -649,10 +649,16 @@ function markRhythmResult(order: ActiveOrder, index: number, result: "hit" | "mi
 function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], patienceMultiplier = 1, cookSpeedMultiplier = 1): ActiveOrder {
   if (order.served) return order;
   if (order.failed) return { ...order, failedTimer: order.failedTimer - dt * TICKS_PER_SECOND };
-  if (order.completed) return order;
 
   const patienceRemaining = Math.max(0, order.patienceRemaining - dt * patienceMultiplier);
   let updatedOrder: ActiveOrder = { ...order, patienceRemaining };
+
+  // Completed orders still lose patience but don't fail
+  if (order.completed) {
+    if (patienceRemaining <= 0) return { ...updatedOrder, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
+    return updatedOrder;
+  }
+
   if (patienceRemaining <= 0) return { ...updatedOrder, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
 
   const step = getCurrentStep(updatedOrder);
@@ -834,7 +840,7 @@ export function handleChoreClick(chore: ActiveChore, x: number, y: number, conta
   if (chore.type === "take_out_trash") {
     const nx = (x - containerRect.left) / containerRect.width;
     const ny = (y - containerRect.top) / containerRect.height;
-    const CLICK_RADIUS = 0.1;
+    const CLICK_RADIUS = 0.15;
     let closest = -1;
     let closestDist = Infinity;
     chore.trashBags.forEach((b, i) => {

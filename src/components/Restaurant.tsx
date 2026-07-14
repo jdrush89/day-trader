@@ -615,10 +615,10 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         if (!prev) return prev;
         // Handle dish scrubbing chore (only when focused)
         if (prev.choreFocused && prev.activeChore && !prev.activeChore.completed && prev.activeChore.type === "wash_dishes") {
-          const container = choreContainerRef.current;
+          const container = choreContainerRef.current?.querySelector(".chore-interactive");
           if (container) {
             const rect = container.getBoundingClientRect();
-            const updated = handleChoreMouseMove(prev.activeChore, event.clientX, event.clientY, rect);
+            const updated = handleChoreMouseMove(prev.activeChore, event.clientX, event.clientY, rect as DOMRect);
             if (updated !== prev.activeChore) {
               return { ...prev, activeChore: updated };
             }
@@ -632,10 +632,10 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
       if (paused || state.shiftOver) return;
       setRestaurantState((prev) => {
         if (!prev?.activeChore || prev.activeChore.completed || !prev.choreFocused) return prev;
-        const container = choreContainerRef.current;
+        const container = choreContainerRef.current?.querySelector(".chore-interactive");
         if (!container) return prev;
         const rect = container.getBoundingClientRect();
-        const updated = handleChoreClick(prev.activeChore, event.clientX, event.clientY, rect);
+        const updated = handleChoreClick(prev.activeChore, event.clientX, event.clientY, rect as DOMRect);
         if (updated === prev.activeChore) return prev;
         return { ...prev, activeChore: updated };
       });
