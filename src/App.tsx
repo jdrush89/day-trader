@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.70";
+const GAME_VERSION = "0.0.71";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -196,8 +196,9 @@ function App() {
         setEodPhase((prev) => {
           const localPicking = prev === "upgrades" || prev === "stocks" || prev === "restaurant-upgrades" || prev === "menu-draft";
           const hostPicking = sync.eodPhase === "upgrades" || sync.eodPhase === "stocks" || sync.eodPhase === "restaurant-upgrades" || sync.eodPhase === "menu-draft";
-          // If peer is locally picking, only accept phase change if host moves to a non-picking phase (e.g., summary = next day started)
-          if (localPicking && hostPicking) return prev;
+          // If peer is on same pick phase as host, don't override (avoids resetting mid-pick).
+          // But if host advances to a DIFFERENT pick phase, accept it so the peer can pick the next thing.
+          if (localPicking && hostPicking && prev === sync.eodPhase) return prev;
           // Don't sync informational phases (summary, challenges, shop) — peers navigate those locally
           const hostInfoPhase = sync.eodPhase === "summary" || sync.eodPhase === "challenges" || sync.eodPhase === "shop";
           if (hostInfoPhase && localEodInfoStep !== null) return prev;
