@@ -23,7 +23,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.54";
+const GAME_VERSION = "0.0.55";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);

@@ -28,9 +28,12 @@ export class MultiplayerPeer {
     this.network = new NetworkManager({
       onMessage: (_peerId, msg) => this.handleMessage(msg as HostMessage),
       onPeerConnected: () => {},
-      onPeerDisconnected: () => {
-        this._connected = false;
-        this.callbacks.onDisconnected();
+      onPeerDisconnected: (peerId) => {
+        // Only treat host disconnection as a real disconnect
+        if (peerId === this.network.hostPeerId) {
+          this._connected = false;
+          this.callbacks.onDisconnected();
+        }
       },
       onStatusChange: () => {},
       onError: (err) => this.callbacks.onError(err),

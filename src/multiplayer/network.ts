@@ -41,6 +41,7 @@ export class NetworkManager {
   private _onFirstPeerConnected: (() => void) | null = null;
   private _useRelay = false; // Fallback to WebSocket relay when WebRTC fails
   private _relayPeers: Set<string> = new Set(); // Peers connected via relay
+  private _hostPeerId: string | null = null; // For peers: the host's peer ID
 
   constructor(callbacks: NetworkCallbacks) {
     this.callbacks = callbacks;
@@ -50,6 +51,7 @@ export class NetworkManager {
   get status() { return this._status; }
   get peerId() { return this._peerId; }
   get isHost() { return this._isHost; }
+  get hostPeerId() { return this._hostPeerId; }
   get connectedPeers() { 
     const webrtcPeers = Array.from(this.peers.keys());
     const relayOnly = Array.from(this._relayPeers).filter(id => !webrtcPeers.includes(id));
@@ -114,26 +116,26 @@ export class NetworkManager {
         if (msg.type === "room_joined") {
           console.log("[MP Peer] Joined room:", roomCode, "existing peers:", msg.peers);
           const peerIds = msg.peers as string[];
-          // Initiate WebRTC connections to all existing peers
-          for (const existingPeerId of peerIds) {
-            this.createPeerConnection(existingPeerId, true);
+          // Only connect to the host (first peer in the list) — skip other peers
+          const hostPeerId = peerIds[0];
+          if (hostPeerId) {
+            this._hostPeerId = hostPeerId;
+            this.createPeerConnection(hostPeerId, true);
           }
-          // Wait for first WebRTC peer to connect
+          // Wait for host WebRTC connection
           this._onFirstPeerConnected = doResolve;
           // If no peers exist, resolve immediately (host waiting for joiners)
-          if (peerIds.length === 0) {
+          if (!hostPeerId) {
             doResolve();
           } else {
             // If WebRTC doesn't connect in 8s, fall back to relay
             setTimeout(() => {
               if (!resolved && this.ws?.readyState === 1) {
-                console.log("[MP] WebRTC timed out, falling back to relay for all peers");
+                console.log("[MP] WebRTC timed out, falling back to relay for host");
                 this._useRelay = true;
-                for (const pid of peerIds) {
-                  if (!(this.peers.get(pid) as any)?.connected) {
-                    this._relayPeers.add(pid);
-                    this.callbacks.onPeerConnected(pid);
-                  }
+                if (!(this.peers.get(hostPeerId) as any)?.connected) {
+                  this._relayPeers.add(hostPeerId);
+                  this.callbacks.onPeerConnected(hostPeerId);
                 }
                 doResolve();
               }
@@ -199,19 +201,18 @@ export class NetworkManager {
 
   // Send to host (peer only) — via WebRTC or relay
   sendToHost(message: NetworkMessage): void {
-    const firstPeer = this.peers.values().next().value;
-    if (firstPeer && !firstPeer.destroyed && (firstPeer as any).connected) {
+    const hostId = this._hostPeerId;
+    if (!hostId) return;
+
+    const hostPeer = this.peers.get(hostId);
+    if (hostPeer && !hostPeer.destroyed && (hostPeer as any).connected) {
       try {
-        firstPeer.send(JSON.stringify(message));
+        hostPeer.send(JSON.stringify(message));
       } catch (e) {
         console.warn("[MP] Failed to send to host", e);
       }
-    } else if (this._useRelay && this._relayPeers.size > 0 && this.ws?.readyState === 1) {
-      // Relay to host (first relay peer)
-      const hostId = this._relayPeers.values().next().value;
-      if (hostId) {
-        this.ws.send(JSON.stringify({ type: "relay", targetPeerId: hostId, data: message }));
-      }
+    } else if (this._useRelay && this._relayPeers.has(hostId) && this.ws?.readyState === 1) {
+      this.ws.send(JSON.stringify({ type: "relay", targetPeerId: hostId, data: message }));
     }
   }
 
@@ -229,6 +230,7 @@ export class NetworkManager {
     }
     this._isHost = false;
     this._roomCode = null;
+    this._hostPeerId = null;
     this.setStatus("disconnected");
   }
 
@@ -423,6 +425,12 @@ export class NetworkManager {
   }
 
   private handleSignal(fromPeerId: string, signalData: any): void {
+    // Peers should only accept signals from the host — ignore other peers
+    if (!this._isHost && this._hostPeerId && fromPeerId !== this._hostPeerId) {
+      console.log("[MP] Ignoring signal from non-host peer:", fromPeerId);
+      return;
+    }
+
     let peer = this.peers.get(fromPeerId);
 
     if (!peer) {
