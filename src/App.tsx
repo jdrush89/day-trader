@@ -1397,10 +1397,12 @@ function App() {
       setEodPhase("shop");
     } else {
       // After trading-only EOD or no tickets — proceed to next phase
+      // Use skipRestaurantTransition when we just came from Shwendy's (restaurantState is non-null)
+      const skipRestaurant = restaurantState !== null;
       setRestaurantState(null);
-      beginScheduledDay();
+      beginScheduledDayRef.current(undefined, skipRestaurant ? { skipRestaurantTransition: true } : undefined);
     }
-  }, [restaurantState, bossDay, gameState.tradingTickets, gameState.restaurantTickets, beginScheduledDay]);
+  }, [restaurantState, bossDay, gameState.tradingTickets, gameState.restaurantTickets]);
   goToShopOrNextDayRef.current = goToShopOrNextDay;
 
   const handleShopContinue = useCallback(() => {
