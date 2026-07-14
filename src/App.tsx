@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.60";
+const GAME_VERSION = "0.0.61";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -2155,6 +2155,8 @@ function App() {
                     <div className="eod-stat-row"><span>Net worth</span><span>${currentNetWorth.toFixed(2)}</span></div>
                     <div className="eod-stat-row"><span>Cash</span><span>${gameState.cash.toFixed(2)}</span></div>
                     <div className="eod-stat-row"><span>Portfolio value</span><span>${portfolioValue.toFixed(2)}</span></div>
+                    {gameState.shorts.length > 0 && <div className="eod-stat-row"><span>Short P&L</span><span className={shortCollateral - shortLiability >= 0 ? "up" : "down"}>${(shortCollateral - shortLiability).toFixed(2)}</span></div>}
+                    {optionsVal !== 0 && <div className="eod-stat-row"><span>Options value</span><span>${optionsVal.toFixed(2)}</span></div>}
                     {gameState.goldenParachutes > 0 && <div className="eod-stat-row"><span>Golden Parachutes</span><span>{gameState.goldenParachutes}</span></div>}
                   </div>
                   {pnlSeries.length > 0 && pnlSeries.some((s) => s.data.length > 1) && (

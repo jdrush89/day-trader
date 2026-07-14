@@ -852,6 +852,11 @@
     gap: 8px;
   }
 
+  /* On small screens, put the interactive station panel above the ticket details */
+  .restaurant-work-area .station-panel {
+    order: -1;
+  }
+
   .restaurant-footer {
     flex-wrap: wrap;
     gap: 6px;
@@ -867,6 +872,36 @@
   .speed-controls button {
     padding: 2px 6px;
     font-size: 0.7rem;
+  }
+
+  /* Compact order slots on small screens */
+  .order-slot {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .slot-number {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+  }
+
+  .slot-main {
+    gap: 4px;
+  }
+
+  .slot-item {
+    font-size: 0.85rem;
+  }
+
+  .slot-step, .slot-empty-copy {
+    font-size: 0.75rem;
+  }
+
+  .slot-mini-meter {
+    height: 4px;
   }
 }
 
@@ -941,7 +976,10 @@
   .restaurant-work-area {
     grid-template-columns: 1fr;
     gap: 8px;
-    order: 0;
+  }
+
+  .restaurant-work-area .station-panel {
+    order: -1;
   }
 
   .restaurant-footer {
@@ -950,6 +988,35 @@
     order: 99;
     padding-top: 6px;
     border-top: 1px solid rgba(255, 163, 92, 0.15);
+  }
+
+  .order-slot {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .slot-number {
+    width: 24px;
+    min-width: 24px;
+    height: 24px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+  }
+
+  .slot-main {
+    gap: 4px;
+  }
+
+  .slot-item {
+    font-size: 0.85rem;
+  }
+
+  .slot-step, .slot-empty-copy {
+    font-size: 0.75rem;
+  }
+
+  .slot-mini-meter {
+    height: 4px;
   }
 }
 
