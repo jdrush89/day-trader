@@ -250,7 +250,7 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
             {ALL_CONSUMABLES.filter((c) => c.phase === "trading").map((c) => {
               const count = gameState.consumableInventory.items.filter((id) => id === c.id).length;
               return (
-                <div key={c.id} className="debug-item-row">
+                <div key={c.id} className="debug-item-row" title={c.description}>
                   <span className="debug-icon">{c.icon}</span>
                   <span className="debug-name">{c.name}</span>
                   <span className="debug-item-count">×{count}</span>
@@ -265,7 +265,7 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
             {ALL_CONSUMABLES.filter((c) => c.phase === "restaurant").map((c) => {
               const count = gameState.consumableInventory.items.filter((id) => id === c.id).length;
               return (
-                <div key={c.id} className="debug-item-row">
+                <div key={c.id} className="debug-item-row" title={c.description}>
                   <span className="debug-icon">{c.icon}</span>
                   <span className="debug-name">{c.name}</span>
                   <span className="debug-item-count">×{count}</span>
