@@ -93,6 +93,9 @@
 
 .transition-overlay {
   background: rgba(0, 0, 0, 0.5);
+  min-width: 420px;
+  padding: 2rem 3rem;
+  border-radius: 12px;
 }
 
 .transition-title {

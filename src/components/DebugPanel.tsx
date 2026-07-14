@@ -10,7 +10,7 @@ interface DebugPanelProps {
   gameState: GameState;
   setGameState: (updater: (prev: GameState) => GameState) => void;
   onClose: () => void;
-  onSkipToDay?: (day: number, cash: number, tradingTickets: number, restaurantTickets: number) => void;
+  onSkipToDay?: (day: number, cash: number, tradingTickets: number, restaurantTickets: number, phase: "trading" | "restaurant") => void;
 }
 
 function generateStockFromCandidate(candidate: StockCandidate, day: number) {
@@ -40,11 +40,13 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
   const [skipCash, setSkipCash] = useState(gameState.cash);
   const [skipTradingTickets, setSkipTradingTickets] = useState(gameState.tradingTickets);
   const [skipRestaurantTickets, setSkipRestaurantTickets] = useState(gameState.restaurantTickets);
+  const [skipPhase, setSkipPhase] = useState<"trading" | "restaurant">("trading");
   const [tab, setTab] = useState<"skip" | "upgrades" | "stocks" | "recipes">("skip");
+  const isBoss = isBossDayCheck(skipDay);
 
   const handleSkipToDay = () => {
     if (onSkipToDay) {
-      onSkipToDay(skipDay, skipCash, skipTradingTickets, skipRestaurantTickets);
+      onSkipToDay(skipDay, skipCash, skipTradingTickets, skipRestaurantTickets, isBoss ? "trading" : skipPhase);
     } else {
       setGameState((prev) => {
         const updated = { ...prev, day: skipDay, cash: skipCash, tradingTickets: skipTradingTickets, restaurantTickets: skipRestaurantTickets, tickets: skipTradingTickets + skipRestaurantTickets, marketOpen: false, loans: [] };
@@ -139,8 +141,16 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
             <label>🍔 Restaurant Tickets:</label>
             <input type="number" min={0} value={skipRestaurantTickets} onChange={(e) => setSkipRestaurantTickets(Number(e.target.value))} />
           </div>
+          <div className="debug-field">
+            <label>Start Phase:</label>
+            <div className="trade-mode-toggle" style={{ display: "flex", gap: "0.5rem" }}>
+              <button className={`mode-btn ${skipPhase === "trading" ? "active" : ""}`} onClick={() => setSkipPhase("trading")} disabled={isBoss}>📈 Trading</button>
+              <button className={`mode-btn ${skipPhase === "restaurant" ? "active" : ""}`} onClick={() => setSkipPhase("restaurant")} disabled={isBoss}>🍔 Restaurant</button>
+            </div>
+            {isBoss && <span style={{ fontSize: "0.75rem", color: "#888" }}>Boss days always start with trading</span>}
+          </div>
           <p className="debug-hint">
-            Day {skipDay}: {isBossDayCheck(skipDay) ? "⚠️ Boss Day (trading + kitchen)" : "📈 Trading Day"}
+            Day {skipDay}: {isBoss ? "⚠️ Boss Day (trading + kitchen)" : "📈 Trading Day"}
           </p>
           <button className="debug-apply-btn" onClick={handleSkipToDay}>Apply & Resume</button>
         </div>

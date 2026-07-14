@@ -23,7 +23,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.51";
+const GAME_VERSION = "0.0.52";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1705,10 +1705,25 @@ function App() {
               gameState={gameState}
               setGameState={(updater) => setGameState(updater)}
               onClose={() => setShowDebug(false)}
-              onSkipToDay={(day, cash, tradingTix, restaurantTix) => {
+              onSkipToDay={(day, cash, tradingTix, restaurantTix, phase) => {
                 const updated = { ...gameState, day, cash, tradingTickets: tradingTix, restaurantTickets: restaurantTix, tickets: tradingTix + restaurantTix, marketOpen: false, loans: [], milestonePayment: null };
-                const marketState = openMarket(updated);
                 const isBoss = isBossDayCheck(day);
+
+                if (phase === "restaurant" && !isBoss) {
+                  // Skip to restaurant phase of the day
+                  const marketState = openMarket(updated);
+                  const challenges = selectDailyChallenges(day, false, true, gameState.runSeed);
+                  setGameState({ ...marketState, activeChallenges: challenges, marketOpen: false });
+                  setBossDay(false);
+                  setRestaurantState(createRestaurantState(marketState, isMultiplayer ? mpState.players.length : 1));
+                  setShowDebug(false);
+                  setPaused(false);
+                  setEodPhase("summary");
+                  setShowChallengeIntro("restaurant");
+                  return;
+                }
+
+                const marketState = openMarket(updated);
                 const challenges = selectDailyChallenges(day, isBoss, false, gameState.runSeed);
                 setGameState({ ...marketState, activeChallenges: challenges });
                 setBossDay(isBoss);
