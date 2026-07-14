@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import {
   acceptOrder,
   handleChopKey,
@@ -351,6 +351,22 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
 
   const tipMultiplier = activeBuffIds.includes("live_band") ? 1.5 : 1;
 
+  // Refs for values used in keydown/keyup/mouse handlers to avoid stale closures
+  const isPeerRef = useRef(isPeer);
+  isPeerRef.current = isPeer;
+  const onPeerKeyRef = useRef(onPeerKey);
+  onPeerKeyRef.current = onPeerKey;
+  const onPeerKeyUpRef = useRef(onPeerKeyUp);
+  onPeerKeyUpRef.current = onPeerKeyUp;
+  const onPeerMouseRef = useRef(onPeerMouse);
+  onPeerMouseRef.current = onPeerMouse;
+  const onSwitchCounterRef = useRef(onSwitchCounter);
+  onSwitchCounterRef.current = onSwitchCounter;
+  const currentCounterRef = useRef(currentCounter);
+  currentCounterRef.current = currentCounter;
+  const tipMultiplierRef = useRef(tipMultiplier);
+  tipMultiplierRef.current = tipMultiplier;
+
   useEffect(() => {
     if (isPeer || paused || state.shiftOver) return; // Peers don't tick — they receive state from host
     const interval = window.setInterval(() => {
@@ -375,16 +391,16 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           const counterNum = Number.parseInt(codeMatch[1], 10);
           if (counterNum >= 1 && counterNum <= state.numCounters) {
             event.preventDefault();
-            onSwitchCounter?.(counterNum - 1);
+            onSwitchCounterRef.current?.(counterNum - 1);
             return;
           }
         }
       }
 
       // Peers forward key presses to host
-      if (isPeer && onPeerKey) {
+      if (isPeerRef.current && onPeerKeyRef.current) {
         event.preventDefault();
-        onPeerKey(event.key);
+        onPeerKeyRef.current(event.key);
         return;
       }
 
@@ -392,12 +408,12 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
       if (!Number.isNaN(slotNumber) && slotNumber >= 1 && slotNumber <= state.slotsPerCounter) {
         event.preventDefault();
         // Map local slot to global index based on current counter
-        const globalIndex = currentCounter * state.slotsPerCounter + (slotNumber - 1);
+        const globalIndex = currentCounterRef.current * state.slotsPerCounter + (slotNumber - 1);
         setRestaurantState((prev) => {
           if (!prev) return prev;
           const order = prev.orderSlots[globalIndex];
           if (!order) return prev;
-          return order.completed ? serveOrder(prev, globalIndex, tipMultiplier) : acceptOrder(prev, globalIndex);
+          return order.completed ? serveOrder(prev, globalIndex, tipMultiplierRef.current) : acceptOrder(prev, globalIndex);
         });
         return;
       }
@@ -414,7 +430,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           if (!prev) return prev;
           const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
           const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
-          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex, tipMultiplier);
+          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex, tipMultiplierRef.current);
           return handleKeyPress(prev, event.key);
         });
         return;
@@ -428,8 +444,8 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
 
     const handleGlobalKeyUp = (event: KeyboardEvent) => {
       if (paused || state.shiftOver) return;
-      if (isPeer && onPeerKeyUp) {
-        onPeerKeyUp(event.key);
+      if (isPeerRef.current && onPeerKeyUpRef.current) {
+        onPeerKeyUpRef.current(event.key);
         return;
       }
       if (/^[a-zA-Z]$/.test(event.key)) {
@@ -439,8 +455,8 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
 
     const handleMouseMove = (event: MouseEvent) => {
       if (paused || state.shiftOver) return;
-      if (isPeer && onPeerMouse) {
-        onPeerMouse(event.clientX, event.clientY);
+      if (isPeerRef.current && onPeerMouseRef.current) {
+        onPeerMouseRef.current(event.clientX, event.clientY);
         return;
       }
       setRestaurantState((prev) => (prev ? handleRestaurantMouseMove(prev, event.clientX, event.clientY) : prev));
@@ -454,7 +470,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
       window.removeEventListener("keyup", handleGlobalKeyUp);
       window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver, currentCounter]);
+  }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver, state.numCounters, state.slotsPerCounter]);
 
   return (
     <div className="restaurant-screen">
