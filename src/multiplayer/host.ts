@@ -30,6 +30,7 @@ export interface HostCallbacks {
   onDismissTransition: () => void;
   onDismissChallengeIntro: (playerId: string) => void;
   onResumeReady: (playerId: string) => void;
+  onEodInfoDone: (playerId: string) => void;
   onSetSpeed: (speed: number) => void;
   onTogglePause: () => void;
   onChooseUpgrade: (id: string) => void;
@@ -412,6 +413,9 @@ export class MultiplayerHost {
         break;
       case "resume_ready":
         this.callbacks.onResumeReady(player.id);
+        break;
+      case "eod_info_done":
+        this.callbacks.onEodInfoDone(player.id);
         break;
       case "set_speed":
         this.callbacks.onSetSpeed(action.speed);

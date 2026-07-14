@@ -44,7 +44,8 @@ export type PeerAction =
   | { type: "view_insider" }
   | { type: "use_consumable"; consumableId: string }
   | { type: "buy_consumable"; consumableId: string }
-  | { type: "restaurant_chore_click"; nx: number; ny: number };
+  | { type: "restaurant_chore_click"; nx: number; ny: number }
+  | { type: "eod_info_done" };
 
 // --- Messages sent from host → peer ---
 

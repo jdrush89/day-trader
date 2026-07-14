@@ -54,6 +54,7 @@ interface RestaurantProps {
   localPlayerId?: string;
   localPlayerName?: string;
   players?: Array<{ id: string; name: string; color: string }>;
+  hideShiftSummary?: boolean; // Hide shift summary overlay (player already advanced past it)
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -433,7 +434,7 @@ function renderChoreInstruction(chore: ActiveChore) {
   }
 }
 
-export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, onPeerChoreClick, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, onPeerChoreClick, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players, hideShiftSummary }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
     ...rawState,
@@ -991,7 +992,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         <div className="restaurant-summary-chip"><span>Tips</span><strong>${state.totalTips.toFixed(2)}</strong></div>
       </footer>
 
-      {state.shiftOver && (() => {
+      {state.shiftOver && !hideShiftSummary && (() => {
         // Build P&L series from order log
         const playerList = players && players.length > 0
           ? players

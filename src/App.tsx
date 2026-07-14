@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.68";
+const GAME_VERSION = "0.0.69";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -68,12 +68,15 @@ function App() {
   const mpSaveIdRef = useRef<string | null>(null);
   mpSaveIdRef.current = mpSaveId;
   const [mpResumeData, setMpResumeData] = useState<MpSaveData | null>(null); // MP save being resumed (waiting for players)
+  const [localEodInfoStep, setLocalEodInfoStep] = useState<"summary" | "challenges" | "shop" | "waiting" | null>(null); // per-player EOD info screen navigation (MP only)
+  const [eodInfoReadyPlayers, setEodInfoReadyPlayers] = useState<Set<string>>(new Set()); // players done with info screens
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
   const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
   const tradeTrackerRef = useRef<TradeTracker>(createTradeTracker());
   tradeTrackerRef.current = tradeTracker;
   const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean; skipTradingTransition?: boolean }) => void>(() => {});
+  const goToShopOrNextDayRef = useRef<() => void>(() => {});
 
   // Multiplayer hook
   const [mpState, mpActions] = useMultiplayer(
@@ -123,6 +126,13 @@ function App() {
       },
       onResumeReady: (playerId: string) => {
         setResumeReadyPlayers((prev) => {
+          const next = new Set(prev);
+          next.add(playerId);
+          return next;
+        });
+      },
+      onEodInfoDone: (playerId: string) => {
+        setEodInfoReadyPlayers((prev) => {
           const next = new Set(prev);
           next.add(playerId);
           return next;
@@ -182,12 +192,23 @@ function App() {
           return merged;
         });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
-        // Don't override local EOD phase during upgrade/stock/restaurant picking
+        // Don't override local EOD phase during upgrade/stock/restaurant picking or info screen navigation
         setEodPhase((prev) => {
           const localPicking = prev === "upgrades" || prev === "stocks" || prev === "restaurant-upgrades" || prev === "menu-draft";
           const hostPicking = sync.eodPhase === "upgrades" || sync.eodPhase === "stocks" || sync.eodPhase === "restaurant-upgrades" || sync.eodPhase === "menu-draft";
           // If peer is locally picking, only accept phase change if host moves to a non-picking phase (e.g., summary = next day started)
           if (localPicking && hostPicking) return prev;
+          // Don't sync informational phases (summary, challenges, shop) — peers navigate those locally
+          const hostInfoPhase = sync.eodPhase === "summary" || sync.eodPhase === "challenges" || sync.eodPhase === "shop";
+          if (hostInfoPhase && localEodInfoStep !== null) return prev;
+          // When host advances to a pick phase, clear local info step
+          if (hostPicking) setLocalEodInfoStep(null);
+          // When host syncs shop phase and local step is null (post-picks), set local step to shop
+          if (sync.eodPhase === "shop" && localEodInfoStep === null) {
+            setLocalEodInfoStep("shop");
+            setShopOffering(generateShopOffering());
+            setEodInfoReadyPlayers(new Set());
+          }
           if (prev !== sync.eodPhase) setEodChoiceMade(false);
           return sync.eodPhase as any;
         });
@@ -243,7 +264,7 @@ function App() {
           } else if (state.menuDraftOptions.length > 0) {
             setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
           } else if (restaurantState !== null && (state.tradingTickets > 0 || state.restaurantTickets > 0)) {
-            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
+            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); setLocalEodInfoStep("shop"); setEodInfoReadyPlayers(new Set()); }, 0);
           } else {
             setRestaurantState(null);
             setTimeout(() => beginScheduledDayRef.current(state), 0);
@@ -263,7 +284,7 @@ function App() {
             state = draftMenuItem(state, itemName);
           }
           if (state.tradingTickets > 0 || state.restaurantTickets > 0) {
-            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); }, 0);
+            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); setLocalEodInfoStep("shop"); setEodInfoReadyPlayers(new Set()); }, 0);
           } else {
             setRestaurantState(null);
             setTimeout(() => beginScheduledDayRef.current(state, { skipRestaurantTransition: true }), 0);
@@ -341,6 +362,71 @@ function App() {
       setResumeReadyPlayers(new Set());
     }
   }, [resumeReadyPlayers, isMultiplayer, paused, mpState.players.length]);
+
+  // Multiplayer: auto-trigger restaurant finish when shift ends (host only)
+  const restaurantFinishTriggered = useRef<number>(0);
+  useEffect(() => {
+    if (!isMultiplayer || isPeer || !restaurantState?.shiftOver) return;
+    if (restaurantFinishTriggered.current === gameState.day) return; // already triggered this day
+    restaurantFinishTriggered.current = gameState.day;
+    // Replicate handleRestaurantFinish logic: finishRestaurantDay + evaluate challenges
+    const tradingDay = gameState.day;
+    const nextState = finishRestaurantDay(gameState, restaurantState.totalEarnings);
+    const milestoneState = isMilestoneDay(tradingDay) ? applyMilestoneCheck(nextState, tradingDay) : nextState;
+    const evaluated = evaluateChallenges(
+      milestoneState.activeChallenges,
+      milestoneState.challengeTracker,
+      milestoneState,
+      restaurantState.challengeTracker,
+    );
+    const earned = getTicketsEarned(evaluated);
+    const challengedState = {
+      ...milestoneState,
+      activeChallenges: evaluated,
+      tickets: milestoneState.tickets + earned.tradingTickets + earned.restaurantTickets,
+      tradingTickets: milestoneState.tradingTickets + earned.tradingTickets,
+      restaurantTickets: milestoneState.restaurantTickets + earned.restaurantTickets,
+    };
+    setGameState(challengedState);
+    doSave(challengedState);
+    setEodPhase("challenges");
+  }, [isMultiplayer, isPeer, restaurantState?.shiftOver]);
+
+  // Multiplayer: EOD info screens gate — when all players are done, advance to picks/next day
+  useEffect(() => {
+    if (!isMultiplayer) return;
+    const totalPlayers = mpState.players.length;
+    if (totalPlayers < 2) return;
+    if (eodInfoReadyPlayers.size < totalPlayers) return;
+    // All players done with info screens — advance to picks or next day
+    setEodInfoReadyPlayers(new Set());
+    setLocalEodInfoStep(null);
+    if (!isPeer) {
+      // Host: determine what comes next (same logic as handleChallengesContinue but without challenge eval)
+      if (gameState.upgradeDraftOptions.length > 0) {
+        setEodPhase("upgrades");
+        setEodChoiceMade(false);
+        setMpUpgradeChoice(null);
+        mpActions.resetEodGate();
+      } else if (gameState.stockDraftOptions.length > 0) {
+        setEodPhase("stocks");
+        setEodChoiceMade(false);
+        mpActions.resetEodGate();
+      } else if (gameState.restaurantUpgradeDraftOptions.length > 0) {
+        setEodPhase("restaurant-upgrades");
+        setEodChoiceMade(false);
+        mpActions.resetEodGate();
+      } else if (gameState.menuDraftOptions.length > 0) {
+        setEodPhase("menu-draft");
+        setEodChoiceMade(false);
+        mpActions.resetEodGate();
+      } else {
+        // Shop was already shown locally via localEodInfoStep — go to next day
+        setRestaurantState(null);
+        beginScheduledDayRef.current(undefined, restaurantState !== null ? { skipRestaurantTransition: true } : undefined);
+      }
+    }
+  }, [eodInfoReadyPlayers, isMultiplayer, mpState.players.length]);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${textSize}%`;
@@ -565,6 +651,8 @@ function App() {
   useEffect(() => {
     if (gameState.marketOpen) {
       setEodPhase("summary");
+      setLocalEodInfoStep(null);
+      setEodInfoReadyPlayers(new Set());
       // Reset trade tracker at start of new trading day
       setTradeTracker(createTradeTracker());
       setPnlSeries([]);
@@ -583,6 +671,28 @@ function App() {
         : [{ id: mpState.localPlayer?.id ?? "player", name: mpState.localPlayer?.name ?? "You", color: "#4fc3f7" }];
       const series = buildPnLSeries(fullLog, players, 100);
       setPnlSeries(series);
+      // In multiplayer, auto-evaluate trading challenges when market closes (host only)
+      // so challenge data is ready before any player navigates to the challenges screen
+      if (isMultiplayer && !isPeer) {
+        const evaluated = evaluateChallenges(
+          gameState.activeChallenges,
+          gameState.challengeTracker,
+          gameState,
+          undefined,
+        );
+        const earned = getTicketsEarned(evaluated);
+        setGameState((prev) => ({
+          ...prev,
+          activeChallenges: evaluated,
+          tickets: prev.tickets + earned.tradingTickets + earned.restaurantTickets,
+          tradingTickets: prev.tradingTickets + earned.tradingTickets,
+          restaurantTickets: prev.restaurantTickets + earned.restaurantTickets,
+        }));
+      }
+      // Set local info step for MP navigation
+      if (isMultiplayer) {
+        setLocalEodInfoStep("summary");
+      }
     }
   }, [gameState.marketOpen]);
 
@@ -1194,7 +1304,12 @@ function App() {
       beginScheduledDay();
       return;
     }
-    // Evaluate challenges and show results
+    // In multiplayer, challenges are auto-evaluated on market close / shift end
+    if (isMultiplayer) {
+      setEodPhase("challenges");
+      return;
+    }
+    // Single player: evaluate challenges and show results
     const evaluated = evaluateChallenges(
       gameState.activeChallenges,
       gameState.challengeTracker,
@@ -1210,7 +1325,7 @@ function App() {
       restaurantTickets: prev.restaurantTickets + earned.restaurantTickets,
     }));
     setEodPhase("challenges");
-  }, [beginScheduledDay, gameState, bossDay, restaurantState]);
+  }, [beginScheduledDay, gameState, bossDay, restaurantState, isMultiplayer]);
 
   const goToShopOrNextDay = useCallback(() => {
     // Shop only shows after restaurant/boss day (last phase of the full day) and if player has any tickets
@@ -1224,6 +1339,7 @@ function App() {
       beginScheduledDay();
     }
   }, [restaurantState, bossDay, gameState.tradingTickets, gameState.restaurantTickets, beginScheduledDay]);
+  goToShopOrNextDayRef.current = goToShopOrNextDay;
 
   const handleShopContinue = useCallback(() => {
     // Shop is the final EOD step (after restaurant/boss day) — skip back to trading
@@ -1254,6 +1370,40 @@ function App() {
       goToShopOrNextDay();
     }
   }, [gameState, isMultiplayer, mpActions, goToShopOrNextDay]);
+
+  // Multiplayer: local EOD info screen navigation (each player advances independently)
+  const handleLocalEodContinue = useCallback(() => {
+    if (localEodInfoStep === "summary") {
+      // Boss day: skip challenges/shop, go directly to waiting for next day
+      if (bossDay) {
+        setLocalEodInfoStep("waiting");
+        const myId = mpState.localPlayer?.id ?? "host";
+        setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+        if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+        return;
+      }
+      setLocalEodInfoStep("challenges");
+    } else if (localEodInfoStep === "challenges") {
+      // Check if shop should show (has tickets + restaurant or boss day)
+      const hasAnyTickets = gameState.tradingTickets > 0 || gameState.restaurantTickets > 0;
+      if ((restaurantState !== null || bossDay) && hasAnyTickets) {
+        setShopOffering(generateShopOffering());
+        setLocalEodInfoStep("shop");
+      } else {
+        setLocalEodInfoStep("waiting");
+        // Signal readiness
+        const myId = mpState.localPlayer?.id ?? "host";
+        setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+        if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+      }
+    } else if (localEodInfoStep === "shop") {
+      setLocalEodInfoStep("waiting");
+      // Signal readiness
+      const myId = mpState.localPlayer?.id ?? "host";
+      setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+      if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+    }
+  }, [localEodInfoStep, gameState.tradingTickets, gameState.restaurantTickets, restaurantState, bossDay, isPeer, mpActions, mpState.localPlayer]);
 
   const handleBuyConsumable = useCallback((itemId: string) => {
     const item = getConsumable(itemId);
@@ -1371,7 +1521,13 @@ function App() {
   }, [gameState, isMultiplayer, isPeer, mpActions, goToShopOrNextDay]);
 
   const handleRestaurantFinish = useCallback((earnings: number) => {
-    // The milestone day is the day that just finished trading (before finishRestaurantDay increments it)
+    // In multiplayer, game state changes are auto-triggered when shiftOver becomes true.
+    // Just advance local info step so the player can navigate challenges/shop independently.
+    if (isMultiplayer) {
+      setLocalEodInfoStep("challenges");
+      return;
+    }
+    // Single player: evaluate challenges and update game state
     const tradingDay = gameState.day;
     const nextState = finishRestaurantDay(gameState, earnings);
     // Apply milestone check now (after Shwendy's)
@@ -1392,10 +1548,10 @@ function App() {
       restaurantTickets: milestoneState.restaurantTickets + earned.restaurantTickets,
     };
     setGameState(challengedState);
-    if (!isPeer) doSave(challengedState);
+    doSave(challengedState);
     // Show challenge results before restaurant upgrades
     setEodPhase("challenges");
-  }, [beginScheduledDay, gameState, restaurantState, isPeer]);
+  }, [beginScheduledDay, gameState, restaurantState, isMultiplayer]);
 
   const handleViewInsider = useCallback(() => {
     setGameState((prev) => {
@@ -1950,6 +2106,7 @@ function App() {
           localPlayerId={mpState.localPlayer?.id ?? "player"}
           localPlayerName={mpState.localPlayer?.name ?? "You"}
           players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
+          hideShiftSummary={isMultiplayer && localEodInfoStep !== null}
         />
         {/* Post-shift overlays render on top of restaurant UI */}
         {showChallengeIntro === "restaurant" && (
@@ -1986,7 +2143,7 @@ function App() {
             </div>
           </div>
         )}
-        {eodPhase === "challenges" && (
+        {(isMultiplayer ? localEodInfoStep === "challenges" : eodPhase === "challenges") && (
           <div className="end-of-day-overlay">
             <div className="end-of-day challenge-results">
               <h2>🎯 Daily Challenges</h2>
@@ -2038,11 +2195,11 @@ function App() {
                   </div>
                 );
               })()}
-              <button onClick={handleChallengesContinue}>Continue →</button>
+              <button onClick={isMultiplayer ? handleLocalEodContinue : handleChallengesContinue}>Continue →</button>
             </div>
           </div>
         )}
-        {eodPhase === "shop" && (
+        {(isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop") && (
           <div className="shop-phase">
             <h2>🎪 Ticket Shop</h2>
             <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
@@ -2073,7 +2230,16 @@ function App() {
                 </div>
               )}
             </div>
-            <button onClick={handleShopContinue}>Continue →</button>
+            <button onClick={isMultiplayer ? handleLocalEodContinue : handleShopContinue}>Continue →</button>
+          </div>
+        )}
+        {/* Multiplayer: waiting for other players after restaurant info screens */}
+        {isMultiplayer && localEodInfoStep === "waiting" && (
+          <div className="end-of-day-overlay">
+            <div className="end-of-day">
+              <h2>⏳ Waiting for other players...</h2>
+              <p style={{ color: "rgba(255,255,255,0.6)" }}>Everyone needs to finish reviewing before continuing</p>
+            </div>
           </div>
         )}
         {eodPhase === "restaurant-upgrades" && (
@@ -2129,7 +2295,7 @@ function App() {
         </>
       ) : (
         <>
-          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "summary" && (() => {
+          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "summary" : eodPhase === "summary") && (() => {
             const ranked = [...gameState.stocks].map((s) => ({ ...s, change: s.price - s.openPrice, changePct: ((s.price - s.openPrice) / s.openPrice) * 100 })).sort((a, b) => b.changePct - a.changePct);
             const winners = ranked.filter((s) => s.changePct > 0);
             const losers = ranked.filter((s) => s.changePct < 0).reverse();
@@ -2215,13 +2381,13 @@ function App() {
                       </div>
                     </div>
                   )}
-                  <button onClick={() => { setBossResult(null); handleNewDay(); }}>Continue →</button>
+                  <button onClick={() => { setBossResult(null); isMultiplayer ? handleLocalEodContinue() : handleNewDay(); }}>Continue →</button>
                 </div>
               </div>
             );
           })()}
 
-          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "challenges" && (
+          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "challenges" : eodPhase === "challenges") && (
             <div className="end-of-day-overlay">
               <div className="end-of-day challenge-results">
                 <h2>🎯 Daily Challenges</h2>
@@ -2258,12 +2424,12 @@ function App() {
                     </div>
                   );
                 })()}
-                <button onClick={handleChallengesContinue}>Continue →</button>
+                <button onClick={isMultiplayer ? handleLocalEodContinue : handleChallengesContinue}>Continue →</button>
               </div>
             </div>
           )}
 
-          {!gameState.marketOpen && !gameState.gameOver && eodPhase === "shop" && (
+          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop") && (
             <div className="shop-phase">
               <h2>🎪 Ticket Shop</h2>
               <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
@@ -2294,7 +2460,17 @@ function App() {
                   </div>
                 )}
               </div>
-              <button onClick={handleShopContinue}>Continue →</button>
+              <button onClick={isMultiplayer ? handleLocalEodContinue : handleShopContinue}>Continue →</button>
+            </div>
+          )}
+
+          {/* Multiplayer: waiting for other players after info screens */}
+          {isMultiplayer && localEodInfoStep === "waiting" && !gameState.marketOpen && !gameState.gameOver && (
+            <div className="end-of-day-overlay">
+              <div className="end-of-day">
+                <h2>⏳ Waiting for other players...</h2>
+                <p style={{ color: "rgba(255,255,255,0.6)" }}>Everyone needs to finish reviewing before continuing</p>
+              </div>
             </div>
           )}
 
@@ -2398,6 +2574,7 @@ function App() {
               localPlayerId={mpState.localPlayer?.id ?? "player"}
               localPlayerName={mpState.localPlayer?.name ?? "You"}
               players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
+              hideShiftSummary={isMultiplayer && localEodInfoStep !== null}
             />
             </div>
           ) : (

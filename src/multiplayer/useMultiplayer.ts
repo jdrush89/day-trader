@@ -78,6 +78,7 @@ export function useMultiplayer(
     onDismissTransition: () => void;
     onDismissChallengeIntro: (playerId: string) => void;
     onResumeReady: (playerId: string) => void;
+    onEodInfoDone: (playerId: string) => void;
     onUseConsumable: (consumableId: string) => void;
     onBuyConsumable: (consumableId: string) => void;
     onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover" | "buy_option" | "sell_option" | "close_option", symbol: string, shares: number, price: number, timestamp: number) => void;
@@ -200,6 +201,7 @@ export function useMultiplayer(
       onDismissTransition: () => appCallbacksRef.current.onDismissTransition(),
       onDismissChallengeIntro: (playerId) => appCallbacksRef.current.onDismissChallengeIntro(playerId),
       onResumeReady: (playerId) => appCallbacksRef.current.onResumeReady(playerId),
+      onEodInfoDone: (playerId) => appCallbacksRef.current.onEodInfoDone(playerId),
       onUseConsumable: (consumableId) => appCallbacksRef.current.onUseConsumable(consumableId),
       onBuyConsumable: (consumableId) => appCallbacksRef.current.onBuyConsumable(consumableId),
       onRecordTrade: (playerId, playerName, action, symbol, shares, price, timestamp) => appCallbacksRef.current.onRecordTrade?.(playerId, playerName, action, symbol, shares, price, timestamp),
