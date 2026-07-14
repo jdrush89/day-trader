@@ -80,7 +80,7 @@ export function useMultiplayer(
     onResumeReady: (playerId: string) => void;
     onUseConsumable: (consumableId: string) => void;
     onBuyConsumable: (consumableId: string) => void;
-    onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover", symbol: string, shares: number, price: number, timestamp: number) => void;
+    onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover" | "buy_option" | "sell_option" | "close_option", symbol: string, shares: number, price: number, timestamp: number) => void;
   },
 ): [MultiplayerState, MultiplayerActions] {
   const [state, setState] = useState<MultiplayerState>({

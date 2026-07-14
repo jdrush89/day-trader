@@ -1945,6 +1945,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+  user-select: none;
 }
 
 .pnl-graph-svg {
@@ -1986,6 +1988,53 @@ body {
   color: var(--text-dim);
   padding: 20px;
   font-style: italic;
+}
+
+.pnl-tooltip {
+  position: absolute;
+  padding: 4px 10px;
+  background: rgba(10, 14, 23, 0.95);
+  border: 1px solid;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.pnl-zoom-indicator {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
+.pnl-action-legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.pnl-action-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.pnl-action-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
 }
 
 .eod-movers {

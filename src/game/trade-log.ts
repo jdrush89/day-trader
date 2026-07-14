@@ -3,15 +3,18 @@
  * Records per-player trades with FIFO ownership tracking for shared positions.
  */
 
+export type TradeAction = "buy" | "sell" | "short" | "cover" | "buy_option" | "sell_option" | "close_option";
+
 export interface TradeLogEntry {
   timestamp: number; // timeOfDay tick
   playerId: string;
   playerName: string;
-  action: "buy" | "sell" | "short" | "cover";
+  action: TradeAction;
   symbol: string;
   shares: number;
   price: number;
-  realizedPnL: number; // For sells/covers: profit/loss realized at this moment
+  realizedPnL: number; // For sells/covers/close_option: profit/loss realized at this moment
+  label?: string; // Human-readable label for tooltip (e.g. "Bought 2 MEGA calls")
 }
 
 // FIFO lot tracking: which player bought which shares at what price
@@ -50,6 +53,7 @@ export function recordBuy(
     shares,
     price,
     realizedPnL: 0,
+    label: `Bought ${shares} ${symbol}`,
   };
   const lot: FIFOLot = { playerId, symbol, shares, price, type: "long" };
   return {
@@ -109,6 +113,7 @@ export function recordSell(
     shares,
     price: sellPrice,
     realizedPnL: pnlByPlayer[playerId] ?? 0,
+    label: `Sold ${shares} ${symbol}`,
   });
 
   // If a different player gets buyer credit, add a phantom entry for them
@@ -150,6 +155,7 @@ export function recordShort(
     shares,
     price,
     realizedPnL: 0,
+    label: `Shorted ${shares} ${symbol}`,
   };
   const lot: FIFOLot = { playerId, symbol, shares, price, type: "short" };
   return {
@@ -204,6 +210,7 @@ export function recordCover(
     shares,
     price: coverPrice,
     realizedPnL: pnlByPlayer[playerId] ?? 0,
+    label: `Covered ${shares} ${symbol}`,
   });
 
   // Phantom entries for original shorters who get credit
@@ -266,10 +273,12 @@ export function computeEODUnrealized(
 /**
  * Build cumulative P&L series per player for graphing.
  * Each point is { time, cumulativePnL } per player.
+ * Also includes action markers for interactive display.
  */
 export interface PnLDataPoint {
   time: number;
   value: number;
+  entry?: TradeLogEntry; // Present when this point is a trade action (for dots/tooltips)
 }
 
 export interface PlayerPnLSeries {
@@ -277,6 +286,76 @@ export interface PlayerPnLSeries {
   playerName: string;
   playerColor: string;
   data: PnLDataPoint[];
+}
+
+export function recordOptionBuy(
+  tracker: TradeTracker,
+  playerId: string,
+  playerName: string,
+  symbol: string,
+  optionType: "call" | "put",
+  contracts: number,
+  premium: number,
+  timestamp: number
+): TradeTracker {
+  const entry: TradeLogEntry = {
+    timestamp,
+    playerId,
+    playerName,
+    action: "buy_option",
+    symbol,
+    shares: contracts,
+    price: premium,
+    realizedPnL: -premium * contracts * 100, // Premium paid
+    label: `Bought ${contracts} ${symbol} ${optionType}${contracts > 1 ? "s" : ""}`,
+  };
+  return { log: [...tracker.log, entry], fifoLots: tracker.fifoLots };
+}
+
+export function recordOptionSell(
+  tracker: TradeTracker,
+  playerId: string,
+  playerName: string,
+  symbol: string,
+  optionType: "call" | "put",
+  contracts: number,
+  premium: number,
+  timestamp: number
+): TradeTracker {
+  const entry: TradeLogEntry = {
+    timestamp,
+    playerId,
+    playerName,
+    action: "sell_option",
+    symbol,
+    shares: contracts,
+    price: premium,
+    realizedPnL: premium * contracts * 100, // Premium received
+    label: `Wrote ${contracts} ${symbol} ${optionType}${contracts > 1 ? "s" : ""}`,
+  };
+  return { log: [...tracker.log, entry], fifoLots: tracker.fifoLots };
+}
+
+export function recordOptionClose(
+  tracker: TradeTracker,
+  playerId: string,
+  playerName: string,
+  symbol: string,
+  realizedPnL: number,
+  timestamp: number
+): TradeTracker {
+  const entry: TradeLogEntry = {
+    timestamp,
+    playerId,
+    playerName,
+    action: "close_option",
+    symbol,
+    shares: 1,
+    price: 0,
+    realizedPnL,
+    label: `Closed ${symbol} option (${realizedPnL >= 0 ? "+" : ""}$${realizedPnL.toFixed(2)})`,
+  };
+  return { log: [...tracker.log, entry], fifoLots: tracker.fifoLots };
 }
 
 export function buildPnLSeries(
@@ -299,13 +378,16 @@ export function buildPnLSeries(
   for (const p of players) cumulative[p.id] = 0;
 
   for (const entry of sorted) {
-    if (entry.realizedPnL === 0) continue; // buys/shorts don't realize PnL
     if (!cumulative.hasOwnProperty(entry.playerId)) continue;
 
-    cumulative[entry.playerId] += entry.realizedPnL;
+    if (entry.realizedPnL !== 0) {
+      cumulative[entry.playerId] += entry.realizedPnL;
+    }
+    // Always add a point for every action (so dots show up even for buys with 0 pnl)
     seriesMap[entry.playerId].push({
       time: entry.timestamp,
       value: cumulative[entry.playerId],
+      entry,
     });
   }
 

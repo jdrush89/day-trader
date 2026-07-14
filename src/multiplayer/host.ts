@@ -47,7 +47,7 @@ export interface HostCallbacks {
   getMpSaveId?: () => string | undefined;
   onUseConsumable: (consumableId: string) => void;
   onBuyConsumable: (consumableId: string) => void;
-  onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover", symbol: string, shares: number, price: number, timestamp: number) => void;
+  onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover" | "buy_option" | "sell_option" | "close_option", symbol: string, shares: number, price: number, timestamp: number) => void;
 }
 
 export class MultiplayerHost {
@@ -347,15 +347,37 @@ export class MultiplayerHost {
         this.callbacks.setGameState((s) => cancelOrder(s, action.orderId));
         break;
       case "buy_option":
-        this.callbacks.setGameState((s) => buyOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts));
+        this.callbacks.setGameState((s) => {
+          const next = buyOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts);
+          if (next !== s) {
+            const newOpt = next.optionsPositions.find((o) => !s.optionsPositions.some((po) => po.id === o.id));
+            this.callbacks.onRecordTrade?.(player.id, player.name, "buy_option", action.symbol, action.contracts, newOpt?.premium ?? 0, s.timeOfDay);
+          }
+          return next;
+        });
         this.addFeedItem(player.id, player.name, `Bought ${action.contracts} ${action.symbol} ${action.optionType}s`);
         break;
       case "sell_option":
-        this.callbacks.setGameState((s) => sellOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts));
+        this.callbacks.setGameState((s) => {
+          const next = sellOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts);
+          if (next !== s) {
+            const newOpt = next.optionsPositions.find((o) => !s.optionsPositions.some((po) => po.id === o.id));
+            this.callbacks.onRecordTrade?.(player.id, player.name, "sell_option", action.symbol, action.contracts, newOpt?.premium ?? 0, s.timeOfDay);
+          }
+          return next;
+        });
         this.addFeedItem(player.id, player.name, `Sold ${action.contracts} ${action.symbol} ${action.optionType}s`);
         break;
       case "close_option":
-        this.callbacks.setGameState((s) => closeOption(s, action.optionId));
+        this.callbacks.setGameState((s) => {
+          const next = closeOption(s, action.optionId);
+          if (next !== s) {
+            const opt = s.optionsPositions.find((o) => o.id === action.optionId);
+            const realizedPnL = next.cash - s.cash;
+            this.callbacks.onRecordTrade?.(player.id, player.name, "close_option", opt?.symbol ?? "?", 1, realizedPnL, s.timeOfDay);
+          }
+          return next;
+        });
         this.addFeedItem(player.id, player.name, `Closed an option`);
         break;
       case "pin_stock":

@@ -19,13 +19,13 @@ import { DebugPanel } from "./components/DebugPanel";
 import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
 import { saveGame, loadGame, deleteSave, saveMpGame, loadAllMpSaves, deleteMpSave } from "./game/save";
 import type { MpSaveData, PlayerSaveData } from "./game/save";
-import { createTradeTracker, recordBuy, recordSell, recordShort, recordCover, computeEODUnrealized, buildPnLSeries, type TradeTracker, type PlayerPnLSeries } from "./game/trade-log";
+import { createTradeTracker, recordBuy, recordSell, recordShort, recordCover, recordOptionBuy, recordOptionSell, recordOptionClose, computeEODUnrealized, buildPnLSeries, type TradeTracker, type PlayerPnLSeries } from "./game/trade-log";
 import { PnLGraph } from "./components/PnLGraph";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.58";
+const GAME_VERSION = "0.0.59";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -138,13 +138,16 @@ function App() {
       onBuyConsumable: (consumableId: string) => {
         handleBuyConsumable(consumableId);
       },
-      onRecordTrade: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover", symbol: string, shares: number, price: number, timestamp: number) => {
+      onRecordTrade: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover" | "buy_option" | "sell_option" | "close_option", symbol: string, shares: number, price: number, timestamp: number) => {
         setTradeTracker((t) => {
           switch (action) {
             case "buy": return recordBuy(t, playerId, playerName, symbol, shares, price, timestamp);
             case "sell": return recordSell(t, playerId, playerName, symbol, shares, price, timestamp);
             case "short": return recordShort(t, playerId, playerName, symbol, shares, price, timestamp);
             case "cover": return recordCover(t, playerId, playerName, symbol, shares, price, timestamp);
+            case "buy_option": return recordOptionBuy(t, playerId, playerName, symbol, "call", shares, price, timestamp);
+            case "sell_option": return recordOptionSell(t, playerId, playerName, symbol, "call", shares, price, timestamp);
+            case "close_option": return recordOptionClose(t, playerId, playerName, symbol, price, timestamp);
             default: return t;
           }
         });
@@ -843,16 +846,46 @@ function App() {
   }, [isPeer, mpActions]);
   const handleBuyOption = useCallback((symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => {
     if (isPeer) { mpActions.sendAction({ type: "buy_option", symbol, optionType: type, strikePrice: strike, expirationDays: days, contracts }); return; }
-    setGameState((prev) => buyOption(prev, symbol, type, strike, days, contracts));
-  }, [isPeer, mpActions]);
+    const pid = mpState.localPlayer?.id ?? "player";
+    const pname = mpState.localPlayer?.name ?? "You";
+    setGameState((prev) => {
+      const next = buyOption(prev, symbol, type, strike, days, contracts);
+      if (next !== prev) {
+        const newOpt = next.optionsPositions.find((o) => !prev.optionsPositions.some((po) => po.id === o.id));
+        const premium = newOpt ? newOpt.premium : 0;
+        setTradeTracker((t) => recordOptionBuy(t, pid, pname, symbol, type, contracts, premium, prev.timeOfDay));
+      }
+      return next;
+    });
+  }, [isPeer, mpActions, mpState.localPlayer]);
   const handleSellOption = useCallback((symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => {
     if (isPeer) { mpActions.sendAction({ type: "sell_option", symbol, optionType: type, strikePrice: strike, expirationDays: days, contracts }); return; }
-    setGameState((prev) => sellOption(prev, symbol, type, strike, days, contracts));
-  }, [isPeer, mpActions]);
+    const pid = mpState.localPlayer?.id ?? "player";
+    const pname = mpState.localPlayer?.name ?? "You";
+    setGameState((prev) => {
+      const next = sellOption(prev, symbol, type, strike, days, contracts);
+      if (next !== prev) {
+        const newOpt = next.optionsPositions.find((o) => !prev.optionsPositions.some((po) => po.id === o.id));
+        const premium = newOpt ? newOpt.premium : 0;
+        setTradeTracker((t) => recordOptionSell(t, pid, pname, symbol, type, contracts, premium, prev.timeOfDay));
+      }
+      return next;
+    });
+  }, [isPeer, mpActions, mpState.localPlayer]);
   const handleCloseOption = useCallback((optionId: string) => {
     if (isPeer) { mpActions.sendAction({ type: "close_option", optionId }); return; }
-    setGameState((prev) => closeOption(prev, optionId));
-  }, [isPeer, mpActions]);
+    const pid = mpState.localPlayer?.id ?? "player";
+    const pname = mpState.localPlayer?.name ?? "You";
+    setGameState((prev) => {
+      const next = closeOption(prev, optionId);
+      if (next !== prev) {
+        const opt = prev.optionsPositions.find((o) => o.id === optionId);
+        const realizedPnL = opt ? next.cash - prev.cash : 0;
+        setTradeTracker((t) => recordOptionClose(t, pid, pname, opt?.symbol ?? "?", realizedPnL, prev.timeOfDay));
+      }
+      return next;
+    });
+  }, [isPeer, mpActions, mpState.localPlayer]);
 
   const handleSetSpeed = useCallback((s: number) => {
     if (isPeer) { mpActions.sendAction({ type: "set_speed", speed: s }); return; }
