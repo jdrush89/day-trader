@@ -19,11 +19,13 @@ import { DebugPanel } from "./components/DebugPanel";
 import { Tutorial, TRADING_STEPS, RESTAURANT_STEPS, type TutorialStep } from "./components/Tutorial";
 import { saveGame, loadGame, deleteSave, saveMpGame, loadAllMpSaves, deleteMpSave } from "./game/save";
 import type { MpSaveData, PlayerSaveData } from "./game/save";
+import { createTradeTracker, recordBuy, recordSell, recordShort, recordCover, computeEODUnrealized, buildPnLSeries, type TradeTracker, type PlayerPnLSeries } from "./game/trade-log";
+import { PnLGraph } from "./components/PnLGraph";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.56";
+const GAME_VERSION = "0.0.57";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -67,6 +69,10 @@ function App() {
   mpSaveIdRef.current = mpSaveId;
   const [mpResumeData, setMpResumeData] = useState<MpSaveData | null>(null); // MP save being resumed (waiting for players)
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
+  const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
+  const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
+  const tradeTrackerRef = useRef<TradeTracker>(createTradeTracker());
+  tradeTrackerRef.current = tradeTracker;
   const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean; skipTradingTransition?: boolean }) => void>(() => {});
 
   // Multiplayer hook
@@ -131,6 +137,17 @@ function App() {
       },
       onBuyConsumable: (consumableId: string) => {
         handleBuyConsumable(consumableId);
+      },
+      onRecordTrade: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover", symbol: string, shares: number, price: number, timestamp: number) => {
+        setTradeTracker((t) => {
+          switch (action) {
+            case "buy": return recordBuy(t, playerId, playerName, symbol, shares, price, timestamp);
+            case "sell": return recordSell(t, playerId, playerName, symbol, shares, price, timestamp);
+            case "short": return recordShort(t, playerId, playerName, symbol, shares, price, timestamp);
+            case "cover": return recordCover(t, playerId, playerName, symbol, shares, price, timestamp);
+            default: return t;
+          }
+        });
       },
       onSetSpeed: setSpeed,
       onTogglePause: () => {
@@ -543,9 +560,27 @@ function App() {
   }, [isMultiplayer, mpState.players, mpState.localPlayer, localUpgrades, localRestaurantUpgrades]);
 
   useEffect(() => {
-    if (gameState.marketOpen) setEodPhase("summary");
+    if (gameState.marketOpen) {
+      setEodPhase("summary");
+      // Reset trade tracker at start of new trading day
+      setTradeTracker(createTradeTracker());
+      setPnlSeries([]);
+    }
     // Auto-save when market closes (end of trading day) — only host saves in MP
     if (!gameState.marketOpen && !gameState.gameOver && !isPeer) doSave(gameState);
+    // Build P&L series when market closes
+    if (!gameState.marketOpen && !gameState.gameOver) {
+      const tracker = tradeTrackerRef.current;
+      // Add unrealized P&L for open positions
+      const eodEntries = computeEODUnrealized(tracker, gameState.stocks, 100);
+      const fullLog = [...tracker.log, ...eodEntries];
+      // Get players list (solo = single player)
+      const players = isMultiplayer
+        ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color }))
+        : [{ id: mpState.localPlayer?.id ?? "player", name: mpState.localPlayer?.name ?? "You", color: "#4fc3f7" }];
+      const series = buildPnLSeries(fullLog, players, 100);
+      setPnlSeries(series);
+    }
   }, [gameState.marketOpen]);
 
   const NEWS_CHANNELS: MonitorChannel[] = ["business_news", "global_news", "social_media"];
@@ -575,12 +610,14 @@ function App() {
 
   const handleBuy = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "buy_stock", symbol, shares }); return; }
+    const playerId = mpState.localPlayer?.id ?? "player";
+    const playerName = mpState.localPlayer?.name ?? "You";
     setGameState((prev) => {
+      const stock = prev.stocks.find((s) => s.symbol === symbol);
+      if (!stock) return prev;
       if (prev.freeNextStock) {
-        // Free stock: buy 1 share at no cost, clear the flag
-        const stock = prev.stocks.find((s) => s.symbol === symbol);
-        if (!stock) return prev;
         const existing = prev.portfolio.find((p) => p.symbol === symbol);
+        setTradeTracker((t) => recordBuy(t, playerId, playerName, symbol, 1, stock.price, prev.timeOfDay));
         return {
           ...prev,
           freeNextStock: false,
@@ -589,13 +626,24 @@ function App() {
             : [...prev.portfolio, { symbol, shares: 1, avgCost: stock.price, dayAcquired: prev.day }],
         };
       }
-      return buyStock(prev, symbol, shares);
+      const next = buyStock(prev, symbol, shares);
+      if (next !== prev) {
+        setTradeTracker((t) => recordBuy(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
+      }
+      return next;
     });
-  }, [isPeer, mpActions]);
+  }, [isPeer, mpActions, mpState.localPlayer]);
   const handleSell = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "sell_stock", symbol, shares }); return; }
+    const playerId = mpState.localPlayer?.id ?? "player";
+    const playerName = mpState.localPlayer?.name ?? "You";
     setGameState((prev) => {
+      const stock = prev.stocks.find((s) => s.symbol === symbol);
+      if (!stock) return prev;
       const next = sellStock(prev, symbol, shares);
+      if (next !== prev) {
+        setTradeTracker((t) => recordSell(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
+      }
       // Golden Coin: negate loss
       if (hasActiveBuff(prev.consumableInventory, "golden_coin") && next.cash < prev.cash) {
         const negated = { ...next, cash: prev.cash, consumableInventory: { ...next.consumableInventory, activeBuffs: next.consumableInventory.activeBuffs.filter((b) => b.consumableId !== "golden_coin") } };
@@ -603,15 +651,32 @@ function App() {
       }
       return next;
     });
-  }, [isPeer, mpActions]);
+  }, [isPeer, mpActions, mpState.localPlayer]);
   const handleShort = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "short_stock", symbol, shares }); return; }
-    setGameState((prev) => shortStock(prev, symbol, shares));
-  }, [isPeer, mpActions]);
+    const playerId = mpState.localPlayer?.id ?? "player";
+    const playerName = mpState.localPlayer?.name ?? "You";
+    setGameState((prev) => {
+      const stock = prev.stocks.find((s) => s.symbol === symbol);
+      if (!stock) return prev;
+      const next = shortStock(prev, symbol, shares);
+      if (next !== prev) {
+        setTradeTracker((t) => recordShort(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
+      }
+      return next;
+    });
+  }, [isPeer, mpActions, mpState.localPlayer]);
   const handleCover = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "cover_short", symbol, shares }); return; }
+    const playerId = mpState.localPlayer?.id ?? "player";
+    const playerName = mpState.localPlayer?.name ?? "You";
     setGameState((prev) => {
+      const stock = prev.stocks.find((s) => s.symbol === symbol);
+      if (!stock) return prev;
       const next = coverShort(prev, symbol, shares);
+      if (next !== prev) {
+        setTradeTracker((t) => recordCover(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
+      }
       // Golden Coin: negate loss
       if (hasActiveBuff(prev.consumableInventory, "golden_coin") && next.cash < prev.cash) {
         const negated = { ...next, cash: prev.cash, consumableInventory: { ...next.consumableInventory, activeBuffs: next.consumableInventory.activeBuffs.filter((b) => b.consumableId !== "golden_coin") } };
@@ -619,7 +684,7 @@ function App() {
       }
       return next;
     });
-  }, [isPeer, mpActions]);
+  }, [isPeer, mpActions, mpState.localPlayer]);
   const handleTogglePin = useCallback((symbol: string) => setGameState((prev) => togglePinStock(prev, symbol)), []);
   const handleToggleStopLoss = useCallback(() => setGameState((prev) => ({ ...prev, stopLossEnabled: !prev.stopLossEnabled })), []);
 
@@ -2040,6 +2105,12 @@ function App() {
                     <div className="eod-stat-row"><span>Portfolio value</span><span>${portfolioValue.toFixed(2)}</span></div>
                     {gameState.goldenParachutes > 0 && <div className="eod-stat-row"><span>Golden Parachutes</span><span>{gameState.goldenParachutes}</span></div>}
                   </div>
+                  {pnlSeries.length > 0 && pnlSeries.some((s) => s.data.length > 1) && (
+                    <div className="eod-pnl-graph-section">
+                      <h3 className="eod-graph-title">📊 Trading Activity</h3>
+                      <PnLGraph series={pnlSeries} width={420} height={180} />
+                    </div>
+                  )}
                   {gameState.milestonePayment && (() => {
                     const { milestoneAmount, loanRepayment, total } = gameState.milestonePayment;
                     const passed = !gameState.gameOver;

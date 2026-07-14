@@ -80,6 +80,7 @@ export function useMultiplayer(
     onResumeReady: (playerId: string) => void;
     onUseConsumable: (consumableId: string) => void;
     onBuyConsumable: (consumableId: string) => void;
+    onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover", symbol: string, shares: number, price: number, timestamp: number) => void;
   },
 ): [MultiplayerState, MultiplayerActions] {
   const [state, setState] = useState<MultiplayerState>({
@@ -201,6 +202,7 @@ export function useMultiplayer(
       onResumeReady: (playerId) => appCallbacksRef.current.onResumeReady(playerId),
       onUseConsumable: (consumableId) => appCallbacksRef.current.onUseConsumable(consumableId),
       onBuyConsumable: (consumableId) => appCallbacksRef.current.onBuyConsumable(consumableId),
+      onRecordTrade: (playerId, playerName, action, symbol, shares, price, timestamp) => appCallbacksRef.current.onRecordTrade?.(playerId, playerName, action, symbol, shares, price, timestamp),
     });
 
     try {

@@ -47,6 +47,7 @@ export interface HostCallbacks {
   getMpSaveId?: () => string | undefined;
   onUseConsumable: (consumableId: string) => void;
   onBuyConsumable: (consumableId: string) => void;
+  onRecordTrade?: (playerId: string, playerName: string, action: "buy" | "sell" | "short" | "cover", symbol: string, shares: number, price: number, timestamp: number) => void;
 }
 
 export class MultiplayerHost {
@@ -307,19 +308,35 @@ export class MultiplayerHost {
   private processAction(player: Player, action: PeerAction): void {
     switch (action.type) {
       case "buy_stock":
-        this.callbacks.setGameState((s) => buyStock(s, action.symbol, action.shares));
+        this.callbacks.setGameState((s) => {
+          const stock = s.stocks.find((st) => st.symbol === action.symbol);
+          if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "buy", action.symbol, action.shares, stock.price, s.timeOfDay);
+          return buyStock(s, action.symbol, action.shares);
+        });
         this.addFeedItem(player.id, player.name, `Bought ${action.shares} ${action.symbol}`);
         break;
       case "sell_stock":
-        this.callbacks.setGameState((s) => sellStock(s, action.symbol, action.shares));
+        this.callbacks.setGameState((s) => {
+          const stock = s.stocks.find((st) => st.symbol === action.symbol);
+          if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "sell", action.symbol, action.shares, stock.price, s.timeOfDay);
+          return sellStock(s, action.symbol, action.shares);
+        });
         this.addFeedItem(player.id, player.name, `Sold ${action.shares} ${action.symbol}`);
         break;
       case "short_stock":
-        this.callbacks.setGameState((s) => shortStock(s, action.symbol, action.shares));
+        this.callbacks.setGameState((s) => {
+          const stock = s.stocks.find((st) => st.symbol === action.symbol);
+          if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "short", action.symbol, action.shares, stock.price, s.timeOfDay);
+          return shortStock(s, action.symbol, action.shares);
+        });
         this.addFeedItem(player.id, player.name, `Shorted ${action.shares} ${action.symbol}`);
         break;
       case "cover_short":
-        this.callbacks.setGameState((s) => coverShort(s, action.symbol, action.shares));
+        this.callbacks.setGameState((s) => {
+          const stock = s.stocks.find((st) => st.symbol === action.symbol);
+          if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "cover", action.symbol, action.shares, stock.price, s.timeOfDay);
+          return coverShort(s, action.symbol, action.shares);
+        });
         this.addFeedItem(player.id, player.name, `Covered ${action.shares} ${action.symbol}`);
         break;
       case "place_order":
