@@ -8,6 +8,7 @@ import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
 import { UPGRADE_POOL } from "./game/upgrades";
 import { selectDailyChallenges, evaluateChallenges, getTicketsEarned, ALL_CHALLENGES } from "./game/challenges";
 import { generateShopOffering, getConsumable, addConsumable, removeConsumable, activateBuff, hasActiveBuff, tickBuffs, type ConsumableItem } from "./game/consumables";
+import { buildEodContext, computeTransition, mapStateToPhases, type EodState } from "./game/eod-helpers";
 import { useMultiplayer } from "./multiplayer";
 import { MultiplayerLobby } from "./components/MultiplayerLobby";
 import { Monitor } from "./components/Monitor";
@@ -25,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.73";
+const GAME_VERSION = "0.0.74";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -193,21 +194,29 @@ function App() {
           return merged;
         });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
-        // Don't override local EOD phase during upgrade/stock/restaurant picking or info screen navigation
+        // Peer phase sync — simplified with state machine awareness:
+        // - Pick phases: accept ONLY when peer is not mid-pick on the SAME phase
+        // - Info phases: ignore (peer navigates locally via localEodInfoStep)
+        // - Shop: accept when localEodInfoStep is null (post-picks)
         setEodPhase((prev) => {
-          const localPicking = prev === "upgrades" || prev === "stocks" || prev === "restaurant-upgrades" || prev === "menu-draft";
-          const hostPicking = sync.eodPhase === "upgrades" || sync.eodPhase === "stocks" || sync.eodPhase === "restaurant-upgrades" || sync.eodPhase === "menu-draft";
-          // If peer is locally picking, only accept phase change if host moves to a non-picking phase (e.g., summary = next day started)
-          if (localPicking && hostPicking) return prev;
-          // Don't sync informational phases (summary, challenges, shop) — peers navigate those locally
-          const hostInfoPhase = sync.eodPhase === "summary" || sync.eodPhase === "challenges" || sync.eodPhase === "shop";
-          if (hostInfoPhase && localEodInfoStep !== null) return prev;
-          // When host advances to a pick phase, clear local info step
-          if (hostPicking) setLocalEodInfoStep(null);
-          // When host syncs shop phase and local step is null (post-picks), set local step to shop
-          if (sync.eodPhase === "shop" && localEodInfoStep === null) {
+          const hostPhase = sync.eodPhase;
+          const isPick = (p: string) => p === "upgrades" || p === "stocks" || p === "restaurant-upgrades" || p === "menu-draft";
+          const isInfo = (p: string) => p === "summary" || p === "challenges";
+
+          // Don't override if peer is navigating info screens locally
+          if (isInfo(hostPhase) && localEodInfoStep !== null) return prev;
+
+          // Accept pick phase changes (host advances to a new pick phase)
+          if (isPick(hostPhase)) {
+            if (prev === hostPhase) return prev; // same phase, no override (avoids mid-pick reset)
+            setLocalEodInfoStep(null);
+            setEodChoiceMade(false);
+            return hostPhase as any;
+          }
+
+          // Shop: accept when peer isn't in local info navigation
+          if (hostPhase === "shop" && localEodInfoStep === null) {
             setLocalEodInfoStep("shop");
-            // Use host's shop offering so all players see the same items
             if (sync.shopOffering && sync.shopOffering.length > 0) {
               const fullItems = sync.shopOffering.map((s) => getConsumable(s.id)).filter(Boolean) as ConsumableItem[];
               setShopOffering(fullItems.length > 0 ? fullItems : generateShopOffering());
@@ -215,9 +224,16 @@ function App() {
               setShopOffering(generateShopOffering());
             }
             setEodInfoReadyPlayers(new Set());
+            return hostPhase as any;
           }
-          if (prev !== sync.eodPhase) setEodChoiceMade(false);
-          return sync.eodPhase as any;
+
+          // Summary phase from host (e.g., new day starting): accept if not navigating locally
+          if (isInfo(hostPhase) && localEodInfoStep === null) {
+            if (prev !== hostPhase) setEodChoiceMade(false);
+            return hostPhase as any;
+          }
+
+          return prev;
         });
         // Sync showTransition so peer sees Shwendy's start screen
         if (sync.showTransition !== undefined) setShowTransition(sync.showTransition as any);
@@ -260,19 +276,33 @@ function App() {
         // Upgrades are now stored locally in handleDraftStock — nothing to do here
       },
       onAllStocksChosen: (choices) => {
-        // Apply all stocks, then move to restaurant-upgrades/menu-draft/shop or next phase
+        // Apply all stocks, then use state machine to determine next phase
         setGameState((prev) => {
           let state = prev;
           for (const { symbol } of choices) {
             state = draftStock(state, symbol);
           }
-          if (state.restaurantUpgradeDraftOptions.length > 0) {
-            setTimeout(() => { setEodPhase("restaurant-upgrades"); mpActions.resetEodGate(); }, 0);
-          } else if (state.menuDraftOptions.length > 0) {
-            setTimeout(() => { setEodPhase("menu-draft"); mpActions.resetEodGate(); }, 0);
-          } else if (restaurantState !== null && (state.tradingTickets > 0 || state.restaurantTickets > 0)) {
-            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); setLocalEodInfoStep("shop"); setEodInfoReadyPlayers(new Set()); }, 0);
-          } else {
+          const ctx = buildEodContext({
+            upgradeDraftOptions: state.upgradeDraftOptions,
+            stockDraftOptions: state.stockDraftOptions,
+            restaurantUpgradeDraftOptions: state.restaurantUpgradeDraftOptions,
+            menuDraftOptions: state.menuDraftOptions,
+            tradingTickets: state.tradingTickets,
+            restaurantTickets: state.restaurantTickets,
+            restaurantState,
+            isBossDay: false,
+          });
+          const { newState } = computeTransition("pick_stocks", { type: "all_chosen" }, ctx);
+          const phases = mapStateToPhases(newState);
+
+          if (phases) {
+            setTimeout(() => {
+              setEodPhase(phases.eodPhase);
+              if (phases.localInfoStep) setLocalEodInfoStep(phases.localInfoStep);
+              if (newState === "shop") { setShopOffering(generateShopOffering()); setEodInfoReadyPlayers(new Set()); }
+              if (newState === "pick_restaurant_upgrades" || newState === "pick_menu") mpActions.resetEodGate();
+            }, 0);
+          } else if (newState === "next_phase") {
             setRestaurantState(null);
             setTimeout(() => beginScheduledDayRef.current(state), 0);
           }
@@ -284,15 +314,32 @@ function App() {
         // Restaurant upgrades are now stored locally in handleAcquireRestaurantUpgrade
       },
       onAllMenuItemsChosen: (choices) => {
-        // All menu items get added to shared pool, then go to shop or next day
+        // All menu items get added to shared pool, then use state machine
         setGameState((prev) => {
           let state = prev;
           for (const { itemName } of choices) {
             state = draftMenuItem(state, itemName);
           }
-          if (state.tradingTickets > 0 || state.restaurantTickets > 0) {
-            setTimeout(() => { setShopOffering(generateShopOffering()); setEodPhase("shop"); setLocalEodInfoStep("shop"); setEodInfoReadyPlayers(new Set()); }, 0);
-          } else {
+          const ctx = buildEodContext({
+            upgradeDraftOptions: state.upgradeDraftOptions,
+            stockDraftOptions: state.stockDraftOptions,
+            restaurantUpgradeDraftOptions: state.restaurantUpgradeDraftOptions,
+            menuDraftOptions: state.menuDraftOptions,
+            tradingTickets: state.tradingTickets,
+            restaurantTickets: state.restaurantTickets,
+            restaurantState,
+            isBossDay: false,
+          });
+          const { newState } = computeTransition("pick_menu", { type: "all_chosen" }, ctx);
+          const phases = mapStateToPhases(newState);
+
+          if (phases) {
+            setTimeout(() => {
+              setEodPhase(phases.eodPhase);
+              if (phases.localInfoStep) setLocalEodInfoStep(phases.localInfoStep);
+              if (newState === "shop") { setShopOffering(generateShopOffering()); setEodInfoReadyPlayers(new Set()); }
+            }, 0);
+          } else if (newState === "next_phase") {
             setRestaurantState(null);
             setTimeout(() => beginScheduledDayRef.current(state, { skipRestaurantTransition: true }), 0);
           }
@@ -405,41 +452,40 @@ function App() {
     const totalPlayers = mpState.players.length;
     if (totalPlayers < 2) return;
     if (eodInfoReadyPlayers.size < totalPlayers) return;
-    // All players done with info screens — advance to picks or next day
+    // All players done — advance using state machine
     setEodInfoReadyPlayers(new Set());
     setLocalEodInfoStep(null);
     if (!isPeer) {
-      // Host: determine what comes next (same logic as handleChallengesContinue but without challenge eval)
-      if (gameState.upgradeDraftOptions.length > 0) {
-        setEodPhase("upgrades");
+      const ctx = buildEodContext({
+        upgradeDraftOptions: gameState.upgradeDraftOptions,
+        stockDraftOptions: gameState.stockDraftOptions,
+        restaurantUpgradeDraftOptions: gameState.restaurantUpgradeDraftOptions,
+        menuDraftOptions: gameState.menuDraftOptions,
+        tradingTickets: gameState.tradingTickets,
+        restaurantTickets: gameState.restaurantTickets,
+        restaurantState,
+        isBossDay: bossDay,
+      });
+      const currentMachineState: EodState = eodPhase === "shop" ? "shop" : "waiting";
+      const { newState } = computeTransition(currentMachineState, { type: "all_ready" }, ctx);
+      const phases = mapStateToPhases(newState);
+
+      if (phases) {
+        setEodPhase(phases.eodPhase);
+        setLocalEodInfoStep(phases.localInfoStep);
         setEodChoiceMade(false);
-        setMpUpgradeChoice(null);
-        mpActions.resetEodGate();
-      } else if (gameState.stockDraftOptions.length > 0) {
-        setEodPhase("stocks");
-        setEodChoiceMade(false);
-        mpActions.resetEodGate();
-      } else if (gameState.restaurantUpgradeDraftOptions.length > 0) {
-        setEodPhase("restaurant-upgrades");
-        setEodChoiceMade(false);
-        mpActions.resetEodGate();
-      } else if (gameState.menuDraftOptions.length > 0) {
-        setEodPhase("menu-draft");
-        setEodChoiceMade(false);
-        mpActions.resetEodGate();
-      } else {
-        // No picks needed — check if shop should show (only if not already shown)
-        const hasAnyTickets = gameState.tradingTickets > 0 || gameState.restaurantTickets > 0;
-        if (eodPhase !== "shop" && (restaurantState !== null || bossDay) && hasAnyTickets) {
-          const offering = generateShopOffering();
-          setShopOffering(offering);
-          setEodPhase("shop");
-          setLocalEodInfoStep("shop");
+        if (newState === "pick_upgrades") setMpUpgradeChoice(null);
+        if (newState === "shop") {
+          setShopOffering(generateShopOffering());
           setEodInfoReadyPlayers(new Set());
-        } else {
-          setRestaurantState(null);
-          beginScheduledDayRef.current(undefined, restaurantState !== null ? { skipRestaurantTransition: true } : undefined);
         }
+        if (newState === "pick_upgrades" || newState === "pick_stocks" ||
+            newState === "pick_restaurant_upgrades" || newState === "pick_menu") {
+          mpActions.resetEodGate();
+        }
+      } else if (newState === "next_phase") {
+        setRestaurantState(null);
+        beginScheduledDayRef.current(undefined, restaurantState !== null ? { skipRestaurantTransition: true } : undefined);
       }
     }
   }, [eodInfoReadyPlayers, isMultiplayer, mpState.players.length, eodPhase]);
@@ -1364,28 +1410,33 @@ function App() {
   }, [beginScheduledDay]);
 
   const handleChallengesContinue = useCallback(() => {
-    // After challenges, go to upgrades/stocks/restaurant-upgrades/menu-draft or shop
-    if (gameState.upgradeDraftOptions.length > 0) {
-      setEodPhase("upgrades");
+    // After challenges — use state machine to determine next phase
+    const ctx = buildEodContext({
+      upgradeDraftOptions: gameState.upgradeDraftOptions,
+      stockDraftOptions: gameState.stockDraftOptions,
+      restaurantUpgradeDraftOptions: gameState.restaurantUpgradeDraftOptions,
+      menuDraftOptions: gameState.menuDraftOptions,
+      tradingTickets: gameState.tradingTickets,
+      restaurantTickets: gameState.restaurantTickets,
+      restaurantState,
+      isBossDay: bossDay,
+    });
+    const { newState } = computeTransition("waiting", { type: "all_ready" }, ctx);
+    const phases = mapStateToPhases(newState);
+
+    if (phases) {
+      setEodPhase(phases.eodPhase);
       setEodChoiceMade(false);
-      setMpUpgradeChoice(null);
-      if (isMultiplayer) mpActions.resetEodGate();
-    } else if (gameState.stockDraftOptions.length > 0) {
-      setEodPhase("stocks");
-      setEodChoiceMade(false);
-      if (isMultiplayer) mpActions.resetEodGate();
-    } else if (gameState.restaurantUpgradeDraftOptions.length > 0) {
-      setEodPhase("restaurant-upgrades");
-      setEodChoiceMade(false);
-      if (isMultiplayer) mpActions.resetEodGate();
-    } else if (gameState.menuDraftOptions.length > 0) {
-      setEodPhase("menu-draft");
-      setEodChoiceMade(false);
-      if (isMultiplayer) mpActions.resetEodGate();
-    } else {
+      if (newState === "pick_upgrades") setMpUpgradeChoice(null);
+      if (newState === "pick_upgrades" || newState === "pick_stocks" ||
+          newState === "pick_restaurant_upgrades" || newState === "pick_menu") {
+        if (isMultiplayer) mpActions.resetEodGate();
+      }
+      if (newState === "shop") setShopOffering(generateShopOffering());
+    } else if (newState === "next_phase") {
       goToShopOrNextDay();
     }
-  }, [gameState, isMultiplayer, mpActions, goToShopOrNextDay]);
+  }, [gameState, isMultiplayer, mpActions, goToShopOrNextDay, restaurantState, bossDay]);
 
   // Multiplayer: local EOD info screen navigation (each player advances independently)
   const handleLocalEodContinue = useCallback(() => {
