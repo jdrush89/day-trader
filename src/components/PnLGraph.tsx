@@ -5,6 +5,7 @@ interface PnLGraphProps {
   series: PlayerPnLSeries[];
   width?: number;
   height?: number;
+  hideActionLegend?: boolean;
 }
 
 const ACTION_COLORS: Record<TradeAction, string> = {
@@ -27,7 +28,7 @@ const ACTION_LABELS: Record<TradeAction, string> = {
   close_option: "Close Option",
 };
 
-export const PnLGraph: React.FC<PnLGraphProps> = ({ series, width = 500, height = 200 }) => {
+export const PnLGraph: React.FC<PnLGraphProps> = ({ series, width = 500, height = 200, hideActionLegend = false }) => {
   if (series.length === 0 || series.every((s) => s.data.length <= 1)) {
     return <div className="pnl-graph-empty">No trades this day</div>;
   }
@@ -279,14 +280,16 @@ export const PnLGraph: React.FC<PnLGraphProps> = ({ series, width = 500, height 
             </span>
           </div>
         ))}
-        <div className="pnl-action-legend">
-          {(Object.entries(ACTION_LABELS) as [TradeAction, string][]).map(([action, label]) => (
-            <span key={action} className="pnl-action-chip">
-              <span className="pnl-action-dot" style={{ background: ACTION_COLORS[action] }} />
-              {label}
-            </span>
-          ))}
-        </div>
+        {!hideActionLegend && (
+          <div className="pnl-action-legend">
+            {(Object.entries(ACTION_LABELS) as [TradeAction, string][]).map(([action, label]) => (
+              <span key={action} className="pnl-action-chip">
+                <span className="pnl-action-dot" style={{ background: ACTION_COLORS[action] }} />
+                {label}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -812,7 +812,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
               {hasData && (
                 <div className="eod-pnl-graph-section" style={{ margin: "12px 0" }}>
                   <h3 className="eod-graph-title">📊 Shift Earnings</h3>
-                  <PnLGraph series={restaurantSeries} width={400} height={160} />
+                  <PnLGraph series={restaurantSeries} width={400} height={160} hideActionLegend />
                 </div>
               )}
               <button type="button" onClick={() => onFinish(state.totalEarnings)}>Continue</button>
