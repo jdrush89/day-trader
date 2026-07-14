@@ -776,6 +776,93 @@
   }
 }
 
+/* Small screens: make restaurant scrollable and compact */
+@media (max-height: 700px) {
+  .restaurant-screen {
+    min-height: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .restaurant-header {
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+
+  .restaurant-header h1 {
+    font-size: 1.1rem;
+  }
+
+  .restaurant-header p {
+    font-size: 0.8rem;
+    margin-top: 2px;
+  }
+
+  .restaurant-stat-box,
+  .restaurant-summary-chip {
+    min-width: 80px;
+    padding: 4px 8px;
+  }
+
+  .restaurant-stat-box span,
+  .restaurant-summary-chip span {
+    font-size: 0.65rem;
+  }
+
+  .restaurant-stat-box strong,
+  .restaurant-summary-chip strong {
+    font-size: 0.95rem;
+    margin-top: 1px;
+  }
+
+  .restaurant-header-stats {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .restaurant-screen {
+    min-height: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .restaurant-header {
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+
+  .restaurant-header h1 {
+    font-size: 1.2rem;
+  }
+
+  .restaurant-header p {
+    font-size: 0.8rem;
+    margin-top: 2px;
+  }
+
+  .restaurant-stat-box,
+  .restaurant-summary-chip {
+    min-width: 80px;
+    padding: 6px 8px;
+  }
+
+  .restaurant-stat-box span,
+  .restaurant-summary-chip span {
+    font-size: 0.7rem;
+  }
+
+  .restaurant-stat-box strong,
+  .restaurant-summary-chip strong {
+    font-size: 1rem;
+    margin-top: 1px;
+  }
+}
+
 /* Multiplayer counter tabs */
 .counter-tabs {
   display: flex;
