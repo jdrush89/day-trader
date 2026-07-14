@@ -23,7 +23,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.52";
+const GAME_VERSION = "0.0.53";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -97,6 +97,7 @@ function App() {
       onDeclineLoan: () => { setShowLoanOffer(null); setShowChallengeIntro("trading"); },
       onDismissTransition: () => {
         const currentTransition = showTransition;
+        if (!currentTransition) return; // Already dismissed (race between host/peer clicks)
         setShowTransition(null);
         if (currentTransition === "trading") {
           beginScheduledDayRef.current(gameState, { skipTradingTransition: true, skipRestaurantTransition: true });

@@ -454,7 +454,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
       window.removeEventListener("keyup", handleGlobalKeyUp);
       window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver]);
+  }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver, currentCounter]);
 
   return (
     <div className="restaurant-screen">
