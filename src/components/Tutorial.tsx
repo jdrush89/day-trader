@@ -107,9 +107,19 @@ const TRADING_STEPS: TutorialStep[] = [
   {
     icon: "🎯",
     title: "Milestones & Goal",
-    body: "Every 3 days, your net worth is checked against a milestone. The targets grow each period — start at $1,500 and increase from there. Every evening, you'll work at Shwendy's restaurant to earn extra cash. Good luck, trader!",
+    body: "Every 3 days, your net worth is checked against a milestone. The targets grow each period — start at $1,500 and increase from there. Every evening, you'll work at Shwendy's restaurant to earn extra cash.",
     selector: ".milestone-stat",
     position: "bottom",
+  },
+  {
+    icon: "🏆",
+    title: "Daily Challenges",
+    body: "Each day you'll receive a challenge — like making a certain profit or trading a specific stock. Complete it to earn restaurant tickets (🍔) that you can spend in the shop on Shwendy's consumable items!",
+  },
+  {
+    icon: "🎒",
+    title: "Consumable Items (Key: 6)",
+    body: "Press 6 to open your Items channel. Here you can use one-time consumable items during trading — things like free stock purchases, doubled price movement, or rewinding time. Buy them in the shop with your tickets. Good luck, trader!",
   },
 ];
 
@@ -144,10 +154,20 @@ const RESTAURANT_STEPS: TutorialStep[] = [
   {
     icon: "✅",
     title: "Serving & Multitasking",
-    body: "When an order is done, press its number, Enter, or click to serve. While one order preps automatically, switch to another to multitask! At shift end, you'll pick a kitchen upgrade and new menu item. Good luck, chef!",
+    body: "When an order is done, press its number, Enter, or click to serve. While one order preps automatically, switch to another to multitask!",
     selector: ".order-slot:first-child",
     position: "bottom",
     action: "setup-completed",
+  },
+  {
+    icon: "🏆",
+    title: "Daily Challenges",
+    body: "Each shift has a challenge — like completing a number of orders or earning enough tips. Complete it to earn trading tickets (📈) that you can spend in the shop on day trading consumable items!",
+  },
+  {
+    icon: "🎒",
+    title: "Consumable Items",
+    body: "During your shift, you can use consumable items from your inventory — like slowing patience timers, boosting tips, or auto-completing prep. Press the item buttons in the header to activate them. At shift end, you'll pick a kitchen upgrade and new menu item. Good luck, chef!",
   },
 ];
 
