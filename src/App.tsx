@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft, applyMilestoneCheck, isMilestoneDay } from "./game/engine";
 import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU, generateRestaurantUpgradeDraft, generateMenuDraft } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
@@ -25,7 +25,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.57";
+const GAME_VERSION = "0.0.58";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1148,7 +1148,8 @@ function App() {
       setShowChallengeIntro("trading");
       setPaused(true);
     } else if (!isBossDay && hasLoanOffer) {
-      // Loan shows first; challenge intro shown after loan is dismissed
+      // Loan shows first; challenge intro shown only after loan is dismissed
+      setShowChallengeIntro(null);
       setPaused(true);
     }
   }, [gameState, restaurantState, bossDay]);
@@ -1337,25 +1338,28 @@ function App() {
   }, [gameState, isMultiplayer, isPeer, mpActions, goToShopOrNextDay]);
 
   const handleRestaurantFinish = useCallback((earnings: number) => {
+    // The milestone day is the day that just finished trading (before finishRestaurantDay increments it)
+    const tradingDay = gameState.day;
     const nextState = finishRestaurantDay(gameState, earnings);
+    // Apply milestone check now (after Shwendy's)
+    const milestoneState = isMilestoneDay(tradingDay) ? applyMilestoneCheck(nextState, tradingDay) : nextState;
     // Evaluate challenges (restaurant challenges use the restaurant tracker)
     const evaluated = evaluateChallenges(
-      nextState.activeChallenges,
-      nextState.challengeTracker,
-      nextState,
+      milestoneState.activeChallenges,
+      milestoneState.challengeTracker,
+      milestoneState,
       restaurantState?.challengeTracker,
     );
     const earned = getTicketsEarned(evaluated);
     const challengedState = {
-      ...nextState,
+      ...milestoneState,
       activeChallenges: evaluated,
-      tickets: nextState.tickets + earned.tradingTickets + earned.restaurantTickets,
-      tradingTickets: nextState.tradingTickets + earned.tradingTickets,
-      restaurantTickets: nextState.restaurantTickets + earned.restaurantTickets,
+      tickets: milestoneState.tickets + earned.tradingTickets + earned.restaurantTickets,
+      tradingTickets: milestoneState.tradingTickets + earned.tradingTickets,
+      restaurantTickets: milestoneState.restaurantTickets + earned.restaurantTickets,
     };
     setGameState(challengedState);
     if (!isPeer) doSave(challengedState);
-    // Don't clear restaurantState yet — keep restaurant UI visible during post-shift phases
     // Show challenge results before restaurant upgrades
     setEodPhase("challenges");
   }, [beginScheduledDay, gameState, restaurantState, isPeer]);
@@ -1982,6 +1986,21 @@ function App() {
                   </div>
                 );
               })()}
+              {gameState.milestonePayment && (() => {
+                const { milestoneAmount, loanRepayment, total } = gameState.milestonePayment;
+                const passed = !gameState.gameOver;
+                return (
+                  <div className={`milestone-check ${passed ? "passed" : "failed"}`}>
+                    <div className="milestone-header">{passed ? "✅ Milestone Passed!" : "❌ Milestone Failed!"}</div>
+                    <div className="milestone-body">
+                      Milestone payment: ${milestoneAmount.toLocaleString()}
+                      {loanRepayment > 0 && <><br />Loan repayment: ${loanRepayment.toFixed(2)}</>}
+                      <br /><strong>Total deducted: ${total.toFixed(2)}</strong>
+                      <br />Cash remaining: <span className={gameState.cash >= 0 ? "up" : "danger"}>${gameState.cash.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
               <button onClick={handleChallengesContinue}>Continue →</button>
             </div>
           </div>
@@ -2412,7 +2431,7 @@ function App() {
         </div>
       )}
 
-      {showChallengeIntro === "trading" && (
+      {showChallengeIntro === "trading" && !showLoanOffer && (
         <div className="end-of-day-overlay">
           <div className="end-of-day challenge-intro">
             <h2>🎯 Daily Challenge</h2>

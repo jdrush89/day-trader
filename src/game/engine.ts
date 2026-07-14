@@ -60,6 +60,37 @@ export function getNetWorth(state: GameState): number {
   return state.cash + getPortfolioValue(state) + getShortCollateral(state) - getShortLiability(state) + getOptionsValue(state);
 }
 
+/**
+ * Apply milestone check AFTER Shwendy's (end of full day).
+ * Deducts milestone amount + loan repayments, sets gameOver if can't pay.
+ * `milestoneDay` is the day being checked (e.g. 3 on the first milestone).
+ */
+export function applyMilestoneCheck(state: GameState, milestoneDay: number): GameState {
+  if (!isMilestoneDay(milestoneDay)) return state;
+
+  let loans = [...state.loans];
+  const dueLoans = loans.filter((l) => l.dueDay <= milestoneDay);
+  const dueTotal = dueLoans.reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0);
+  loans = loans.filter((l) => l.dueDay > milestoneDay);
+
+  const milestone = getMilestone(milestoneDay)!;
+  const milestoneAmount = milestone.required;
+  const totalPayment = milestoneAmount + dueTotal;
+
+  const netWorth = getNetWorth({ ...state, loans });
+  let gameOver = netWorth < totalPayment;
+  let goldenParachutes = state.goldenParachutes;
+  if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; }
+
+  const milestonePayment = { milestoneAmount, loanRepayment: Math.round(dueTotal * 100) / 100, total: Math.round(totalPayment * 100) / 100 };
+  let cash = state.cash;
+  if (!gameOver) {
+    cash -= Math.round(totalPayment * 100) / 100;
+  }
+
+  return { ...state, cash, loans, goldenParachutes, gameOver, milestonePayment };
+}
+
 export function getBuyingPower(state: GameState): number {
   const marginStacks = upgradeCount(state, "margin");
   if (marginStacks === 0) return state.cash;
@@ -739,28 +770,11 @@ export function tick(state: GameState): GameState {
     }
 
     const finalNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
-    const completedDay = state.day; let gameOver = false; let goldenParachutes = postOptionsState.goldenParachutes;
-    // Milestone payment: deduct milestone amount + loan repayments from cash
-    let loans = [...postOptionsState.loans];
-    let milestonePayment: GameState["milestonePayment"] = null;
-    if (isMilestoneDay(completedDay)) {
-      const dueLoans = loans.filter((l) => l.dueDay <= completedDay);
-      const dueTotal = dueLoans.reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0);
-      loans = loans.filter((l) => l.dueDay > completedDay);
-      const milestone = getMilestone(completedDay)!;
-      const milestoneAmount = milestone.required;
-      const totalPayment = milestoneAmount + dueTotal;
-      const adjustedNetWorth = finalCash + portfolioValue + shortCollateral - shortLiability + optionsValue;
-      gameOver = adjustedNetWorth < totalPayment;
-      if (gameOver && goldenParachutes > 0) { gameOver = false; goldenParachutes -= 1; }
-      milestonePayment = { milestoneAmount, loanRepayment: Math.round(dueTotal * 100) / 100, total: Math.round(totalPayment * 100) / 100 };
-      if (!gameOver) {
-        finalCash -= Math.round(totalPayment * 100) / 100;
-      }
-    }
+    const gameOver = false; const goldenParachutes = postOptionsState.goldenParachutes;
+    const loans = [...postOptionsState.loans];
     const pendingOrders = hasUpgrade(postOptionsState, "limit_order_pro") ? postOptionsState.pendingOrders : [];
-    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck, loans, milestonePayment };
-    return gameOver ? endOfDayState : generateDraftOptions(generateUpgradeDraft(endOfDayState));
+    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck, loans, milestonePayment: null };
+    return generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 
   return { ...postOrderState, stocks: newStocks, news: newNews, timeOfDay: newTimeOfDay, insiderTip, insiderTip2, institutionalOrders };

@@ -3070,6 +3070,51 @@ body {
   white-space: nowrap;
 }
 
+.debug-item-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  background: #1a1a2a;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 0.8rem;
+}
+
+.debug-item-count {
+  margin-left: auto;
+  color: #4fc3f7;
+  font-weight: 700;
+  min-width: 28px;
+  text-align: center;
+}
+
+.debug-item-btn {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: #2a2a3a;
+  border: 1px solid #555;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.debug-item-btn:hover:not(:disabled) {
+  background: #3a3a5a;
+  border-color: #88f;
+}
+
+.debug-item-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* Debug Fast-Forward Button */
 .debug-ff-btn {
   background: #c44;

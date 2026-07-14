@@ -5,6 +5,7 @@ import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
 import { STOCK_POOL, StockCandidate } from "../game/stock-pool";
 import { MENU_POOL } from "../game/restaurant-engine";
 import { openMarket, isBossDayCheck } from "../game/engine";
+import { ALL_CONSUMABLES } from "../game/consumables";
 
 interface DebugPanelProps {
   gameState: GameState;
@@ -41,7 +42,7 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
   const [skipTradingTickets, setSkipTradingTickets] = useState(gameState.tradingTickets);
   const [skipRestaurantTickets, setSkipRestaurantTickets] = useState(gameState.restaurantTickets);
   const [skipPhase, setSkipPhase] = useState<"trading" | "restaurant">("trading");
-  const [tab, setTab] = useState<"skip" | "upgrades" | "stocks" | "recipes">("skip");
+  const [tab, setTab] = useState<"skip" | "upgrades" | "stocks" | "recipes" | "items">("skip");
   const isBoss = isBossDayCheck(skipDay);
 
   const handleSkipToDay = () => {
@@ -113,6 +114,26 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
     });
   };
 
+  const addConsumableItem = (id: string) => {
+    setGameState((prev) => ({
+      ...prev,
+      consumableInventory: {
+        ...prev.consumableInventory,
+        items: [...prev.consumableInventory.items, id],
+      },
+    }));
+  };
+
+  const removeConsumableItem = (id: string) => {
+    setGameState((prev) => {
+      const idx = prev.consumableInventory.items.indexOf(id);
+      if (idx === -1) return prev;
+      const items = [...prev.consumableInventory.items];
+      items.splice(idx, 1);
+      return { ...prev, consumableInventory: { ...prev.consumableInventory, items } };
+    });
+  };
+
   return (
     <div className="debug-panel">
       <h2>🐛 Debug Menu</h2>
@@ -121,6 +142,7 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
         <button className={tab === "upgrades" ? "active" : ""} onClick={() => setTab("upgrades")}>Upgrades</button>
         <button className={tab === "stocks" ? "active" : ""} onClick={() => setTab("stocks")}>Stocks</button>
         <button className={tab === "recipes" ? "active" : ""} onClick={() => setTab("recipes")}>Recipes</button>
+        <button className={tab === "items" ? "active" : ""} onClick={() => setTab("items")}>Items</button>
       </div>
 
       {tab === "skip" && (
@@ -217,6 +239,41 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
                 <span className="debug-name">{m.name}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {tab === "items" && (
+        <div className="debug-section debug-scroll">
+          <h3>📈 Trading Items</h3>
+          <div className="debug-grid">
+            {ALL_CONSUMABLES.filter((c) => c.phase === "trading").map((c) => {
+              const count = gameState.consumableInventory.items.filter((id) => id === c.id).length;
+              return (
+                <div key={c.id} className="debug-item-row">
+                  <span className="debug-icon">{c.icon}</span>
+                  <span className="debug-name">{c.name}</span>
+                  <span className="debug-item-count">×{count}</span>
+                  <button className="debug-item-btn" onClick={() => removeConsumableItem(c.id)} disabled={count === 0}>−</button>
+                  <button className="debug-item-btn" onClick={() => addConsumableItem(c.id)}>+</button>
+                </div>
+              );
+            })}
+          </div>
+          <h3>🍔 Restaurant Items</h3>
+          <div className="debug-grid">
+            {ALL_CONSUMABLES.filter((c) => c.phase === "restaurant").map((c) => {
+              const count = gameState.consumableInventory.items.filter((id) => id === c.id).length;
+              return (
+                <div key={c.id} className="debug-item-row">
+                  <span className="debug-icon">{c.icon}</span>
+                  <span className="debug-name">{c.name}</span>
+                  <span className="debug-item-count">×{count}</span>
+                  <button className="debug-item-btn" onClick={() => removeConsumableItem(c.id)} disabled={count === 0}>−</button>
+                  <button className="debug-item-btn" onClick={() => addConsumableItem(c.id)}>+</button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
