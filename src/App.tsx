@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.75";
+const GAME_VERSION = "0.0.75-debug";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1227,6 +1227,7 @@ function App() {
 
   const beginScheduledDay = useCallback((stateOverride?: GameState, opts?: { skipRestaurantTransition?: boolean; skipTradingTransition?: boolean }) => {
     const nextState = stateOverride ?? gameState;
+    console.log("[beginScheduledDay]", { marketOpen: nextState.marketOpen, restaurantState: restaurantState !== null, skipNextRestaurant, opts, bossDay, day: nextState.day });
 
     // Boss day: when market closes, day is done (restaurant was running alongside)
     if (bossDay && !nextState.marketOpen) {
@@ -1272,6 +1273,7 @@ function App() {
     // After boss day EOD (day already incremented by finishRestaurantDay), skip restaurant once
     // After trading (market just closed), go to Shwendy's
     if (!nextState.marketOpen && restaurantState === null && !skipNextRestaurant && !opts?.skipRestaurantTransition) {
+      console.log("[beginScheduledDay] → showing restaurant transition, day:", nextState.day);
       const challenges = selectDailyChallenges(nextState.day, false, true, gameState.runSeed);
       setGameState({ ...nextState, activeChallenges: challenges });
       setShowTransition("restaurant");
@@ -1287,11 +1289,13 @@ function App() {
     // Show morning transition on day 2+ (non-boss). Day 1 goes straight to market.
     const pendingDay = nextState.day ?? (gameState.day + 1);
     if (pendingDay > 1 && !isBossDayCheck(pendingDay) && !opts?.skipTradingTransition) {
+      console.log("[beginScheduledDay] → showing morning trading transition, day:", pendingDay);
       setGameState(nextState);
       setShowTransition("trading");
       setEodPhase("summary");
       return;
     }
+    console.log("[beginScheduledDay] → opening market directly, day:", pendingDay);
 
     const marketState = openMarket(nextState);
 
@@ -1392,6 +1396,7 @@ function App() {
   const goToShopOrNextDay = useCallback(() => {
     // Shop only shows after restaurant/boss day (last phase of the full day) and if player has any tickets
     const hasAnyTickets = gameState.tradingTickets > 0 || gameState.restaurantTickets > 0;
+    console.log("[goToShopOrNextDay]", { restaurantState: restaurantState !== null, bossDay, hasAnyTickets, tradingTickets: gameState.tradingTickets, restaurantTickets: gameState.restaurantTickets });
     if ((restaurantState !== null || bossDay) && hasAnyTickets) {
       setShopOffering(generateShopOffering());
       setEodPhase("shop");
@@ -1399,6 +1404,7 @@ function App() {
       // After trading-only EOD or no tickets — proceed to next phase
       // Use skipRestaurantTransition when we just came from Shwendy's (restaurantState is non-null)
       const skipRestaurant = restaurantState !== null;
+      console.log("[goToShopOrNextDay] calling beginScheduledDay, skipRestaurant:", skipRestaurant);
       setRestaurantState(null);
       beginScheduledDayRef.current(undefined, skipRestaurant ? { skipRestaurantTransition: true } : undefined);
     }
@@ -1425,6 +1431,7 @@ function App() {
     });
     const { newState } = computeTransition("waiting", { type: "all_ready" }, ctx);
     const phases = mapStateToPhases(newState);
+    console.log("[handleChallengesContinue]", { ctx, newState, phases });
 
     if (phases) {
       setEodPhase(phases.eodPhase);
@@ -1537,6 +1544,7 @@ function App() {
     }
     const nextState = draftStock(gameState, symbol);
     setGameState(nextState);
+    console.log("[handleDraftStock SP]", { restaurantUpgradeDraft: nextState.restaurantUpgradeDraftOptions.length, menuDraft: nextState.menuDraftOptions.length, marketOpen: nextState.marketOpen });
     if (nextState.restaurantUpgradeDraftOptions.length > 0) {
       setEodPhase("restaurant-upgrades");
     } else if (nextState.menuDraftOptions.length > 0) {
