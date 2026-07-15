@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.84-debug";
+const GAME_VERSION = "0.0.85";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -240,11 +240,6 @@ function App() {
             if (peerInPostShift) return prev; // peer in restaurant post-shift flow
             if (prev !== hostPhase) setEodChoiceMade(false);
             return hostPhase as any;
-          }
-
-          // Log any phase override that falls through to the default
-          if (prev !== hostPhase) {
-            console.log("[peerSync] eodPhase fallthrough", { prev, hostPhase, localEodInfoStep, peerInPostShift });
           }
 
           return prev;
@@ -1471,21 +1466,15 @@ function App() {
       // After challenges, go directly to picks — no waiting gate needed here.
       // Each player advances through upgrade/stock/restaurant-upgrade/menu picks at their own pace.
       // The existing MP gate (checkEodGate in host.ts) waits for all players to submit picks.
-      console.log("[handleLocalEodContinue] challenges→picks", {
-        upgradeDraft: gameState.upgradeDraftOptions.length,
-        stockDraft: gameState.stockDraftOptions.length,
-        restaurantUpgradeDraft: gameState.restaurantUpgradeDraftOptions.length,
-        menuDraft: gameState.menuDraftOptions.length,
-        eodPhase,
-        isPeer,
-        isRestaurantShift: !!restaurantState,
-      });
       setLocalEodInfoStep(null);
-      if (gameState.upgradeDraftOptions.length > 0) {
+      // When in the restaurant phase, only check restaurant drafts (trading drafts may
+      // be stale leftovers preserved by the multiplayer game state merge guard)
+      const inRestaurantPhase = restaurantState !== null;
+      if (!inRestaurantPhase && gameState.upgradeDraftOptions.length > 0) {
         setEodPhase("upgrades");
         setEodChoiceMade(false);
         setMpUpgradeChoice(null);
-      } else if (gameState.stockDraftOptions.length > 0) {
+      } else if (!inRestaurantPhase && gameState.stockDraftOptions.length > 0) {
         setEodPhase("stocks");
         setEodChoiceMade(false);
       } else if (gameState.restaurantUpgradeDraftOptions.length > 0) {
@@ -1508,7 +1497,7 @@ function App() {
       setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
       if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     }
-  }, [localEodInfoStep, bossDay, isPeer, mpActions, mpState.localPlayer, gameState.upgradeDraftOptions.length, gameState.stockDraftOptions.length, gameState.restaurantUpgradeDraftOptions.length, gameState.menuDraftOptions.length]);
+  }, [localEodInfoStep, bossDay, isPeer, mpActions, mpState.localPlayer, gameState.upgradeDraftOptions.length, gameState.stockDraftOptions.length, gameState.restaurantUpgradeDraftOptions.length, gameState.menuDraftOptions.length, restaurantState]);
 
   const handleBuyConsumable = useCallback((itemId: string) => {
     const item = getConsumable(itemId);
