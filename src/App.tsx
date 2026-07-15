@@ -1455,11 +1455,30 @@ function App() {
       }
       setLocalEodInfoStep("challenges");
     } else if (localEodInfoStep === "challenges") {
-      // After challenges, go straight to waiting — shop shows after picks (if any)
-      setLocalEodInfoStep("waiting");
-      const myId = mpState.localPlayer?.id ?? "host";
-      setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
-      if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+      // After challenges, go directly to picks — no waiting gate needed here.
+      // Each player advances through upgrade/stock/restaurant-upgrade/menu picks at their own pace.
+      // The existing MP gate (checkEodGate in host.ts) waits for all players to submit picks.
+      setLocalEodInfoStep(null);
+      if (gameState.upgradeDraftOptions.length > 0) {
+        setEodPhase("upgrades");
+        setEodChoiceMade(false);
+        setMpUpgradeChoice(null);
+      } else if (gameState.stockDraftOptions.length > 0) {
+        setEodPhase("stocks");
+        setEodChoiceMade(false);
+      } else if (gameState.restaurantUpgradeDraftOptions.length > 0) {
+        setEodPhase("restaurant-upgrades");
+        setEodChoiceMade(false);
+      } else if (gameState.menuDraftOptions.length > 0) {
+        setEodPhase("menu-draft");
+        setEodChoiceMade(false);
+      } else {
+        // No picks available — go to waiting (for shop or next day)
+        setLocalEodInfoStep("waiting");
+        const myId = mpState.localPlayer?.id ?? "host";
+        setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+        if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+      }
     } else if (localEodInfoStep === "shop") {
       setLocalEodInfoStep("waiting");
       // Signal readiness
@@ -1467,7 +1486,7 @@ function App() {
       setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
       if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     }
-  }, [localEodInfoStep, bossDay, isPeer, mpActions, mpState.localPlayer]);
+  }, [localEodInfoStep, bossDay, isPeer, mpActions, mpState.localPlayer, gameState.upgradeDraftOptions.length, gameState.stockDraftOptions.length, gameState.restaurantUpgradeDraftOptions.length, gameState.menuDraftOptions.length]);
 
   const handleBuyConsumable = useCallback((itemId: string) => {
     const item = getConsumable(itemId);
