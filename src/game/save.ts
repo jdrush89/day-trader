@@ -100,8 +100,7 @@ export function loadGame(): GameState | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data: SaveData = JSON.parse(raw);
-    // Accept both old (v1) and new (v2) saves
-    if (data.version !== SAVE_VERSION && data.version !== 1) return null;
+    if (data.version !== SAVE_VERSION) return null;
     if (!data.gameState || typeof data.gameState.day !== "number") return null;
     return backfillGameState(data.gameState);
   } catch (e) {
@@ -176,7 +175,7 @@ export function loadAllMpSaves(): MpSaveData[] {
     if (!raw) return [];
     const saves: MpSaveData[] = JSON.parse(raw);
     return saves
-      .filter((s) => (s.version === SAVE_VERSION || s.version === 1) && s.gameState && typeof s.gameState.day === "number")
+      .filter((s) => s.version === SAVE_VERSION && s.gameState && typeof s.gameState.day === "number")
       .map((s) => ({ ...s, saveType: s.saveType ?? "manual" })); // backfill old saves
   } catch {
     return [];
