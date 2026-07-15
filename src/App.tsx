@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.91";
+const GAME_VERSION = "0.0.92";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -828,7 +828,7 @@ function App() {
             : [...prev.portfolio, { symbol, shares: 1, avgCost: stock.price, dayAcquired: prev.day }],
         };
       }
-      const next = buyStock(prev, symbol, shares);
+      const next = buyStock(prev, symbol, shares, playerName);
       if (next !== prev) {
         setTradeTracker((t) => recordBuy(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
       }
@@ -842,7 +842,7 @@ function App() {
     setGameState((prev) => {
       const stock = prev.stocks.find((s) => s.symbol === symbol);
       if (!stock) return prev;
-      const next = sellStock(prev, symbol, shares);
+      const next = sellStock(prev, symbol, shares, playerName);
       if (next !== prev) {
         setTradeTracker((t) => recordSell(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
       }
@@ -875,7 +875,7 @@ function App() {
     setGameState((prev) => {
       const stock = prev.stocks.find((s) => s.symbol === symbol);
       if (!stock) return prev;
-      const next = coverShort(prev, symbol, shares);
+      const next = coverShort(prev, symbol, shares, playerName);
       if (next !== prev) {
         setTradeTracker((t) => recordCover(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
       }
@@ -2283,6 +2283,7 @@ function App() {
                       <div className="challenge-info">
                         <span className="challenge-name">{def.name}</span>
                         <span className="challenge-desc">{def.description}</span>
+                        {ch.resultDetail && <span className="challenge-detail">{ch.resultDetail}</span>}
                       </div>
                       <span className="challenge-reward">
                         {ch.completed ? `+${def.tickets} ${def.type === "trading" ? "🍔" : "📈"}` : "—"}
@@ -2527,6 +2528,7 @@ function App() {
                         <div className="challenge-info">
                           <span className="challenge-name">{def.name}</span>
                           <span className="challenge-desc">{def.description}</span>
+                          {ch.resultDetail && <span className="challenge-detail">{ch.resultDetail}</span>}
                         </div>
                         <span className="challenge-reward">
                           {ch.completed ? `+${def.tickets} ${def.type === "trading" ? "🍔" : "📈"}` : "—"}

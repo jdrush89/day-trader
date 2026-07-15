@@ -1018,11 +1018,17 @@ export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds
     return step && (step.type === "grill" || step.type === "fry") && s.prepProgress < (step as any).duration;
   }).length;
   if (cookingCount > tracker.maxCookingOrders) tracker.maxCookingOrders = cookingCount;
-  // Check if any order's patience went below 50%
+  // Check if any order's patience went below 50% (track first occurrence)
   for (const slot of orderSlots) {
     if (slot && !slot.failed && !slot.served) {
       const ratio = slot.patienceRemaining / slot.menuItem.patience;
-      if (ratio < 0.5) tracker.anyTimerBelow50 = true;
+      if (ratio < 0.5) {
+        if (!tracker.anyTimerBelow50) {
+          tracker.firstTimerBelow50Order = slot.menuItem.name;
+          tracker.firstTimerBelow50Time = state.shiftDuration - shiftTimeRemaining;
+        }
+        tracker.anyTimerBelow50 = true;
+      }
     }
   }
   nextState = { ...nextState, challengeTracker: tracker };
@@ -1323,7 +1329,19 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
   if (elapsed <= 3) tracker.fastCompletions++;
   if (elapsed < 1) tracker.subSecondCompletion = true;
   if (order.patienceRemaining < 2) tracker.clutchCompletions++;
-  if (tip <= 0) tracker.allTipsPositive = false;
+  if (tip <= 0) {
+    if (tracker.allTipsPositive) {
+      // First missed tip — record details
+      tracker.firstMissedTipOrder = order.menuItem.name;
+      tracker.firstMissedTipTime = state.shiftDuration - state.shiftTimeRemaining;
+    }
+    tracker.allTipsPositive = false;
+  }
+  // Track fastest completion
+  if (elapsed < tracker.fastestCompletion) {
+    tracker.fastestCompletion = elapsed;
+    tracker.fastestCompletionOrder = order.menuItem.name;
+  }
 
   // Log the completed order for graphing
   const contributors = state.orderContributors[order.id] ?? [];

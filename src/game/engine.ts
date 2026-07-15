@@ -796,7 +796,7 @@ function addTradedStock(tracker: TradingChallengeTracker, symbol: string): Tradi
   return { ...tracker, tradedStocks: [...tracker.tradedStocks, symbol] };
 }
 
-export function buyStock(state: GameState, symbol: string, shares: number): GameState {
+export function buyStock(state: GameState, symbol: string, shares: number, playerName?: string): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock || shares <= 0) return state;
   const cost = stock.price * shares;
@@ -815,17 +815,18 @@ export function buyStock(state: GameState, symbol: string, shares: number): Game
 
   // Challenge tracking
   let tracker = addTradedStock(state.challengeTracker, symbol);
-  tracker = { ...tracker, boughtAny: true, buyPrices: [...tracker.buyPrices, { symbol, price: stock.price }] };
+  tracker = { ...tracker, boughtAny: true, buyPrices: [...tracker.buyPrices, { symbol, price: stock.price, tick: state.timeOfDay, playerName }] };
+  if (!tracker.firstBuyPlayer && playerName) tracker = { ...tracker, firstBuyPlayer: playerName };
   // Contrarian: check if buying during bad news window
   const badNewsTick = tracker.badNewsStocks[symbol];
   if (badNewsTick !== undefined && state.timeOfDay - badNewsTick <= 10) {
-    tracker = { ...tracker, contrarianBuys: [...tracker.contrarianBuys, { symbol, buyPrice: stock.price }] };
+    tracker = { ...tracker, contrarianBuys: [...tracker.contrarianBuys, { symbol, buyPrice: stock.price, playerName }] };
   }
 
   return { ...state, cash: state.cash - cost, portfolio: newPortfolio, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
 }
 
-export function sellStock(state: GameState, symbol: string, shares: number): GameState {
+export function sellStock(state: GameState, symbol: string, shares: number, playerName?: string): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
   const position = state.portfolio.find((p) => p.symbol === symbol);
   if (!stock || !position || position.shares < shares || shares <= 0) return state;
@@ -846,13 +847,14 @@ export function sellStock(state: GameState, symbol: string, shares: number): Gam
 
   // Challenge tracking
   let tracker = addTradedStock(state.challengeTracker, symbol);
-  tracker = { ...tracker, soldAny: true, sellPrices: [...tracker.sellPrices, { symbol, price: stock.price }] };
+  tracker = { ...tracker, soldAny: true, sellPrices: [...tracker.sellPrices, { symbol, price: stock.price, tick: state.timeOfDay, playerName }] };
+  if (!tracker.firstSellPlayer && playerName) tracker = { ...tracker, firstSellPlayer: playerName };
   // Track profit by stock
   const prevProfit = tracker.profitByStock[symbol] ?? 0;
   tracker = { ...tracker, profitByStock: { ...tracker.profitByStock, [symbol]: prevProfit + adjustedProfit } };
   // Track max single trade profit
   if (adjustedProfit > tracker.maxSingleTradeProfit) {
-    tracker = { ...tracker, maxSingleTradeProfit: adjustedProfit };
+    tracker = { ...tracker, maxSingleTradeProfit: adjustedProfit, maxSingleTradeSymbol: symbol, maxSingleTradePlayer: playerName ?? "" };
   }
   // Track tech profit
   if (stock.tags.includes("tech") && adjustedProfit > 0) {
@@ -878,7 +880,7 @@ export function shortStock(state: GameState, symbol: string, shares: number): Ga
   return { ...state, cash: state.cash - collateral, shorts: newShorts, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
 }
 
-export function coverShort(state: GameState, symbol: string, shares: number): GameState {
+export function coverShort(state: GameState, symbol: string, shares: number, playerName?: string): GameState {
   const stock = state.stocks.find((s) => s.symbol === symbol);
   const position = state.shorts.find((p) => p.symbol === symbol);
   if (!stock || !position || position.shares < shares || shares <= 0) return state;
@@ -901,7 +903,7 @@ export function coverShort(state: GameState, symbol: string, shares: number): Ga
   const prevProfit = tracker.profitByStock[symbol] ?? 0;
   tracker = { ...tracker, profitByStock: { ...tracker.profitByStock, [symbol]: prevProfit + profit } };
   if (profit > tracker.maxSingleTradeProfit) {
-    tracker = { ...tracker, maxSingleTradeProfit: profit };
+    tracker = { ...tracker, maxSingleTradeProfit: profit, maxSingleTradeSymbol: symbol, maxSingleTradePlayer: playerName ?? "" };
   }
   if (stock.tags.includes("tech") && profit > 0) {
     tracker = { ...tracker, techProfit: tracker.techProfit + profit };

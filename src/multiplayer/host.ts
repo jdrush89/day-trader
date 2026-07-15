@@ -316,7 +316,7 @@ export class MultiplayerHost {
         this.callbacks.setGameState((s) => {
           const stock = s.stocks.find((st) => st.symbol === action.symbol);
           if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "buy", action.symbol, action.shares, stock.price, s.timeOfDay);
-          return buyStock(s, action.symbol, action.shares);
+          return buyStock(s, action.symbol, action.shares, player.name);
         });
         this.addFeedItem(player.id, player.name, `Bought ${action.shares} ${action.symbol}`);
         break;
@@ -324,7 +324,7 @@ export class MultiplayerHost {
         this.callbacks.setGameState((s) => {
           const stock = s.stocks.find((st) => st.symbol === action.symbol);
           if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "sell", action.symbol, action.shares, stock.price, s.timeOfDay);
-          return sellStock(s, action.symbol, action.shares);
+          return sellStock(s, action.symbol, action.shares, player.name);
         });
         this.addFeedItem(player.id, player.name, `Sold ${action.shares} ${action.symbol}`);
         break;
@@ -340,7 +340,7 @@ export class MultiplayerHost {
         this.callbacks.setGameState((s) => {
           const stock = s.stocks.find((st) => st.symbol === action.symbol);
           if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "cover", action.symbol, action.shares, stock.price, s.timeOfDay);
-          return coverShort(s, action.symbol, action.shares);
+          return coverShort(s, action.symbol, action.shares, player.name);
         });
         this.addFeedItem(player.id, player.name, `Covered ${action.shares} ${action.symbol}`);
         break;
