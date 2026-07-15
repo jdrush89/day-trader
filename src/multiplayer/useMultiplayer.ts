@@ -169,7 +169,10 @@ export function useMultiplayer(
       getMpSaveId: () => getMpSaveIdRef.current(),
       getShopOffering: () => getShopOfferingRef.current(),
       onPlayerJoined: (player) => {
-        setState((s) => ({ ...s, players: [...s.players, player] }));
+        setState((s) => {
+          if (s.players.some((p) => p.id === player.id)) return s;
+          return { ...s, players: [...s.players, player] };
+        });
       },
       onPlayerLeft: (playerId) => {
         const player = stateRef.current.players.find((p) => p.id === playerId);
@@ -245,7 +248,10 @@ export function useMultiplayer(
         }));
       },
       onPlayerJoined: (player) => {
-        setState((s) => ({ ...s, players: [...s.players, player] }));
+        setState((s) => {
+          if (s.players.some((p) => p.id === player.id)) return s;
+          return { ...s, players: [...s.players, player] };
+        });
       },
       onPlayerLeft: (playerId) => {
         const player = stateRef.current.players.find((p) => p.id === playerId);
