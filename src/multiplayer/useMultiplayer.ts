@@ -57,6 +57,7 @@ export function useMultiplayer(
   getPlayerSaves: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined,
   getMpSaveId: () => string | undefined,
   getShopOffering: () => Array<{ id: string; name: string; phase: string; tier: number }>,
+  getPnlSeries: () => Array<{ playerId: string; playerName: string; playerColor: string; data: Array<{ time: number; value: number }> }> | undefined,
   appCallbacks: {
     onViewInsider: () => void;
     onAcceptLoan: () => void;
@@ -136,8 +137,10 @@ export function useMultiplayer(
   getPlayerSavesRef.current = getPlayerSaves;
   const getMpSaveIdRef = useRef(getMpSaveId);
   getMpSaveIdRef.current = getMpSaveId;
-  const getShopOfferingRef = useRef(getShopOffering);
+   const getShopOfferingRef = useRef(getShopOffering);
   getShopOfferingRef.current = getShopOffering;
+  const getPnlSeriesRef = useRef(getPnlSeries);
+  getPnlSeriesRef.current = getPnlSeries;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -168,6 +171,7 @@ export function useMultiplayer(
       getPlayerSaves: () => getPlayerSavesRef.current(),
       getMpSaveId: () => getMpSaveIdRef.current(),
       getShopOffering: () => getShopOfferingRef.current(),
+      getPnlSeries: () => getPnlSeriesRef.current(),
       onPlayerJoined: (player) => {
         setState((s) => {
           if (s.players.some((p) => p.id === player.id)) return s;

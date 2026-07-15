@@ -67,6 +67,7 @@ export interface GameSync {
   playerSaves?: Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }>; // for resume sync
   mpSaveId?: string; // save ID for this game run
   shopOffering?: Array<{ id: string; name: string; phase: string; tier: number }>; // synced shop items
+  pnlSeries?: Array<{ playerId: string; playerName: string; playerColor: string; data: Array<{ time: number; value: number }> }>; // trading P&L graph data
 }
 
 export interface ActionFeedItem {

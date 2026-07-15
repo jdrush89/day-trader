@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.90";
+const GAME_VERSION = "0.0.91";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -96,6 +96,7 @@ function App() {
     () => mpResumeData?.players,
     () => mpSaveIdRef.current ?? undefined,
     () => shopOffering.map((item) => ({ id: item.id, name: item.name, phase: item.phase, tier: item.tier })),
+    () => pnlSeries.length > 0 ? pnlSeries : undefined,
     {
       onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
@@ -194,6 +195,10 @@ function App() {
           return merged;
         });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
+        // Sync P&L trading graph data from host
+        if (sync.pnlSeries && sync.pnlSeries.length > 0) {
+          setPnlSeries(sync.pnlSeries);
+        }
         // Peer phase sync — simplified with state machine awareness:
         // - Pick phases: accept ONLY when peer is NOT already in a pick phase or post-shift screens
         // - Info phases: ignore (peer navigates locally via localEodInfoStep)
