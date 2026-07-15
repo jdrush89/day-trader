@@ -105,6 +105,7 @@ export interface ActiveOrder {
   // Per-assemble-step customization: which ingredients are wanted (true) vs unwanted (false)
   customizations: Record<number, boolean[]>;
   orderCorrect: boolean;
+  isInsider: boolean;
 }
 
 export interface RestaurantOrderLog {
@@ -200,4 +201,6 @@ export interface RestaurantState {
   choresCompleted: number;
   choresScheduled: number; // how many chores this shift (1-2)
   servingBlocked: boolean; // true when a chore timer has expired
+  // Insider schmooze system
+  insiderServed: boolean; // whether an insider was served this shift (max 1)
 }

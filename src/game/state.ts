@@ -99,5 +99,6 @@ export function createInitialState(playerCount: number = 1): GameState {
     freeNextStock: false,
     consumableInventory: createEmptyInventory(),
     playerCount,
+    schmoozeInsiderTip: null,
   };
 }

@@ -495,6 +495,7 @@ function createOrder(menuItem: MenuItem, id: number, upgrades: string[]): Active
       failedTimer: 0,
       customizations,
       orderCorrect: true,
+      isInsider: false,
     },
     upgrades,
   );
@@ -562,6 +563,13 @@ function spawnOrder(state: RestaurantState): RestaurantState {
   if (emptyIndex === -1) return state;
   const menuItem = state.availableMenu[Math.floor(Math.random() * state.availableMenu.length)];
   const order = createOrder(menuItem, state.orderIdCounter, state.acquiredUpgrades);
+
+  // ~15% chance to be an insider customer, max 1 per shift
+  const hasInsiderAlready = state.orderSlots.some((o) => o?.isInsider) || state.insiderServed;
+  if (!hasInsiderAlready && Math.random() < 0.15) {
+    order.isInsider = true;
+  }
+
   const orderSlots = [...state.orderSlots];
   orderSlots[emptyIndex] = order;
   return {
@@ -969,6 +977,7 @@ export function createRestaurantState(state: GameState, numPlayers = 1): Restaur
     choresCompleted: 0,
     choresScheduled: choreCount,
     servingBlocked: false,
+    insiderServed: false,
   };
 
   return spawnOrder(baseState);
@@ -1376,6 +1385,7 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
     challengeTracker: tracker,
     orderContributors: newContributors,
     orderLog: [...state.orderLog, logEntry],
+    insiderServed: state.insiderServed || order.isInsider,
   };
 }
 

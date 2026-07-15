@@ -54,7 +54,7 @@ interface RestaurantProps {
   localPlayerId?: string;
   localPlayerName?: string;
   players?: Array<{ id: string; name: string; color: string }>;
-  hideShiftSummary?: boolean; // Hide shift summary overlay (player already advanced past it)
+  hideShiftSummary?: boolean;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -841,7 +841,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
             <button
               key={`slot-${globalIndex}`}
               type="button"
-              className={`order-slot ${effectiveActiveOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""}`}
+              className={`order-slot ${effectiveActiveOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""} ${order.isInsider ? "insider" : ""}`}
               onClick={() =>
                 isPeer && onPeerKey
                   ? onPeerKey(String(localIndex + 1))

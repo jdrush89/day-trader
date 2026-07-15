@@ -89,6 +89,7 @@ function backfillGameState(gs: GameState): GameState {
   if (gs.freeNextStock == null) gs.freeNextStock = false;
   if (!gs.consumableInventory) gs.consumableInventory = createEmptyInventory();
   if (gs.playerCount == null) gs.playerCount = 1;
+  if (gs.schmoozeInsiderTip === undefined) gs.schmoozeInsiderTip = null;
   // Rebuild default monitors if stripped
   if (!gs.monitors || gs.monitors.length === 0) {
     const firstStock = gs.stocks?.[0]?.symbol ?? "MEGA";

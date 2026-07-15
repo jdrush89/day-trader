@@ -180,4 +180,5 @@ export interface GameState {
   freeNextStock: boolean;
   consumableInventory: ConsumableInventory;
   playerCount: number;
+  schmoozeInsiderTip: InsiderTip | null;
 }

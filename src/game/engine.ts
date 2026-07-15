@@ -531,7 +531,7 @@ const INSIDER_TIP_TEMPLATES = [
 
 let insiderIdCounter = 0;
 
-function generateInsiderTip(stocks: Stock[], day: number, excludedSymbols: string[] = []): InsiderTip {
+export function generateInsiderTip(stocks: Stock[], day: number, excludedSymbols: string[] = []): InsiderTip {
   const available = stocks.filter((stock) => !excludedSymbols.includes(stock.symbol));
   const pool = available.length > 0 ? available : stocks;
   const stock = pool[Math.floor(Math.random() * pool.length)];
@@ -914,7 +914,9 @@ export function coverShort(state: GameState, symbol: string, shares: number, pla
 
 export function openMarket(state: GameState): GameState {
   const netWorth = getNetWorth(state);
-  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [], challengeTracker: createTradingTracker() };
+  // If a schmooze tip was earned from Shwendy's, use it as this day's insider tip
+  const schmoozeHint = state.schmoozeInsiderTip;
+  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: schmoozeHint, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, institutionalOrders: [], challengeTracker: createTradingTracker(), schmoozeInsiderTip: null };
 }
 
 export function acquireUpgrade(state: GameState, upgradeId: string): GameState {
