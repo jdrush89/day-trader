@@ -719,6 +719,7 @@ function App() {
 
   // MP-aware save helper
   const doSave = useCallback((gs: GameState, type: "auto" | "manual" = "auto") => {
+    const phase: "trading" | "restaurant" = restaurantState !== null ? "restaurant" : "trading";
     if (isMultiplayer) {
       const playerSaves: PlayerSaveData[] = mpState.players.map((p) => ({
         name: p.name,
@@ -731,9 +732,9 @@ function App() {
         setMpSaveId(id);
       }
     } else {
-      saveGame(gs);
+      saveGame(gs, phase);
     }
-  }, [isMultiplayer, mpState.players, mpState.localPlayer, localUpgrades, localRestaurantUpgrades]);
+  }, [isMultiplayer, mpState.players, mpState.localPlayer, localUpgrades, localRestaurantUpgrades, restaurantState]);
 
   useEffect(() => {
     if (gameState.marketOpen) {
@@ -1910,7 +1911,11 @@ function App() {
     const savedGame = loadGame();
     const handleResume = () => {
       if (savedGame) {
-        setGameState(savedGame);
+        setGameState(savedGame.gameState);
+        if (savedGame.phase === "restaurant") {
+          const rs = createRestaurantState(savedGame.gameState, savedGame.gameState.playerCount);
+          setRestaurantState(rs);
+        }
         setShowTitle(false);
       }
     };
@@ -1968,7 +1973,7 @@ function App() {
         <div className="title-screen-overlay title-menu-bottom">
           {savedGame && (
             <button className="title-start-btn title-resume-btn" onClick={handleResume}>
-              RESUME (Day {savedGame.day})
+              RESUME (Day {savedGame.gameState.day})
             </button>
           )}
           <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); const s = createInitialState(); setGameState(s); setShowTitle(false); setShowChallengeIntro("trading"); setPaused(true); }}>
@@ -2040,7 +2045,7 @@ function App() {
          setShowTitle(true);
          // Restore saved game state (tutorial may have modified it)
          const saved = loadGame();
-         setGameState(saved ?? createInitialState());
+         setGameState(saved?.gameState ?? createInitialState());
        }} onStepChange={handleTradingTutorialStep} />
      )}
 

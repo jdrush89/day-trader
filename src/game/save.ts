@@ -9,6 +9,7 @@ const SAVE_VERSION = 2; // Bumped for slim save format
 interface SaveData {
   version: number;
   gameState: GameState;
+  phase: "trading" | "restaurant";
   savedAt: number;
 }
 
@@ -53,11 +54,12 @@ function slimStateForSave(gs: GameState): GameState {
   };
 }
 
-export function saveGame(gameState: GameState): boolean {
+export function saveGame(gameState: GameState, phase: "trading" | "restaurant"): boolean {
   const slim = slimStateForSave(gameState);
   const data: SaveData = {
     version: SAVE_VERSION,
     gameState: slim,
+    phase,
     savedAt: Date.now(),
   };
   try {
@@ -95,14 +97,14 @@ function backfillGameState(gs: GameState): GameState {
   return gs;
 }
 
-export function loadGame(): GameState | null {
+export function loadGame(): { gameState: GameState; phase: "trading" | "restaurant" } | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
     const data: SaveData = JSON.parse(raw);
     if (data.version !== SAVE_VERSION) return null;
     if (!data.gameState || typeof data.gameState.day !== "number") return null;
-    return backfillGameState(data.gameState);
+    return { gameState: backfillGameState(data.gameState), phase: data.phase ?? "trading" };
   } catch (e) {
     console.warn("[loadGame] Failed to load save:", e);
     return null;
