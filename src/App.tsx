@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.86";
+const GAME_VERSION = "0.0.87";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -462,6 +462,8 @@ function App() {
     setGameState(challengedState);
     doSave(challengedState);
     setEodPhase("challenges");
+    // Clear stale choices from previous restaurant EOD so the gate waits for fresh picks
+    mpActions.resetEodGate();
   }, [isMultiplayer, isPeer, restaurantState?.shiftOver]);
 
   // Multiplayer: EOD info screens gate — when all players are done, advance to picks/next day
@@ -772,6 +774,8 @@ function App() {
       // Set local info step for MP navigation
       if (isMultiplayer) {
         setLocalEodInfoStep("summary");
+        // Clear stale choices from previous day so the gate waits for fresh picks
+        if (!isPeer) mpActions.resetEodGate();
       }
     }
   }, [gameState.marketOpen]);
