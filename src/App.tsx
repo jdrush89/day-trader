@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.81";
+const GAME_VERSION = "0.0.82";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -195,9 +195,12 @@ function App() {
         });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
         // Peer phase sync — simplified with state machine awareness:
-        // - Pick phases: accept ONLY when peer is NOT already in a pick phase
+        // - Pick phases: accept ONLY when peer is NOT already in a pick phase or post-shift screens
         // - Info phases: ignore (peer navigates locally via localEodInfoStep)
         // - Shop: accept when localEodInfoStep is null (post-picks)
+        // Check if peer is still navigating restaurant post-shift screens (shift ended but
+        // peer hasn't finished dismissing shift summary + challenge results yet)
+        const peerInPostShift = restaurantState !== null && (restaurantState as any).shiftOver === true;
         setEodPhase((prev) => {
           const hostPhase = sync.eodPhase;
           const isPick = (p: string) => p === "upgrades" || p === "stocks" || p === "restaurant-upgrades" || p === "menu-draft";
@@ -206,11 +209,12 @@ function App() {
           // Don't override if peer is navigating info screens locally
           if (isInfo(hostPhase) && localEodInfoStep !== null) return prev;
 
-          // Pick phases: don't override if peer is still in info screens or mid-pick
-          // (each player advances through summary → challenges → picks at their own pace)
+          // Pick phases: don't override if peer is still in info screens, mid-pick,
+          // or navigating post-shift restaurant screens (summary → challenges)
           if (isPick(hostPhase)) {
             if (isPick(prev)) return prev; // peer is mid-pick, don't override
             if (localEodInfoStep !== null) return prev; // peer still viewing info screens
+            if (peerInPostShift) return prev; // peer still in restaurant post-shift flow
             setLocalEodInfoStep(null);
             setEodChoiceMade(false);
             return hostPhase as any;
@@ -446,19 +450,7 @@ function App() {
     setGameState(challengedState);
     doSave(challengedState);
     setEodPhase("challenges");
-    setLocalEodInfoStep("challenges");
   }, [isMultiplayer, isPeer, restaurantState?.shiftOver]);
-
-  // Multiplayer peer: immediately protect from host sync override when shift ends
-  // (peer still needs to dismiss the restaurant summary before seeing challenges,
-  //  but localEodInfoStep must be set NOW to block host's pick phase from overriding)
-  const peerShiftEndTriggered = useRef<number>(0);
-  useEffect(() => {
-    if (!isMultiplayer || !isPeer || !restaurantState?.shiftOver) return;
-    if (peerShiftEndTriggered.current === gameState.day) return;
-    peerShiftEndTriggered.current = gameState.day;
-    setLocalEodInfoStep("challenges");
-  }, [isMultiplayer, isPeer, restaurantState?.shiftOver, gameState.day]);
 
   // Multiplayer: EOD info screens gate — when all players are done, advance to picks/next day
   useEffect(() => {
