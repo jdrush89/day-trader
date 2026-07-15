@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.88";
+const GAME_VERSION = "0.0.89";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1736,6 +1736,11 @@ function App() {
     setTitleTutorial(null);
     setMenuFocusIndex(-1);
     setEodPhase("summary");
+    setLocalEodInfoStep(null);
+    setEodChoiceMade(false);
+    setEodInfoReadyPlayers(new Set());
+    setShowTransition(null);
+    setSkipNextRestaurant(false);
     setShowOptions(null);
     setShowChallengeIntro(null);
     setPaused(false);
@@ -1746,6 +1751,12 @@ function App() {
     setMpSaveId(null);
     mpSaveIdRef.current = null;
     setMpResumeData(null);
+    setMpUpgradeChoice(null);
+    // Reset day-tracking refs so effects fire correctly on new game
+    restaurantFinishTriggered.current = 0;
+    peerDraftGenerated.current = 0;
+    peerRestaurantDraftGenerated.current = 0;
+    peerMenuDraftGenerated.current = 0;
   }, [mpActions]);
 
   const formatMarketTime = (pct: number): string => {
