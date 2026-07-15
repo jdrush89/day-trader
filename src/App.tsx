@@ -195,7 +195,7 @@ function App() {
         });
         if (sync.restaurantState !== undefined) setRestaurantState(sync.restaurantState);
         // Peer phase sync — simplified with state machine awareness:
-        // - Pick phases: accept ONLY when peer is not mid-pick on the SAME phase
+        // - Pick phases: accept ONLY when peer is NOT already in a pick phase
         // - Info phases: ignore (peer navigates locally via localEodInfoStep)
         // - Shop: accept when localEodInfoStep is null (post-picks)
         setEodPhase((prev) => {
@@ -206,9 +206,10 @@ function App() {
           // Don't override if peer is navigating info screens locally
           if (isInfo(hostPhase) && localEodInfoStep !== null) return prev;
 
-          // Accept pick phase changes (host advances to a new pick phase)
+          // Pick phases: don't override if peer is currently in any pick phase
+          // (host may advance faster, but peer needs to finish their own pick first)
           if (isPick(hostPhase)) {
-            if (prev === hostPhase) return prev; // same phase, no override (avoids mid-pick reset)
+            if (isPick(prev)) return prev; // peer is mid-pick, don't override
             setLocalEodInfoStep(null);
             setEodChoiceMade(false);
             return hostPhase as any;
