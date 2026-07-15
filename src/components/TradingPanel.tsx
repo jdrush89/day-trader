@@ -28,7 +28,7 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTog
   const netWorth = gameState.cash + portfolioValue + shortCollateral - shortLiability + optionsValue;
   const buyingPower = getBuyingPower(gameState);
   const marginActive = buyingPower > gameState.cash + 0.01;
-  const milestone = getMilestone(gameState.day);
+  const milestone = getMilestone(gameState.day, gameState.playerCount);
   const daysUntilCheck = milestone ? milestone.checkDay - gameState.day : 0;
   const loansDue = milestone
     ? gameState.loans.filter((l) => l.dueDay <= milestone.checkDay).reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0)

@@ -34,6 +34,7 @@ function backfillGameState(gs: GameState): GameState {
   if (gs.runSeed == null) gs.runSeed = Math.floor(Math.random() * 2147483647);
   if (gs.freeNextStock == null) gs.freeNextStock = false;
   if (!gs.consumableInventory) gs.consumableInventory = createEmptyInventory();
+  if (gs.playerCount == null) gs.playerCount = 1;
   return gs;
 }
 

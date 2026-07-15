@@ -43,7 +43,7 @@ const INITIAL_STOCKS: Stock[] = [
   { symbol: "MEME", name: "MemeTech Solutions", price: 12, openPrice: 12, history: [12], dailyHistory: [], tags: ["small-cap", "tech", "speculative", "social-media"], ipoDay: 63 },
 ];
 
-export function createInitialState(): GameState {
+export function createInitialState(playerCount: number = 1): GameState {
   const stocksWithHistory = INITIAL_STOCKS.map((stock, idx) => {
     const volatility = stock.tags.includes("speculative") ? 0.04 : stock.tags.includes("small-cap") ? 0.03 : 0.018;
     const dailyHistory = generateFakeHistory(stock.price, stock.ipoDay, (idx + 1) * 7919, volatility);
@@ -52,7 +52,7 @@ export function createInitialState(): GameState {
 
   return {
     day: 1,
-    cash: 1000,
+    cash: 1000 * playerCount,
     restaurantEarnings: 0,
     portfolio: [],
     shorts: [],
@@ -70,7 +70,7 @@ export function createInitialState(): GameState {
     gameOver: false,
     totalProfit: 0,
     milestonePayment: null,
-    dayStartNetWorth: 1000,
+    dayStartNetWorth: 1000 * playerCount,
     insiderTip: null,
     insiderTip2: null,
     insiderViewed: false,
@@ -98,5 +98,6 @@ export function createInitialState(): GameState {
     runSeed: Math.floor(Math.random() * 2147483647),
     freeNextStock: false,
     consumableInventory: createEmptyInventory(),
+    playerCount,
   };
 }

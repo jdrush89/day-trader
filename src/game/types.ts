@@ -179,4 +179,5 @@ export interface GameState {
   runSeed: number;
   freeNextStock: boolean;
   consumableInventory: ConsumableInventory;
+  playerCount: number;
 }

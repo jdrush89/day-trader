@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.89";
+const GAME_VERSION = "0.0.90";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1258,7 +1258,7 @@ function App() {
 
       // Difficulty scales with milestone number (boss day follows milestone day)
       const milestoneNum = nextState.day / 4;
-      const requiredProfit = 300 + (milestoneNum - 1) * 100;
+      const requiredProfit = (300 + (milestoneNum - 1) * 100) * (gameState.playerCount || 1);
       const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
 
       // Calculate trading profit for the day
@@ -1330,7 +1330,7 @@ function App() {
       const rs = createRestaurantState(marketState, isMultiplayer ? mpState.players.length : 1);
       setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
       const milestoneNum = marketState.day / 4;
-      const requiredProfit = 300 + (milestoneNum - 1) * 100;
+      const requiredProfit = (300 + (milestoneNum - 1) * 100) * (gameState.playerCount || 1);
       const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
       setShowBossIntro({ requiredProfit, maxMissed });
     }
@@ -1352,7 +1352,7 @@ function App() {
       const shouldOffer = netWorth < 0 || Math.random() < 0.3;
 
       if (shouldOffer) {
-        const milestone = getMilestone(marketState.day);
+        const milestone = getMilestone(marketState.day, marketState.playerCount);
         const nextMilestoneDay = milestone?.checkDay ?? marketState.day + 3;
         const dueDay = nextMilestoneDay <= marketState.day ? nextMilestoneDay + 3 : nextMilestoneDay;
 
@@ -1835,7 +1835,7 @@ function App() {
               const rs = createRestaurantState(gs, mpState.players.length);
               setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
               const milestoneNum = gs.day / 4;
-              const requiredProfit = 300 + (milestoneNum - 1) * 100;
+              const requiredProfit = (300 + (milestoneNum - 1) * 100) * (gs.playerCount || 1);
               const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
               setShowBossIntro({ requiredProfit, maxMissed });
             } else {
@@ -1843,7 +1843,7 @@ function App() {
               setPaused(true);
             }
           } else {
-            setGameState(createInitialState());
+            setGameState(createInitialState(mpState.players.length));
             setShowChallengeIntro("trading");
             setPaused(true);
           }
@@ -2064,7 +2064,7 @@ function App() {
             )}
             {bossDay && restaurantState && (() => {
               const milestoneNum = gameState.day / 4;
-              const requiredProfit = 300 + (milestoneNum - 1) * 100;
+              const requiredProfit = (300 + (milestoneNum - 1) * 100) * (gameState.playerCount || 1);
               const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
               const currentProfit = (gameState.cash + gameState.portfolio.reduce((sum: number, pos) => { const s = gameState.stocks.find((st) => st.symbol === pos.symbol); return sum + (s ? s.price * pos.shares : 0); }, 0) + gameState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0) - gameState.shorts.reduce((sum: number, sp) => { const s = gameState.stocks.find((st) => st.symbol === sp.symbol); return sum + (s ? s.price * sp.shares : 0); }, 0) + getOptionsValue(gameState)) - gameState.dayStartNetWorth;
               return (
@@ -2113,7 +2113,7 @@ function App() {
                   const rs = createRestaurantState(marketState, isMultiplayer ? mpState.players.length : 1);
                   setRestaurantState({ ...rs, shiftTimeRemaining: 100 });
                   const milestoneNum = day / 4;
-                  const requiredProfit = 300 + (milestoneNum - 1) * 100;
+                  const requiredProfit = (300 + (milestoneNum - 1) * 100) * (gameState.playerCount || 1);
                   const maxMissed = Math.max(2, 5 - Math.floor((milestoneNum - 1) / 2));
                   setShowBossIntro({ requiredProfit, maxMissed });
                 } else {
@@ -2194,12 +2194,12 @@ function App() {
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
           milestoneTarget={(() => {
-            const m = getMilestone(gameState.day);
+            const m = getMilestone(gameState.day, gameState.playerCount);
             if (!m) return null;
             const loansDue = gameState.loans.filter((l) => l.dueDay <= m.checkDay).reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0);
             return Math.round(m.required + loansDue);
           })()}
-          milestoneDaysLeft={getMilestone(gameState.day) ? getMilestone(gameState.day)!.checkDay - gameState.day : 0}
+          milestoneDaysLeft={getMilestone(gameState.day, gameState.playerCount) ? getMilestone(gameState.day, gameState.playerCount)!.checkDay - gameState.day : 0}
           netWorth={gameState.cash + gameState.portfolio.reduce((sum: number, pos) => { const s = gameState.stocks.find((st) => st.symbol === pos.symbol); return sum + (s ? s.price * pos.shares : 0); }, 0) + gameState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0) - gameState.shorts.reduce((sum: number, sp) => { const s = gameState.stocks.find((st) => st.symbol === sp.symbol); return sum + (s ? s.price * sp.shares : 0); }, 0) + getOptionsValue(gameState)}
           speed={speed}
           onSpeedChange={handleSetSpeed}

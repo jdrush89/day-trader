@@ -13,7 +13,7 @@ export function isBossDayCheck(day: number): boolean {
   return day >= 4 && day % 4 === 0;
 }
 
-export function getMilestone(day: number): { checkDay: number; required: number } | null {
+export function getMilestone(day: number, playerCount: number = 1): { checkDay: number; required: number } | null {
   // Find the next milestone check day for the given day
   let milestoneNum: number;
   let checkDay: number;
@@ -26,7 +26,7 @@ export function getMilestone(day: number): { checkDay: number; required: number 
   }
   return {
     checkDay,
-    required: 1000 + 250 * milestoneNum * (milestoneNum + 1),
+    required: (1000 + 250 * milestoneNum * (milestoneNum + 1)) * playerCount,
   };
 }
 
@@ -73,7 +73,7 @@ export function applyMilestoneCheck(state: GameState, milestoneDay: number): Gam
   const dueTotal = dueLoans.reduce((sum, l) => sum + l.amount * (1 + l.interestRate), 0);
   loans = loans.filter((l) => l.dueDay > milestoneDay);
 
-  const milestone = getMilestone(milestoneDay)!;
+  const milestone = getMilestone(milestoneDay, state.playerCount)!;
   const milestoneAmount = milestone.required;
   const totalPayment = milestoneAmount + dueTotal;
 
