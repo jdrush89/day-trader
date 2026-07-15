@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.82";
+const GAME_VERSION = "0.0.83";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -2197,7 +2197,7 @@ function App() {
           localPlayerId={mpState.localPlayer?.id ?? "player"}
           localPlayerName={mpState.localPlayer?.name ?? "You"}
           players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
-          hideShiftSummary={isMultiplayer && localEodInfoStep !== null}
+          hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop")}
         />
         {/* Post-shift overlays render on top of restaurant UI */}
         {showChallengeIntro === "restaurant" && (
@@ -2665,7 +2665,7 @@ function App() {
               localPlayerId={mpState.localPlayer?.id ?? "player"}
               localPlayerName={mpState.localPlayer?.name ?? "You"}
               players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
-              hideShiftSummary={isMultiplayer && localEodInfoStep !== null}
+              hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop")}
             />
             </div>
           ) : (
