@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.92";
+const GAME_VERSION = "0.0.93";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1208,6 +1208,49 @@ function App() {
         const slots = [...prev.orderSlots];
         slots[0] = order;
         return { ...prev, orderSlots: slots, activeOrderId: 9000 };
+      });
+    } else if (step.action === "setup-chore") {
+      setRestaurantState((prev) => {
+        if (!prev) return prev;
+        // Create a sample "wash dishes" chore for the tutorial
+        const sampleChore = {
+          id: 9100,
+          type: "wash_dishes" as const,
+          timer: 15,
+          timerExpired: false,
+          completed: false,
+          dishSpots: [
+            { x: 0.25, y: 0.3, scrubbed: false },
+            { x: 0.55, y: 0.5, scrubbed: false },
+            { x: 0.4, y: 0.7, scrubbed: false },
+            { x: 0.7, y: 0.35, scrubbed: false },
+          ],
+          trashBags: [],
+          mopPhase: "dunk" as const,
+          mopCycles: 0,
+          mopCyclesNeeded: 3,
+          mopSqueezeCount: 0,
+          mopSwipeCount: 0,
+          mopLastDirection: null,
+          platePosition: 0,
+          plateDirection: 1 as const,
+          plateSpeed: 0.02,
+          platesStacked: 0,
+          platesNeeded: 6,
+          lastPlatePosition: 0.5,
+          plateMissed: false,
+          recyclePhase: "click" as const,
+          recycleClicks: 0,
+          recycleClicksNeeded: 8,
+          recycleArrows: 0,
+          recycleArrowsNeeded: 8,
+          recycleCycles: 0,
+          recycleCyclesNeeded: 3,
+        };
+        // Clear the order slot and place chore there
+        const slots = [...prev.orderSlots];
+        slots[0] = null;
+        return { ...prev, orderSlots: slots, activeChore: sampleChore, choreSlotIndex: 0, choreFocused: true, activeOrderId: null };
       });
     } else if (step.action === "setup-completed") {
       setRestaurantState((prev) => {

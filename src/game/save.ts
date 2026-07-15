@@ -12,21 +12,31 @@ interface SaveData {
   savedAt: number;
 }
 
-export function saveGame(gameState: GameState): void {
+export function saveGame(gameState: GameState): boolean {
   const data: SaveData = {
     version: SAVE_VERSION,
     gameState,
     savedAt: Date.now(),
   };
   try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-  } catch {
-    // Storage full or unavailable — silently fail
+    const json = JSON.stringify(data);
+    localStorage.setItem(SAVE_KEY, json);
+    return true;
+  } catch (e) {
+    console.warn("[saveGame] Failed to save:", e);
+    return false;
   }
 }
 
 function backfillGameState(gs: GameState): GameState {
   if (!gs.challengeTracker) gs.challengeTracker = createTradingTracker();
+  else {
+    // Backfill new tracker fields for old saves
+    if (gs.challengeTracker.maxSingleTradeSymbol == null) gs.challengeTracker.maxSingleTradeSymbol = "";
+    if (gs.challengeTracker.maxSingleTradePlayer == null) gs.challengeTracker.maxSingleTradePlayer = "";
+    if (gs.challengeTracker.firstSellPlayer == null) gs.challengeTracker.firstSellPlayer = "";
+    if (gs.challengeTracker.firstBuyPlayer == null) gs.challengeTracker.firstBuyPlayer = "";
+  }
   if (!gs.activeChallenges) gs.activeChallenges = [];
   if (gs.tickets == null) gs.tickets = 0;
   if (gs.tradingTickets == null) gs.tradingTickets = gs.tickets || 0;
@@ -46,7 +56,8 @@ export function loadGame(): GameState | null {
     if (data.version !== SAVE_VERSION) return null;
     if (!data.gameState || typeof data.gameState.day !== "number") return null;
     return backfillGameState(data.gameState);
-  } catch {
+  } catch (e) {
+    console.warn("[loadGame] Failed to load save:", e);
     return null;
   }
 }

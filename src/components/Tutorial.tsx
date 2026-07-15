@@ -165,6 +165,14 @@ const RESTAURANT_STEPS: TutorialStep[] = [
     body: "Each shift has a challenge — like completing a number of orders or earning enough tips. Complete it to earn trading tickets (📈) that you can spend in the shop on day trading consumable items!",
   },
   {
+    icon: "🧹",
+    title: "Chores",
+    body: "During your shift, chores will pop up in an order slot — like washing dishes, mopping, or stacking plates. Each chore has a timer — if it runs out, your serving is blocked until you complete it! Click the chore slot (or press its number) to focus on it, then follow the on-screen instructions.",
+    selector: ".chore-slot",
+    position: "bottom",
+    action: "setup-chore",
+  },
+  {
     icon: "🎒",
     title: "Consumable Items",
     body: "During your shift, you can use consumable items from your inventory — like slowing patience timers, boosting tips, or auto-completing prep. Press the item buttons in the header to activate them. At shift end, you'll pick a kitchen upgrade and new menu item. Good luck, chef!",
