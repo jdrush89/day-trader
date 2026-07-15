@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.87";
+const GAME_VERSION = "0.0.88";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -213,7 +213,7 @@ function App() {
           // or navigating post-shift restaurant screens (summary → challenges)
           if (isPick(hostPhase)) {
             if (isPick(prev)) return prev; // peer is mid-pick, don't override
-            if (localEodInfoStep !== null) return prev; // peer still viewing info screens
+            if (localEodInfoStep !== null && localEodInfoStep !== "waiting") return prev; // peer still viewing info screens (but "waiting" means ready for picks)
             if (peerInPostShift) return prev; // peer still in restaurant post-shift flow
             setLocalEodInfoStep(null);
             setEodChoiceMade(false);
