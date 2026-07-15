@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.83";
+const GAME_VERSION = "0.0.84";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -233,8 +233,11 @@ function App() {
             return hostPhase as any;
           }
 
-          // Summary phase from host (e.g., new day starting): accept if not navigating locally
+          // Info phase from host (e.g., new day starting): accept if peer hasn't already
+          // advanced past info screens into picks or post-shift flow
           if (isInfo(hostPhase) && localEodInfoStep === null) {
+            if (isPick(prev)) return prev; // peer already advanced to picks
+            if (peerInPostShift) return prev; // peer in restaurant post-shift flow
             if (prev !== hostPhase) setEodChoiceMade(false);
             return hostPhase as any;
           }
