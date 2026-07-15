@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.79";
+const GAME_VERSION = "0.0.80";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -206,10 +206,11 @@ function App() {
           // Don't override if peer is navigating info screens locally
           if (isInfo(hostPhase) && localEodInfoStep !== null) return prev;
 
-          // Pick phases: don't override if peer is currently in any pick phase
-          // (host may advance faster, but peer needs to finish their own pick first)
+          // Pick phases: don't override if peer is still in info screens or mid-pick
+          // (each player advances through summary → challenges → picks at their own pace)
           if (isPick(hostPhase)) {
             if (isPick(prev)) return prev; // peer is mid-pick, don't override
+            if (localEodInfoStep !== null) return prev; // peer still viewing info screens
             setLocalEodInfoStep(null);
             setEodChoiceMade(false);
             return hostPhase as any;
