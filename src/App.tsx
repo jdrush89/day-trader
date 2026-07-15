@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.80";
+const GAME_VERSION = "0.0.81";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -446,7 +446,19 @@ function App() {
     setGameState(challengedState);
     doSave(challengedState);
     setEodPhase("challenges");
+    setLocalEodInfoStep("challenges");
   }, [isMultiplayer, isPeer, restaurantState?.shiftOver]);
+
+  // Multiplayer peer: immediately protect from host sync override when shift ends
+  // (peer still needs to dismiss the restaurant summary before seeing challenges,
+  //  but localEodInfoStep must be set NOW to block host's pick phase from overriding)
+  const peerShiftEndTriggered = useRef<number>(0);
+  useEffect(() => {
+    if (!isMultiplayer || !isPeer || !restaurantState?.shiftOver) return;
+    if (peerShiftEndTriggered.current === gameState.day) return;
+    peerShiftEndTriggered.current = gameState.day;
+    setLocalEodInfoStep("challenges");
+  }, [isMultiplayer, isPeer, restaurantState?.shiftOver, gameState.day]);
 
   // Multiplayer: EOD info screens gate — when all players are done, advance to picks/next day
   useEffect(() => {
