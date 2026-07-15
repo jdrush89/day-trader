@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.85";
+const GAME_VERSION = "0.0.86";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -245,7 +245,16 @@ function App() {
           return prev;
         });
         // Sync showTransition so peer sees Shwendy's start screen
-        if (sync.showTransition !== undefined) setShowTransition(sync.showTransition as any);
+        // When a transition arrives, we're moving to a new phase/day — clear stale EOD state
+        // so the peer doesn't block subsequent phase syncs with leftover pick/info phases
+        if (sync.showTransition !== undefined) {
+          if (sync.showTransition && sync.showTransition !== showTransition) {
+            setLocalEodInfoStep(null);
+            setEodChoiceMade(false);
+            setEodPhase(sync.eodPhase as any);
+          }
+          setShowTransition(sync.showTransition as any);
+        }
         if (sync.showChallengeIntro !== undefined) setShowChallengeIntro(sync.showChallengeIntro as any);
         if (sync.showLoanOffer !== undefined) setShowLoanOffer(sync.showLoanOffer);
         setPaused(sync.paused);
