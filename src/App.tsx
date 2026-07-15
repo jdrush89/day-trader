@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.84";
+const GAME_VERSION = "0.0.84-debug";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -240,6 +240,11 @@ function App() {
             if (peerInPostShift) return prev; // peer in restaurant post-shift flow
             if (prev !== hostPhase) setEodChoiceMade(false);
             return hostPhase as any;
+          }
+
+          // Log any phase override that falls through to the default
+          if (prev !== hostPhase) {
+            console.log("[peerSync] eodPhase fallthrough", { prev, hostPhase, localEodInfoStep, peerInPostShift });
           }
 
           return prev;
@@ -1466,6 +1471,15 @@ function App() {
       // After challenges, go directly to picks — no waiting gate needed here.
       // Each player advances through upgrade/stock/restaurant-upgrade/menu picks at their own pace.
       // The existing MP gate (checkEodGate in host.ts) waits for all players to submit picks.
+      console.log("[handleLocalEodContinue] challenges→picks", {
+        upgradeDraft: gameState.upgradeDraftOptions.length,
+        stockDraft: gameState.stockDraftOptions.length,
+        restaurantUpgradeDraft: gameState.restaurantUpgradeDraftOptions.length,
+        menuDraft: gameState.menuDraftOptions.length,
+        eodPhase,
+        isPeer,
+        isRestaurantShift: !!restaurantState,
+      });
       setLocalEodInfoStep(null);
       if (gameState.upgradeDraftOptions.length > 0) {
         setEodPhase("upgrades");
