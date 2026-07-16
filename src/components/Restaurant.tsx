@@ -988,6 +988,17 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
             </div>
             <div className="station-panel">
               {activeOrder.schmoozing ? (
+                activeOrder.schmoozing.resultMessage ? (
+                <div className="schmooze-inline">
+                  <div className="schmooze-inline-header">
+                    <span className="schmooze-inline-icon">{activeOrder.schmoozing.success ? "🤫" : "😤"}</span>
+                    <span>{activeOrder.schmoozing.resultMessage}</span>
+                  </div>
+                  {activeOrder.schmoozing.resultTimer != null && (
+                    <div className="schmooze-round-label">{(activeOrder.schmoozing.resultTimer / 20).toFixed(1)}s</div>
+                  )}
+                </div>
+                ) : (
                 <div className="schmooze-inline">
                   <div className="schmooze-inline-header">
                     <span className="schmooze-inline-icon">🕴️</span>
@@ -1018,6 +1029,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                     ))}
                   </div>
                 </div>
+                )
               ) : activeOrder.failed ? (
                 <div className="restaurant-step-card fail-card">
                   <div className="restaurant-step-title">{activeOrder.served ? "Insider left" : "Order failed"}</div>

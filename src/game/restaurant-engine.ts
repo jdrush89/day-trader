@@ -661,6 +661,15 @@ function markRhythmResult(order: ActiveOrder, index: number, result: "hit" | "mi
 function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], patienceMultiplier = 1, cookSpeedMultiplier = 1): ActiveOrder {
   // Schmoozing orders still tick patience, but nothing else
   if (order.schmoozing) {
+    // If showing a result message, count down the timer
+    if (order.schmoozing.resultTimer != null && order.schmoozing.resultTimer > 0) {
+      const resultTimer = order.schmoozing.resultTimer - 1;
+      if (resultTimer <= 0) {
+        // Timer expired — remove order from slot
+        return { ...order, failed: true, failedTimer: 0 };
+      }
+      return { ...order, schmoozing: { ...order.schmoozing, resultTimer } };
+    }
     const patienceRemaining = Math.max(0, order.patienceRemaining - dt * patienceMultiplier);
     if (patienceRemaining <= 0) return { ...order, patienceRemaining: 0, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
     return { ...order, patienceRemaining };
@@ -1453,14 +1462,23 @@ export function selectSchmoozeOption(
   const isCorrect = optionIndex === schmooze.correctIndex;
 
   if (!isCorrect) {
-    // Wrong answer — fail and remove order
+    // Wrong answer — show the insult for 5 seconds, then remove
+    const selectedText = schmooze.options[optionIndex];
     const orderSlots = [...state.orderSlots];
-    orderSlots[slotIndex] = null;
+    orderSlots[slotIndex] = {
+      ...order,
+      schmoozing: {
+        ...schmooze,
+        failed: true,
+        selected: optionIndex,
+        resultMessage: `"${selectedText}?! Get out of my face."`,
+        resultTimer: TICKS_PER_SECOND * 5,
+      },
+    };
     return {
       state: {
         ...state,
         orderSlots,
-        activeOrderId: state.activeOrderId === order.id ? null : state.activeOrderId,
       },
     };
   }
@@ -1483,14 +1501,22 @@ export function selectSchmoozeOption(
     return { state: { ...state, orderSlots } };
   }
 
-  // All rounds complete — success! Remove order from slot
+  // All rounds complete — success! Show tip for 5 seconds
   const orderSlots = [...state.orderSlots];
-  orderSlots[slotIndex] = null;
+  orderSlots[slotIndex] = {
+    ...order,
+    schmoozing: {
+      ...schmooze,
+      success: true,
+      selected: optionIndex,
+      resultMessage: "The insider whispers a tip for tomorrow...",
+      resultTimer: TICKS_PER_SECOND * 5,
+    },
+  };
   return {
     state: {
       ...state,
       orderSlots,
-      activeOrderId: state.activeOrderId === order.id ? null : state.activeOrderId,
     },
     schmoozeSuccess: true,
   };

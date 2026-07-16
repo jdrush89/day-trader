@@ -116,6 +116,8 @@ export interface ActiveOrder {
     selected: number | null;
     failed: boolean;
     success: boolean;
+    resultMessage?: string;
+    resultTimer?: number;
   };
 }
 
