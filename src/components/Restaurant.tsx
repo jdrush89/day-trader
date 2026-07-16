@@ -11,6 +11,7 @@ import {
   recordOrderContributor,
   restaurantTick,
   serveOrder,
+  selectSchmoozeOption,
 } from "../game/restaurant-engine";
 import { ActiveChore, ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
@@ -55,6 +56,7 @@ interface RestaurantProps {
   localPlayerName?: string;
   players?: Array<{ id: string; name: string; color: string }>;
   hideShiftSummary?: boolean;
+  onSchmoozeSuccess?: () => void;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -434,7 +436,7 @@ function renderChoreInstruction(chore: ActiveChore) {
   }
 }
 
-export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, onPeerChoreClick, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players, hideShiftSummary }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, onPeerChoreClick, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players, hideShiftSummary, onSchmoozeSuccess }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
     ...rawState,
@@ -559,6 +561,8 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           if (next.choreFocused) return next;
           const order = prev.orderSlots[globalIndex];
           if (!order) return prev;
+          // Schmoozing orders just get selected
+          if (order.schmoozing) return { ...prev, activeOrderId: order.id, choreFocused: false };
           if (order.completed) return serveOrder(prev, globalIndex, tipMultiplierRef.current, localPlayerIdRef.current);
           return next.activeOrderId != null ? recordOrderContributor(next, next.activeOrderId, localPlayerIdRef.current) : next;
         });
@@ -841,7 +845,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
             <button
               key={`slot-${globalIndex}`}
               type="button"
-              className={`order-slot ${effectiveActiveOrderId === order.id ? "active" : ""} ${order.completed ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""} ${order.isInsider ? "insider" : ""}`}
+              className={`order-slot ${effectiveActiveOrderId === order.id ? "active" : ""} ${order.completed && !order.schmoozing ? "done" : ""} ${order.failed ? "failed" : ""} ${order.burnt ? "burnt" : ""} ${!order.orderCorrect ? "incorrect" : ""} ${order.isInsider ? "insider" : ""} ${order.schmoozing ? "schmoozing" : ""}`}
               onClick={() =>
                 isPeer && onPeerKey
                   ? onPeerKey(String(localIndex + 1))
@@ -849,6 +853,8 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                       if (!prev) return prev;
                       const currentOrder = prev.orderSlots[globalIndex];
                       if (!currentOrder) return prev;
+                      // Schmoozing orders just get selected (focused)
+                      if (currentOrder.schmoozing) return { ...prev, activeOrderId: currentOrder.id, choreFocused: false };
                       if (currentOrder.completed) return serveOrder(prev, globalIndex, tipMultiplier, localPlayerId);
                       const next = acceptOrder(prev, globalIndex);
                       return next.activeOrderId != null ? recordOrderContributor(next, next.activeOrderId, localPlayerId) : next;
@@ -943,26 +949,73 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
             <div className="ticket-panel">
               <div className="ticket-header">
                 <h2>{activeOrder.menuItem.icon} {activeOrder.menuItem.name}</h2>
-                <span>Customer patience: {activeOrder.patienceRemaining.toFixed(1)}s</span>
+                <span>{activeOrder.schmoozing ? "Schmoozing..." : "Customer patience:"} {activeOrder.patienceRemaining.toFixed(1)}s</span>
               </div>
-              <div className="ticket-steps">
-                {activeOrder.menuItem.steps.map((step, index) => {
-                  const complete = index < activeOrder.currentStepIndex || activeOrder.completed;
-                  const current = index === activeOrder.currentStepIndex && !activeOrder.completed;
-                  return (
-                    <div key={`${step.label}-${index}`} className={`ticket-step ${complete ? "complete" : ""} ${current ? "current" : ""}`}>
-                      <span>{complete ? "✅" : current ? "👉" : "•"}</span>
-                      <span>{step.label}</span>
-                    </div>
-                  );
-                })}
-              </div>
+              {activeOrder.schmoozing ? (
+                <div className="ticket-steps">
+                  <div className="ticket-step complete"><span>✅</span><span>Order served</span></div>
+                  {activeOrder.schmoozing.rounds.map((_, i) => {
+                    const done = i < activeOrder.schmoozing!.currentRound;
+                    const current = i === activeOrder.schmoozing!.currentRound;
+                    return (
+                      <div key={i} className={`ticket-step ${done ? "complete" : ""} ${current ? "current" : ""}`}>
+                        <span>{done ? "✅" : current ? "👉" : "•"}</span>
+                        <span>Schmooze round {i + 1}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="ticket-steps">
+                  {activeOrder.menuItem.steps.map((step, index) => {
+                    const complete = index < activeOrder.currentStepIndex || activeOrder.completed;
+                    const current = index === activeOrder.currentStepIndex && !activeOrder.completed;
+                    return (
+                      <div key={`${step.label}-${index}`} className={`ticket-step ${complete ? "complete" : ""} ${current ? "current" : ""}`}>
+                        <span>{complete ? "✅" : current ? "👉" : "•"}</span>
+                        <span>{step.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="station-panel">
-              {activeOrder.failed ? (
+              {activeOrder.schmoozing ? (
+                <div className="schmooze-inline">
+                  <div className="schmooze-inline-header">
+                    <span className="schmooze-inline-icon">🕴️</span>
+                    <span>Schmooze the insider! Pick the compliment.</span>
+                  </div>
+                  <div className="schmooze-round-label">Round {activeOrder.schmoozing.currentRound + 1} of {activeOrder.schmoozing.rounds.length}</div>
+                  <div className="schmooze-options">
+                    {activeOrder.schmoozing.options.map((opt, i) => (
+                      <button
+                        key={i}
+                        className="schmooze-option"
+                        onClick={() => {
+                          const slotIndex = state.orderSlots.findIndex((s) => s?.id === activeOrder.id);
+                          if (slotIndex < 0) return;
+                          setRestaurantState((prev) => {
+                            if (!prev) return prev;
+                            const result = selectSchmoozeOption(prev, slotIndex, i);
+                            if (result.schmoozeSuccess && onSchmoozeSuccess) {
+                              // Defer callback to after state update
+                              setTimeout(() => onSchmoozeSuccess(), 0);
+                            }
+                            return result.state;
+                          });
+                        }}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : activeOrder.failed ? (
                 <div className="restaurant-step-card fail-card">
-                  <div className="restaurant-step-title">Order failed</div>
-                  <div className="restaurant-step-copy">This customer bounced. Pick another ticket.</div>
+                  <div className="restaurant-step-title">{activeOrder.served ? "Insider left" : "Order failed"}</div>
+                  <div className="restaurant-step-copy">{activeOrder.served ? "The insider ran out of patience before you could finish schmoozing." : "This customer bounced. Pick another ticket."}</div>
                 </div>
               ) : activeOrder.completed ? (
                 <div className="restaurant-step-card success-card">

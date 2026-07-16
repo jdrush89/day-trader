@@ -25,9 +25,8 @@ import { PnLGraph } from "./components/PnLGraph";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
-import { pickSchmoozeRounds, shuffleOptions } from "./game/schmooze-data";
 
-const GAME_VERSION = "0.0.95";
+const GAME_VERSION = "0.0.96";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -75,16 +74,6 @@ function App() {
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
   const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
-  const [schmoozeState, setSchmoozeState] = useState<{
-    rounds: { compliment: string; insults: string[] }[];
-    currentRound: number;
-    options: string[];
-    correctIndex: number;
-    selected: number | null;
-    failures: number;
-    done: boolean;
-    success: boolean;
-  } | null>(null);
   const tradeTrackerRef = useRef<TradeTracker>(createTradeTracker());
   tradeTrackerRef.current = tradeTracker;
   const beginScheduledDayRef = useRef<(state?: GameState, opts?: { skipRestaurantTransition?: boolean; skipTradingTransition?: boolean }) => void>(() => {});
@@ -796,15 +785,6 @@ function App() {
       }
     }
   }, [gameState.marketOpen]);
-
-  // Trigger schmooze when an insider order is served
-  const prevInsiderServed = useRef(false);
-  useEffect(() => {
-    if (restaurantState?.insiderServed && !prevInsiderServed.current && !schmoozeState) {
-      handleInsiderServed();
-    }
-    prevInsiderServed.current = restaurantState?.insiderServed ?? false;
-  }, [restaurantState?.insiderServed]);
 
   const NEWS_CHANNELS: MonitorChannel[] = ["business_news", "global_news", "social_media"];
 
@@ -1701,57 +1681,10 @@ function App() {
     goToShopOrNextDay(nextState);
   }, [gameState, isMultiplayer, isPeer, mpActions, goToShopOrNextDay]);
 
-  const handleInsiderServed = useCallback(() => {
-    if (schmoozeState) return; // already schmoozing
-    const rounds = pickSchmoozeRounds(3);
-    const { options, correctIndex } = shuffleOptions(rounds[0]);
-    setSchmoozeState({
-      rounds,
-      currentRound: 0,
-      options,
-      correctIndex,
-      selected: null,
-      failures: 0,
-      done: false,
-      success: false,
-    });
-  }, [schmoozeState]);
-
-  const handleSchmoozeSelect = useCallback((index: number) => {
-    if (!schmoozeState || schmoozeState.selected !== null || schmoozeState.done) return;
-
-    const isCorrect = index === schmoozeState.correctIndex;
-    const newFailures = schmoozeState.failures + (isCorrect ? 0 : 1);
-
-    // Show selection result briefly
-    setSchmoozeState({ ...schmoozeState, selected: index });
-
-    setTimeout(() => {
-      // If wrong, instant fail
-      if (!isCorrect) {
-        setSchmoozeState((prev) => prev ? { ...prev, done: true, success: false } : null);
-        return;
-      }
-      // If correct and more rounds remain
-      const nextRound = schmoozeState.currentRound + 1;
-      if (nextRound < schmoozeState.rounds.length) {
-        const { options, correctIndex } = shuffleOptions(schmoozeState.rounds[nextRound]);
-        setSchmoozeState((prev) => prev ? {
-          ...prev,
-          currentRound: nextRound,
-          options,
-          correctIndex,
-          selected: null,
-          failures: newFailures,
-        } : null);
-      } else {
-        // All rounds complete — success!
-        const tip = generateInsiderTip(gameState.stocks, gameState.day + 1);
-        setGameState((prev) => ({ ...prev, schmoozeInsiderTip: tip }));
-        setSchmoozeState((prev) => prev ? { ...prev, done: true, success: true } : null);
-      }
-    }, 800);
-  }, [schmoozeState, gameState.stocks, gameState.day]);
+  const handleSchmoozeSuccess = useCallback(() => {
+    const tip = generateInsiderTip(gameState.stocks, gameState.day + 1);
+    setGameState((prev) => ({ ...prev, schmoozeInsiderTip: tip }));
+  }, [gameState.stocks, gameState.day]);
 
   const handleRestaurantFinish = useCallback((earnings: number) => {
     // In multiplayer, game state changes are auto-triggered when shiftOver becomes true.
@@ -2316,7 +2249,7 @@ function App() {
         <>
         <Restaurant
           day={gameState.day}
-          paused={paused || titleTutorial === "restaurant" || restaurantState.shiftOver || showChallengeIntro === "restaurant" || schmoozeState !== null}
+          paused={paused || titleTutorial === "restaurant" || restaurantState.shiftOver || showChallengeIntro === "restaurant"}
           state={restaurantState}
           setRestaurantState={setRestaurantState}
           onFinish={handleRestaurantFinish}
@@ -2355,48 +2288,8 @@ function App() {
           localPlayerName={mpState.localPlayer?.name ?? "You"}
           players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
           hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop")}
+          onSchmoozeSuccess={handleSchmoozeSuccess}
         />
-        {/* Schmooze modal — appears when insider order is served */}
-        {schmoozeState && (
-          <div className="schmooze-overlay">
-            <div className="schmooze-modal">
-              {!schmoozeState.done ? (
-                <>
-                  <h2>🕴️ Insider Customer</h2>
-                  <p className="schmooze-prompt">Schmooze the insider! Pick the compliment.</p>
-                  <p className="schmooze-round">Round {schmoozeState.currentRound + 1} of {schmoozeState.rounds.length}</p>
-                  <div className="schmooze-options">
-                    {schmoozeState.options.map((opt, i) => (
-                      <button
-                        key={i}
-                        className={`schmooze-option ${schmoozeState.selected === i ? (i === schmoozeState.correctIndex ? "correct" : "wrong") : ""}`}
-                        onClick={() => handleSchmoozeSelect(i)}
-                        disabled={schmoozeState.selected !== null}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2>{schmoozeState.success ? "🤝 Schmooze Successful!" : "😤 Insider Offended!"}</h2>
-                  <p className={`schmooze-result ${schmoozeState.success ? "success" : "failure"}`}>
-                    {schmoozeState.success ? "The insider is impressed by your charm." : "You insulted the insider. They left without sharing anything."}
-                  </p>
-                  {schmoozeState.success && gameState.schmoozeInsiderTip && (
-                    <div className="schmooze-tip">
-                      💡 "{gameState.schmoozeInsiderTip.tipText}"
-                    </div>
-                  )}
-                  <button className="schmooze-continue" onClick={() => setSchmoozeState(null)}>
-                    Continue
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        )}
         {/* Post-shift overlays render on top of restaurant UI */}
         {showChallengeIntro === "restaurant" && (
           <div className="end-of-day-overlay">
@@ -2824,7 +2717,7 @@ function App() {
             <div className="boss-restaurant-wrap">
             <Restaurant
               day={gameState.day}
-              paused={paused || schmoozeState !== null}
+              paused={paused}
               state={restaurantState}
               setRestaurantState={setRestaurantState}
               onFinish={() => {}}

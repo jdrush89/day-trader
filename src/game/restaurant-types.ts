@@ -106,6 +106,16 @@ export interface ActiveOrder {
   customizations: Record<number, boolean[]>;
   orderCorrect: boolean;
   isInsider: boolean;
+  // Schmooze state (populated after serving an insider)
+  schmoozing?: {
+    rounds: { compliment: string; insults: string[] }[];
+    currentRound: number;
+    options: string[];
+    correctIndex: number;
+    selected: number | null;
+    failed: boolean;
+    success: boolean;
+  };
 }
 
 export interface RestaurantOrderLog {

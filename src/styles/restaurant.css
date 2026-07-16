@@ -125,58 +125,56 @@
   font-size: 0.7rem;
 }
 
-/* Schmooze modal */
-.schmooze-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+.order-slot.schmoozing {
+  border-color: #ffd700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  animation: schmooze-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes schmooze-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
+  50% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.7); }
+}
+
+/* Inline schmooze UI in station panel */
+.schmooze-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+}
+
+.schmooze-inline-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.schmooze-modal {
-  background: var(--bg-panel, #1a1a2e);
-  border: 2px solid #ffd700;
-  border-radius: 12px;
-  padding: 1.5rem 2rem;
-  max-width: 500px;
-  width: 90%;
-  text-align: center;
-}
-
-.schmooze-modal h2 {
+  gap: 0.5rem;
+  font-size: 0.95rem;
   color: #ffd700;
-  margin-bottom: 0.5rem;
 }
 
-.schmooze-modal .schmooze-prompt {
-  color: #ccc;
-  margin-bottom: 1rem;
-  font-size: 0.9rem;
+.schmooze-inline-icon {
+  font-size: 1.5rem;
 }
 
-.schmooze-modal .schmooze-round {
+.schmooze-round-label {
   color: #888;
   font-size: 0.8rem;
-  margin-bottom: 0.75rem;
 }
 
 .schmooze-options {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .schmooze-option {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 8px;
-  padding: 0.6rem 1rem;
+  padding: 0.5rem 0.75rem;
   color: #eee;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-align: left;
   transition: background 0.15s, border-color 0.15s;
 }
@@ -184,54 +182,6 @@
 .schmooze-option:hover {
   background: rgba(255, 215, 0, 0.1);
   border-color: #ffd700;
-}
-
-.schmooze-option.correct {
-  background: rgba(0, 200, 100, 0.2);
-  border-color: #00c864;
-  color: #00ff7f;
-}
-
-.schmooze-option.wrong {
-  background: rgba(255, 50, 50, 0.2);
-  border-color: #ff3333;
-  color: #ff6666;
-}
-
-.schmooze-result {
-  margin-top: 1rem;
-  font-size: 1rem;
-  font-weight: bold;
-}
-
-.schmooze-result.success {
-  color: #00ff7f;
-}
-
-.schmooze-result.failure {
-  color: #ff6666;
-}
-
-.schmooze-tip {
-  margin-top: 0.75rem;
-  padding: 0.75rem;
-  background: rgba(255, 215, 0, 0.1);
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  border-radius: 8px;
-  color: #ffd700;
-  font-size: 0.85rem;
-  font-style: italic;
-}
-
-.schmooze-continue {
-  margin-top: 1rem;
-  padding: 0.5rem 1.5rem;
-  background: #ffd700;
-  color: #1a1a2e;
-  border: none;
-  border-radius: 6px;
-  font-weight: bold;
-  cursor: pointer;
 }
 
 .order-slot.empty {

@@ -18,6 +18,7 @@ import {
 } from "./restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./restaurant-upgrades";
 import { getNetWorth } from "./engine";
+import { pickSchmoozeRounds, shuffleOptions } from "./schmooze-data";
 
 const TICKS_PER_SECOND = 20;
 const SHIFT_DURATION_SECONDS = 120;
@@ -655,6 +656,12 @@ function markRhythmResult(order: ActiveOrder, index: number, result: "hit" | "mi
 }
 
 function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], patienceMultiplier = 1, cookSpeedMultiplier = 1): ActiveOrder {
+  // Schmoozing orders still tick patience, but nothing else
+  if (order.schmoozing) {
+    const patienceRemaining = Math.max(0, order.patienceRemaining - dt * patienceMultiplier);
+    if (patienceRemaining <= 0) return { ...order, patienceRemaining: 0, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
+    return { ...order, patienceRemaining };
+  }
   if (order.served) return order;
   if (order.failed) return { ...order, failedTimer: order.failedTimer - dt * TICKS_PER_SECOND };
 
@@ -1321,6 +1328,8 @@ export function calculateTip(order: ActiveOrder, upgrades: string[] = []): numbe
 export function serveOrder(state: RestaurantState, slotIndex: number, tipMultiplier = 1, servingPlayerId?: string): RestaurantState {
   const order = state.orderSlots[slotIndex];
   if (!order || !order.completed || order.failed) return state;
+  // Don't re-serve an order already in schmooze mode
+  if (order.schmoozing) return state;
   // Can't serve while a chore is blocking
   if (state.servingBlocked) return state;
 
@@ -1330,7 +1339,6 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
   const comboBonus = hasRestaurantUpgrade(state.acquiredUpgrades, "combo_bonus") && nextComboStreak % 3 === 0 ? 3 : 0;
   const payout = basePay + tip + comboBonus;
   const orderSlots = [...state.orderSlots];
-  orderSlots[slotIndex] = null;
 
   // Challenge tracking
   let tracker = { ...state.challengeTracker };
@@ -1340,13 +1348,11 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
   if (order.patienceRemaining < 2) tracker.clutchCompletions++;
   if (tip <= 0) {
     if (tracker.allTipsPositive) {
-      // First missed tip — record details
       tracker.firstMissedTipOrder = order.menuItem.name;
       tracker.firstMissedTipTime = state.shiftDuration - state.shiftTimeRemaining;
     }
     tracker.allTipsPositive = false;
   }
-  // Track fastest completion
   if (elapsed < tracker.fastestCompletion) {
     tracker.fastestCompletion = elapsed;
     tracker.fastestCompletionOrder = order.menuItem.name;
@@ -1354,11 +1360,9 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
 
   // Log the completed order for graphing
   const contributors = state.orderContributors[order.id] ?? [];
-  // Add serving player if not already a contributor
   if (servingPlayerId && !contributors.includes(servingPlayerId)) {
     contributors.push(servingPlayerId);
   }
-  // Fallback: if no contributors tracked, use "player" for solo
   const finalContributors = contributors.length > 0 ? contributors : ["player"];
 
   const logEntry: RestaurantOrderLog = {
@@ -1370,14 +1374,34 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
     contributors: finalContributors,
   };
 
-  // Clean up contributor tracking for this order
   const newContributors = { ...state.orderContributors };
   delete newContributors[order.id];
+
+  // Insider orders stay in slot for schmoozing
+  if (order.isInsider && !state.insiderServed) {
+    const rounds = pickSchmoozeRounds(3);
+    const { options, correctIndex } = shuffleOptions(rounds[0]);
+    orderSlots[slotIndex] = {
+      ...order,
+      served: true,
+      schmoozing: {
+        rounds,
+        currentRound: 0,
+        options,
+        correctIndex,
+        selected: null,
+        failed: false,
+        success: false,
+      },
+    };
+  } else {
+    orderSlots[slotIndex] = null;
+  }
 
   return {
     ...state,
     orderSlots,
-    activeOrderId: state.activeOrderId === order.id ? null : state.activeOrderId,
+    activeOrderId: state.activeOrderId === order.id ? (order.isInsider && !state.insiderServed ? order.id : null) : state.activeOrderId,
     completedOrders: state.completedOrders + 1,
     totalEarnings: Math.round((state.totalEarnings + payout) * 100) / 100,
     totalTips: Math.round((state.totalTips + tip) * 100) / 100,
@@ -1396,6 +1420,64 @@ export function recordOrderContributor(state: RestaurantState, orderId: number, 
   return {
     ...state,
     orderContributors: { ...state.orderContributors, [orderId]: [...existing, playerId] },
+  };
+}
+
+/** Select a schmooze option for the active insider order. Returns { state, success?, tipEarned? } */
+export function selectSchmoozeOption(
+  state: RestaurantState,
+  slotIndex: number,
+  optionIndex: number,
+): { state: RestaurantState; schmoozeSuccess?: boolean } {
+  const order = state.orderSlots[slotIndex];
+  if (!order?.schmoozing || order.schmoozing.selected !== null || order.schmoozing.failed || order.schmoozing.success) {
+    return { state };
+  }
+
+  const schmooze = order.schmoozing;
+  const isCorrect = optionIndex === schmooze.correctIndex;
+
+  if (!isCorrect) {
+    // Wrong answer — fail and remove order
+    const orderSlots = [...state.orderSlots];
+    orderSlots[slotIndex] = null;
+    return {
+      state: {
+        ...state,
+        orderSlots,
+        activeOrderId: state.activeOrderId === order.id ? null : state.activeOrderId,
+      },
+    };
+  }
+
+  // Correct — advance to next round or complete
+  const nextRound = schmooze.currentRound + 1;
+  if (nextRound < schmooze.rounds.length) {
+    const { options, correctIndex } = shuffleOptions(schmooze.rounds[nextRound]);
+    const orderSlots = [...state.orderSlots];
+    orderSlots[slotIndex] = {
+      ...order,
+      schmoozing: {
+        ...schmooze,
+        currentRound: nextRound,
+        options,
+        correctIndex,
+        selected: null,
+      },
+    };
+    return { state: { ...state, orderSlots } };
+  }
+
+  // All rounds complete — success! Remove order from slot
+  const orderSlots = [...state.orderSlots];
+  orderSlots[slotIndex] = null;
+  return {
+    state: {
+      ...state,
+      orderSlots,
+      activeOrderId: state.activeOrderId === order.id ? null : state.activeOrderId,
+    },
+    schmoozeSuccess: true,
   };
 }
 
