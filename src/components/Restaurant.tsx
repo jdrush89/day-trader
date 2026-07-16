@@ -14,6 +14,7 @@ import {
   selectSchmoozeOption,
 } from "../game/restaurant-engine";
 import { ActiveChore, ActiveOrder, OrderStep, RestaurantState, RhythmResult } from "../game/restaurant-types";
+import { type InsiderTip } from "../game/types";
 import { RESTAURANT_UPGRADE_POOL } from "../game/restaurant-upgrades";
 import { ALL_CHALLENGES, type ActiveChallenge } from "../game/challenges";
 import { getConsumable, getPhaseItems, type ConsumableInventory } from "../game/consumables";
@@ -56,7 +57,7 @@ interface RestaurantProps {
   localPlayerName?: string;
   players?: Array<{ id: string; name: string; color: string }>;
   hideShiftSummary?: boolean;
-  onSchmoozeSuccess?: () => void;
+  onSchmoozeSuccess?: () => InsiderTip;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -1017,8 +1018,21 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                             if (!prev) return prev;
                             const result = selectSchmoozeOption(prev, slotIndex, i);
                             if (result.schmoozeSuccess && onSchmoozeSuccess) {
-                              // Defer callback to after state update
-                              setTimeout(() => onSchmoozeSuccess(), 0);
+                              // Get the tip and update the result message with it
+                              setTimeout(() => {
+                                const tip = onSchmoozeSuccess();
+                                setRestaurantState((rs) => {
+                                  if (!rs) return rs;
+                                  const order = rs.orderSlots[slotIndex];
+                                  if (!order?.schmoozing?.resultMessage) return rs;
+                                  const orderSlots = [...rs.orderSlots];
+                                  orderSlots[slotIndex] = {
+                                    ...order,
+                                    schmoozing: { ...order.schmoozing, resultMessage: `🤫 "${tip.tipText}"` },
+                                  };
+                                  return { ...rs, orderSlots };
+                                });
+                              }, 0);
                             }
                             return result.state;
                           });

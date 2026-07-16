@@ -100,5 +100,6 @@ export function createInitialState(playerCount: number = 1): GameState {
     consumableInventory: createEmptyInventory(),
     playerCount,
     schmoozeInsiderTip: null,
+    schmoozeActiveTip: null,
   };
 }

@@ -181,4 +181,5 @@ export interface GameState {
   consumableInventory: ConsumableInventory;
   playerCount: number;
   schmoozeInsiderTip: InsiderTip | null;
+  schmoozeActiveTip: InsiderTip | null;
 }

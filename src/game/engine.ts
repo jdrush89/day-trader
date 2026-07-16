@@ -320,11 +320,19 @@ export function getOptionsValue(state: GameState): number {
 }
 
 function isTipSymbol(state: GameState, symbol: string): boolean {
-  return [state.insiderTip?.symbol, state.insiderTip2?.symbol].filter(Boolean).includes(symbol);
+  return [state.insiderTip?.symbol, state.insiderTip2?.symbol, state.schmoozeActiveTip?.symbol].filter(Boolean).includes(symbol);
 }
 
 function getViewedTipSymbols(state: GameState): string[] {
-  return Array.from(new Set([state.insiderTip?.symbol, state.insiderTip2?.symbol].filter(Boolean) as string[]));
+  const symbols: string[] = [];
+  // Schmooze tip is always "viewed" (player saw it at the restaurant)
+  if (state.schmoozeActiveTip) symbols.push(state.schmoozeActiveTip.symbol);
+  // Regular tips only count if the player clicked "View Tip"
+  if (state.insiderViewed) {
+    if (state.insiderTip) symbols.push(state.insiderTip.symbol);
+    if (state.insiderTip2) symbols.push(state.insiderTip2.symbol);
+  }
+  return Array.from(new Set(symbols));
 }
 
 function applyProfitModifiers(state: GameState, stock: Stock, position: Position, profit: number): number {
@@ -746,7 +754,7 @@ export function tick(state: GameState): GameState {
     const dayFines: { amount: number; symbol: string; profit: number; day: number }[] = [];
     let pendingSECCheck: { catchChance: number; fineAmount: number; symbol: string; profit: number } | null = null;
 
-    if (postOptionsState.insiderViewed && getViewedTipSymbols(postOptionsState).length > 0) {
+    if ((postOptionsState.insiderViewed || postOptionsState.schmoozeActiveTip) && getViewedTipSymbols(postOptionsState).length > 0) {
       let totalInsiderProfit = postOptionsState.insiderRealizedProfit;
       for (const tipSymbol of getViewedTipSymbols(postOptionsState)) {
         const tipStock = newStocks.find((s) => s.symbol === tipSymbol);
@@ -773,7 +781,7 @@ export function tick(state: GameState): GameState {
     const gameOver = false; const goldenParachutes = postOptionsState.goldenParachutes;
     const loans = [...postOptionsState.loans];
     const pendingOrders = hasUpgrade(postOptionsState, "limit_order_pro") ? postOptionsState.pendingOrders : [];
-    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck, loans, milestonePayment: null };
+    const endOfDayState: GameState = { ...postOptionsState, day: state.day, cash: finalCash, stocks: newStocks, news: newNews, timeOfDay: 0, marketOpen: false, gameOver, totalProfit: finalNetWorth - 1000, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: [], insiderSnapshotShorts: [], insiderRealizedProfit: 0, goldenParachutes, pendingOrders, secFines: dayFines.length > 0 ? [...postOptionsState.secFines, ...dayFines] : postOptionsState.secFines, institutionalOrders: [], pendingSECCheck, loans, milestonePayment: null, schmoozeActiveTip: null };
     return generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 
@@ -838,7 +846,7 @@ export function sellStock(state: GameState, symbol: string, shares: number, play
   const remainingShares = position.shares - shares;
   const newPortfolio = remainingShares === 0 ? state.portfolio.filter((p) => p.symbol !== symbol) : state.portfolio.map((p) => p.symbol === symbol ? { ...p, shares: remainingShares } : p);
   let insiderRealizedProfit = state.insiderRealizedProfit;
-  if (state.insiderViewed && isTipSymbol(state, symbol)) {
+  if ((state.insiderViewed || state.schmoozeActiveTip) && isTipSymbol(state, symbol)) {
     const snapPos = state.insiderSnapshotHoldings.find((p) => p.symbol === symbol);
     const snapShares = snapPos?.shares ?? 0;
     const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
@@ -891,7 +899,7 @@ export function coverShort(state: GameState, symbol: string, shares: number, pla
   const remainingShares = position.shares - shares;
   const newShorts = remainingShares === 0 ? state.shorts.filter((p) => p.symbol !== symbol) : state.shorts.map((p) => p.symbol === symbol ? { ...p, shares: remainingShares } : p);
   let insiderRealizedProfit = state.insiderRealizedProfit;
-  if (state.insiderViewed && isTipSymbol(state, symbol)) {
+  if ((state.insiderViewed || state.schmoozeActiveTip) && isTipSymbol(state, symbol)) {
     const snapShort = state.insiderSnapshotShorts.find((p) => p.symbol === symbol);
     const snapShares = snapShort?.shares ?? 0;
     const insiderShares = Math.max(0, Math.min(shares, position.shares - snapShares));
@@ -914,14 +922,13 @@ export function coverShort(state: GameState, symbol: string, shares: number, pla
 
 export function openMarket(state: GameState): GameState {
   const netWorth = getNetWorth(state);
-  // If a schmooze tip was earned from Shwendy's, use it as this day's insider tip
+  // If a schmooze tip was earned from Shwendy's, activate it separately from the regular insider tip
   const schmoozeHint = state.schmoozeInsiderTip;
-  // Schmooze tips: player already knows the info, so mark as viewed immediately
-  // and snapshot current holdings for SEC profit calculation
-  const viewed = schmoozeHint != null;
-  const snapshotHoldings = viewed ? state.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })) : [];
-  const snapshotShorts = viewed ? state.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) : [];
-  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: schmoozeHint, insiderTip2: null, insiderViewed: viewed, insiderViewedTick: 0, insiderSnapshotHoldings: snapshotHoldings, insiderSnapshotShorts: snapshotShorts, insiderRealizedProfit: 0, institutionalOrders: [], challengeTracker: createTradingTracker(), schmoozeInsiderTip: null };
+  // Schmooze tips: player already saw the tip at the restaurant, so snapshot holdings for SEC profit calculation
+  const hasSchmooze = schmoozeHint != null;
+  const snapshotHoldings = hasSchmooze ? state.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })) : [];
+  const snapshotShorts = hasSchmooze ? state.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) : [];
+  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: snapshotHoldings, insiderSnapshotShorts: snapshotShorts, insiderRealizedProfit: 0, institutionalOrders: [], challengeTracker: createTradingTracker(), schmoozeInsiderTip: null, schmoozeActiveTip: schmoozeHint };
 }
 
 export function acquireUpgrade(state: GameState, upgradeId: string): GameState {

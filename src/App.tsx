@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { GameState, MonitorChannel, OrderType, OrderSide } from "./game/types";
+import { GameState, MonitorChannel, OrderType, OrderSide, InsiderTip } from "./game/types";
 import { createInitialState } from "./game/state";
 import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft, applyMilestoneCheck, isMilestoneDay, generateInsiderTip } from "./game/engine";
 import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU, generateRestaurantUpgradeDraft, generateMenuDraft } from "./game/restaurant-engine";
@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.100";
+const GAME_VERSION = "0.0.101";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -98,7 +98,7 @@ function App() {
     () => shopOffering.map((item) => ({ id: item.id, name: item.name, phase: item.phase, tier: item.tier })),
     () => pnlSeries.length > 0 ? pnlSeries : undefined,
     {
-      onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
+      onViewInsider: () => setGameState((prev) => prev.insiderViewed ? prev : { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, insiderSnapshotHoldings: prev.schmoozeActiveTip ? prev.insiderSnapshotHoldings : prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })), insiderSnapshotShorts: prev.schmoozeActiveTip ? prev.insiderSnapshotShorts : prev.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) }),
       onAcceptLoan: () => {
         if (showLoanOffer) {
           setGameState((prev) => ({ ...prev, cash: prev.cash + showLoanOffer.amount, loans: [...prev.loans, { amount: showLoanOffer.amount, dueDay: showLoanOffer.dueDay, interestRate: showLoanOffer.interestRate }] }));
@@ -1683,9 +1683,10 @@ function App() {
     goToShopOrNextDay(nextState);
   }, [gameState, isMultiplayer, isPeer, mpActions, goToShopOrNextDay]);
 
-  const handleSchmoozeSuccess = useCallback(() => {
+  const handleSchmoozeSuccess = useCallback((): InsiderTip => {
     const tip = generateInsiderTip(gameState.stocks, gameState.day + 1);
     setGameState((prev) => ({ ...prev, schmoozeInsiderTip: tip }));
+    return tip;
   }, [gameState.stocks, gameState.day]);
 
   const handleRestaurantFinish = useCallback((earnings: number) => {
@@ -1729,12 +1730,14 @@ function App() {
         const inv = { ...prev.consumableInventory, activeBuffs: prev.consumableInventory.activeBuffs.filter((b) => b.consumableId !== "quantum_encryption") };
         return { ...prev, insiderViewed: true, insiderViewedTick: prev.timeOfDay, consumableInventory: inv };
       }
+      // If schmooze tip already created snapshots, keep those (earlier baseline = more SEC exposure)
+      const hasExistingSnapshot = prev.schmoozeActiveTip != null;
       return {
         ...prev,
         insiderViewed: true,
         insiderViewedTick: prev.timeOfDay,
-        insiderSnapshotHoldings: prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })),
-        insiderSnapshotShorts: prev.shorts.map((p) => ({ symbol: p.symbol, shares: p.shares, entryPrice: p.entryPrice })),
+        insiderSnapshotHoldings: hasExistingSnapshot ? prev.insiderSnapshotHoldings : prev.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })),
+        insiderSnapshotShorts: hasExistingSnapshot ? prev.insiderSnapshotShorts : prev.shorts.map((p) => ({ symbol: p.symbol, shares: p.shares, entryPrice: p.entryPrice })),
       };
     });
   }, []);
