@@ -96,6 +96,7 @@ export interface ActiveOrder {
   memorizeRevealed: boolean;
   memorizeRevealTimer: number;
   memorizeInputIndex: number;
+  memorizeInputDelay: number;
   startTime: number;
   patienceRemaining: number;
   completed: boolean;

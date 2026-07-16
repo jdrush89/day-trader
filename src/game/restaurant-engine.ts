@@ -400,6 +400,7 @@ function resetStepProgress(order: ActiveOrder): ActiveOrder {
     memorizeRevealed: false,
     memorizeRevealTimer: 0,
     memorizeInputIndex: 0,
+    memorizeInputDelay: 0,
   };
 }
 
@@ -439,9 +440,10 @@ function initializeCurrentStep(order: ActiveOrder, upgrades: string[]): ActiveOr
     return {
       ...order,
       memorizeSequence: generateMemorizeSequence(step.sequenceLength),
-      memorizeRevealed: true,
-      memorizeRevealTimer: step.revealDuration,
+      memorizeRevealed: false,
+      memorizeRevealTimer: 0,
       memorizeInputIndex: 0,
+      memorizeInputDelay: 0,
     };
   }
 
@@ -488,6 +490,7 @@ function createOrder(menuItem: MenuItem, id: number, upgrades: string[]): Active
       memorizeRevealed: false,
       memorizeRevealTimer: 0,
       memorizeInputIndex: 0,
+      memorizeInputDelay: 0,
       startTime: Date.now(),
       patienceRemaining: menuItem.patience,
       completed: false,
@@ -725,11 +728,16 @@ function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], pat
 
   if (step.type === "memorize" && updatedOrder.memorizeRevealed) {
     const memorizeRevealTimer = Math.max(0, updatedOrder.memorizeRevealTimer - dt * TICKS_PER_SECOND);
-    return {
-      ...updatedOrder,
-      memorizeRevealTimer,
-      memorizeRevealed: memorizeRevealTimer > 0,
-    };
+    if (memorizeRevealTimer <= 0) {
+      // Reveal ended — start 2-second input delay
+      return { ...updatedOrder, memorizeRevealed: false, memorizeRevealTimer: 0, memorizeInputDelay: secondsToTicks(2) };
+    }
+    return { ...updatedOrder, memorizeRevealTimer };
+  }
+
+  // Tick down the input delay after memorize reveal
+  if (step.type === "memorize" && updatedOrder.memorizeInputDelay > 0) {
+    return { ...updatedOrder, memorizeInputDelay: Math.max(0, updatedOrder.memorizeInputDelay - dt * TICKS_PER_SECOND) };
   }
 
   return updatedOrder;
@@ -1116,7 +1124,14 @@ export function acceptOrder(state: RestaurantState, slotIndex: number): Restaura
   if (!order || order.failed || order.served) return state;
   if (state.activeOrderId === order.id) return state;
 
-  return { ...replaceOrder(state, { ...order, lastMousePos: null }, order.id), choreFocused: false };
+  // Trigger memorize reveal when focusing a memorize-step order
+  let updatedOrder = { ...order, lastMousePos: null };
+  const step = order.menuItem.steps[order.currentStepIndex];
+  if (step?.type === "memorize" && !order.memorizeRevealed && order.memorizeInputIndex === 0 && order.memorizeInputDelay === 0) {
+    updatedOrder = { ...updatedOrder, memorizeRevealed: true, memorizeRevealTimer: (step as MemorizeStep).revealDuration };
+  }
+
+  return { ...replaceOrder(state, updatedOrder, order.id), choreFocused: false };
 }
 
 export function handleKeyPress(state: RestaurantState, key: string): RestaurantState {
@@ -1212,7 +1227,7 @@ export function handleKeyPress(state: RestaurantState, key: string): RestaurantS
   }
 
   if (step.type === "memorize") {
-    if (activeOrder.memorizeRevealed) return state;
+    if (activeOrder.memorizeRevealed || activeOrder.memorizeInputDelay > 0) return state;
     const expected = activeOrder.memorizeSequence[activeOrder.memorizeInputIndex];
     if (!expected) return state;
 

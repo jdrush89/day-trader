@@ -26,7 +26,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.98";
+const GAME_VERSION = "0.0.99";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1197,6 +1197,7 @@ function App() {
           memorizeRevealed: false,
           memorizeRevealTimer: 0,
           memorizeInputIndex: 0,
+          memorizeInputDelay: 0,
           startTime: Date.now(),
           patienceRemaining: burger.patience,
           completed: false,
@@ -1281,6 +1282,7 @@ function App() {
           memorizeRevealed: false,
           memorizeRevealTimer: 0,
           memorizeInputIndex: 0,
+          memorizeInputDelay: 0,
           startTime: Date.now(),
           patienceRemaining: burger.patience,
           completed: true,

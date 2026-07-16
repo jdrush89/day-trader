@@ -268,13 +268,19 @@ function renderStepInstruction(order: ActiveOrder) {
 
   if (step.type === "memorize") {
     const showSequence = order.memorizeRevealed;
+    const waiting = !showSequence && order.memorizeInputDelay > 0;
+    const inputReady = !showSequence && order.memorizeInputDelay <= 0;
     return (
       <div className="restaurant-step-card memorize-card">
         <div className="restaurant-step-title">{step.label}</div>
         <div className="restaurant-step-copy">
           {showSequence
-            ? `Memorize the sequence before it flips away. ${(order.memorizeRevealTimer / 20).toFixed(1)}s remaining.`
-            : "Repeat the hidden sequence from memory. One wrong key makes the order incorrect."}
+            ? `Memorize the sequence! ${(order.memorizeRevealTimer / 20).toFixed(1)}s remaining.`
+            : waiting
+              ? `Sequence hidden. Get ready... ${(order.memorizeInputDelay / 20).toFixed(1)}s`
+              : order.memorizeInputIndex === 0 && order.memorizeSequence.length > 0
+                ? "Now type the sequence from memory!"
+                : "Repeat the hidden sequence from memory. One wrong key makes the order incorrect."}
         </div>
         <div className={`memorize-sequence ${showSequence ? "revealed" : "hidden"}`}>
           {order.memorizeSequence.map((key, index) => {
@@ -287,7 +293,7 @@ function renderStepInstruction(order: ActiveOrder) {
           })}
         </div>
         <div className="cook-meta">
-          <span>{showSequence ? "Remember it!" : `${order.memorizeInputIndex}/${step.sequenceLength} keys entered`}</span>
+          <span>{showSequence ? "Remember it!" : waiting ? "⏳ Wait..." : inputReady ? `${order.memorizeInputIndex}/${step.sequenceLength} keys entered` : ""}</span>
           <span>{!order.orderCorrect ? "⚠️ No tip" : "Stay sharp"}</span>
         </div>
       </div>
