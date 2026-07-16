@@ -1007,7 +1007,7 @@ export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds
     return updated;
   });
   const activeStillValid = orderSlots.some(
-    (slot) => slot && slot.id === state.activeOrderId && !slot.failed && !slot.served,
+    (slot) => slot && slot.id === state.activeOrderId && !slot.failed && (!slot.served || slot.schmoozing),
   );
   const hasEmptySlot = orderSlots.some((slot, i) => slot === null && i !== state.choreSlotIndex);
 
