@@ -22,11 +22,13 @@ import { saveGame, loadGame, deleteSave, saveMpGame, loadAllMpSaves, deleteMpSav
 import type { MpSaveData, PlayerSaveData } from "./game/save";
 import { createTradeTracker, recordBuy, recordSell, recordShort, recordCover, recordOptionBuy, recordOptionSell, recordOptionClose, computeEODUnrealized, buildPnLSeries, type TradeTracker, type PlayerPnLSeries } from "./game/trade-log";
 import { PnLGraph } from "./components/PnLGraph";
+import { Fishing } from "./components/Fishing";
+import { FishingReward } from "./game/fishing";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.103";
+const GAME_VERSION = "0.0.104";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -40,7 +42,7 @@ function App() {
   });
 
   const [ordersOpen, setOrdersOpen] = useState(false);
-  const [eodPhase, setEodPhase] = useState<"summary" | "challenges" | "shop" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft">("summary");
+  const [eodPhase, setEodPhase] = useState<"summary" | "challenges" | "shop" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft" | "leisure">("summary");
   const [restaurantState, setRestaurantState] = useState<RestaurantState | null>(null);
   const [activeMonitorId, setActiveMonitorId] = useState(0);
   const [showTransition, setShowTransition] = useState<"restaurant" | "trading" | null>(null);
@@ -69,7 +71,7 @@ function App() {
   const mpSaveIdRef = useRef<string | null>(null);
   mpSaveIdRef.current = mpSaveId;
   const [mpResumeData, setMpResumeData] = useState<MpSaveData | null>(null); // MP save being resumed (waiting for players)
-  const [localEodInfoStep, setLocalEodInfoStep] = useState<"summary" | "challenges" | "shop" | "waiting" | null>(null); // per-player EOD info screen navigation (MP only)
+  const [localEodInfoStep, setLocalEodInfoStep] = useState<"summary" | "challenges" | "shop" | "waiting" | "leisure" | null>(null); // per-player EOD info screen navigation (MP only)
   const [eodInfoReadyPlayers, setEodInfoReadyPlayers] = useState<Set<string>>(new Set()); // players done with info screens
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
@@ -491,7 +493,7 @@ function App() {
         restaurantState,
         isBossDay: bossDay,
       });
-      const currentMachineState: EodState = eodPhase === "shop" ? "shop" : "waiting";
+      const currentMachineState: EodState = eodPhase === "shop" ? "shop" : eodPhase === "leisure" ? "leisure" : "waiting";
       const { newState } = computeTransition(currentMachineState, { type: "all_ready" }, ctx);
       const phases = mapStateToPhases(newState);
 
@@ -1482,10 +1484,41 @@ function App() {
   goToShopOrNextDayRef.current = goToShopOrNextDay;
 
   const handleShopContinue = useCallback(() => {
-    // Shop is the final EOD step (after restaurant/boss day) — skip back to trading
-    setRestaurantState(null);
-    beginScheduledDay(undefined, { skipRestaurantTransition: true });
-  }, [beginScheduledDay]);
+    // After shop, go to leisure
+    setEodPhase("leisure");
+  }, []);
+
+  const handleLeisureComplete = useCallback((reward: FishingReward | null) => {
+    if (reward) {
+      setGameState((prev) => {
+        switch (reward.type) {
+          case "cash":
+            return { ...prev, cash: Math.round((prev.cash + (reward.amount ?? 0)) * 100) / 100 };
+          case "ticket":
+            return { ...prev, tickets: prev.tickets + 1, tradingTickets: prev.tradingTickets + 1 };
+          case "upgrade":
+            if (reward.upgradeId && !prev.acquiredUpgrades.includes(reward.upgradeId)) {
+              return { ...prev, acquiredUpgrades: [...prev.acquiredUpgrades, reward.upgradeId] };
+            }
+            return { ...prev, cash: prev.cash + 75 }; // fallback if already owned
+          case "recipe":
+            return { ...prev, cash: prev.cash + 50 }; // For now, give cash bonus
+          default:
+            return prev;
+        }
+      });
+    }
+    // Advance to next phase — signal readiness
+    if (isMultiplayer) {
+      setLocalEodInfoStep("waiting");
+      const myId = mpState.localPlayer?.id ?? "host";
+      setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+      if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+    } else {
+      setRestaurantState(null);
+      beginScheduledDay(undefined, { skipRestaurantTransition: true });
+    }
+  }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer, beginScheduledDay]);
 
   const handleChallengesContinue = useCallback(() => {
     // After challenges — use state machine to determine next phase
@@ -1557,6 +1590,10 @@ function App() {
         if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
       }
     } else if (localEodInfoStep === "shop") {
+      // After shop, go to leisure
+      setLocalEodInfoStep("leisure");
+      setEodPhase("leisure");
+    } else if (localEodInfoStep === "leisure") {
       setLocalEodInfoStep("waiting");
       // Signal readiness
       const myId = mpState.localPlayer?.id ?? "host";
@@ -2292,7 +2329,7 @@ function App() {
           localPlayerId={mpState.localPlayer?.id ?? "player"}
           localPlayerName={mpState.localPlayer?.name ?? "You"}
           players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
-          hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop")}
+          hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop" || eodPhase === "leisure")}
           onSchmoozeSuccess={handleSchmoozeSuccess}
         />
         {/* Post-shift overlays render on top of restaurant UI */}
@@ -2387,7 +2424,7 @@ function App() {
             </div>
           </div>
         )}
-        {(isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop") && (
+        {(isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop" || eodPhase === "leisure") && (
           <div className="shop-phase">
             <h2>🎪 Ticket Shop</h2>
             <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
@@ -2419,6 +2456,15 @@ function App() {
               )}
             </div>
             <button onClick={isMultiplayer ? handleLocalEodContinue : handleShopContinue}>Continue →</button>
+          </div>
+        )}
+        {(isMultiplayer ? localEodInfoStep === "leisure" : eodPhase === "leisure") && (
+          <div className="end-of-day-overlay">
+            <Fishing
+              day={gameState.day}
+              acquiredUpgrades={gameState.acquiredUpgrades}
+              onComplete={handleLeisureComplete}
+            />
           </div>
         )}
         {/* Multiplayer: waiting for other players after restaurant info screens */}
@@ -2618,7 +2664,7 @@ function App() {
             </div>
           )}
 
-          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop") && (
+          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop" || eodPhase === "leisure") && (
             <div className="shop-phase">
               <h2>🎪 Ticket Shop</h2>
               <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
@@ -2650,6 +2696,16 @@ function App() {
                 )}
               </div>
               <button onClick={isMultiplayer ? handleLocalEodContinue : handleShopContinue}>Continue →</button>
+            </div>
+          )}
+
+          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "leisure" : eodPhase === "leisure") && (
+            <div className="end-of-day-overlay">
+              <Fishing
+                day={gameState.day}
+                acquiredUpgrades={gameState.acquiredUpgrades}
+                onComplete={handleLeisureComplete}
+              />
             </div>
           )}
 
@@ -2763,7 +2819,7 @@ function App() {
               localPlayerId={mpState.localPlayer?.id ?? "player"}
               localPlayerName={mpState.localPlayer?.name ?? "You"}
               players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
-              hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop")}
+              hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop" || eodPhase === "leisure")}
             />
             </div>
           ) : (

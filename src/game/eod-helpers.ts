@@ -8,8 +8,8 @@
 
 import { eodTransition, buildEodContext, EodState, EodEvent, EodContext } from "./eod-machine";
 
-export type EodPhase = "summary" | "challenges" | "shop" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft";
-export type LocalInfoStep = "summary" | "challenges" | "shop" | "waiting" | null;
+export type EodPhase = "summary" | "challenges" | "shop" | "upgrades" | "stocks" | "restaurant-upgrades" | "menu-draft" | "leisure";
+export type LocalInfoStep = "summary" | "challenges" | "shop" | "waiting" | "leisure" | null;
 
 /**
  * Maps an EodState to the pair of (eodPhase, localInfoStep) used for rendering.
@@ -33,6 +33,8 @@ export function mapStateToPhases(state: EodState): { eodPhase: EodPhase; localIn
       return { eodPhase: "menu-draft", localInfoStep: null };
     case "shop":
       return { eodPhase: "shop", localInfoStep: "shop" };
+    case "leisure":
+      return { eodPhase: "leisure", localInfoStep: "leisure" };
     case "next_phase":
       return null; // triggers side effects, not rendering
     case "trading":

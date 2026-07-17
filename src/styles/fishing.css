@@ -1,0 +1,253 @@
+/* Fishing Mini-Game */
+.fishing-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  padding: 20px;
+  background: linear-gradient(180deg, #1a2a3a 0%, #0d1b2a 50%, #1b3a4b 100%);
+  color: #e0e8f0;
+  user-select: none;
+  cursor: crosshair;
+}
+
+.fishing-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.fishing-header h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.6rem;
+}
+
+.fishing-status {
+  margin: 0;
+  font-size: 1.1rem;
+  opacity: 0.9;
+}
+
+.fishing-game-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  width: 100%;
+  max-width: 400px;
+  gap: 16px;
+}
+
+/* Vertical meter */
+.fishing-meter {
+  position: relative;
+  width: 80px;
+  height: 300px;
+  border: 2px solid #4a6a8a;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #0a1929 0%, #1a3a5a 50%, #0a2a4a 100%);
+  overflow: hidden;
+}
+
+.fishing-meter-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Fish indicator (right side of meter) */
+.fishing-fish-indicator {
+  position: absolute;
+  right: 0;
+  width: 50%;
+  background: rgba(255, 120, 50, 0.35);
+  border-left: 3px solid #ff7832;
+  border-radius: 4px 0 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: bottom 0.05s linear;
+}
+
+.fish-icon {
+  font-size: 1.4rem;
+}
+
+/* Pole indicator (left side of meter) */
+.fishing-pole-indicator {
+  position: absolute;
+  left: 0;
+  width: 50%;
+  height: 5%;
+  background: rgba(100, 200, 255, 0.4);
+  border-right: 3px solid #64c8ff;
+  border-radius: 0 4px 4px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: bottom 0.05s linear;
+}
+
+/* Progress bar */
+.fishing-progress {
+  width: 100%;
+  text-align: center;
+}
+
+.fishing-progress-label {
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.fishing-progress-bar {
+  width: 100%;
+  height: 12px;
+  background: #1a2a3a;
+  border: 1px solid #4a6a8a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.fishing-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2a6a2a, #4aff4a);
+  border-radius: 6px;
+  transition: width 0.05s linear;
+}
+
+.fishing-time-remaining {
+  font-size: 0.85rem;
+  margin-top: 4px;
+  opacity: 0.7;
+}
+
+/* Result */
+.fishing-result {
+  text-align: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid #4a6a8a;
+}
+
+.fishing-reward-fish {
+  font-size: 1.4rem;
+  margin-bottom: 12px;
+}
+
+.reward-item {
+  font-size: 1.3rem;
+  padding: 8px 16px;
+  background: rgba(74, 255, 74, 0.15);
+  border: 1px solid #4aff4a;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.fishing-miss {
+  font-size: 1.1rem;
+}
+
+.fishing-hint {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-top: 8px;
+}
+
+/* Reel hint */
+.fishing-reel-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 0.6;
+  font-size: 0.9rem;
+}
+
+.reel-circle {
+  width: 36px;
+  height: 36px;
+  border: 2px solid #64c8ff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: spin-hint 2s linear infinite;
+}
+
+.reel-arrow {
+  font-size: 1.4rem;
+  color: #64c8ff;
+}
+
+@keyframes spin-hint {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Leisure selection screen */
+.leisure-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 30px;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  color: #e0e8f0;
+}
+
+.leisure-container h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.8rem;
+}
+
+.leisure-container p {
+  margin: 0 0 24px 0;
+  opacity: 0.7;
+}
+
+.leisure-choices {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.leisure-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 30px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid #3a5a7a;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
+}
+
+.leisure-choice:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #64c8ff;
+  transform: translateY(-2px);
+}
+
+.leisure-choice-icon {
+  font-size: 2.5rem;
+}
+
+.leisure-choice-label {
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.leisure-waiting {
+  margin-top: 24px;
+  padding: 12px 24px;
+  background: rgba(255, 200, 50, 0.1);
+  border: 1px solid rgba(255, 200, 50, 0.3);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  opacity: 0.8;
+}

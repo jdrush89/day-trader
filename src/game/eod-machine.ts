@@ -23,6 +23,7 @@ export type EodState =
   | "pick_restaurant_upgrades" // Kitchen upgrade (no gate: each advances independently)
   | "pick_menu"         // Menu item draft (gated: all must choose)
   | "shop"             // Ticket shop (each player browses, then signals ready)
+  | "leisure"          // Leisure activity (fishing, etc.) — each player picks and completes
   | "next_phase"       // Transition to restaurant or next trading day
   | "restaurant"       // Restaurant shift is active
   ;
@@ -94,6 +95,10 @@ export function eodTransition(state: EodState, event: EodEvent, ctx: EodContext)
       return state;
 
     case "shop":
+      if (event.type === "all_ready") return "leisure";
+      return state;
+
+    case "leisure":
       if (event.type === "all_ready") return "next_phase";
       return state;
 
@@ -112,7 +117,7 @@ function nextPickOrShopOrDone(ctx: EodContext): EodState {
   if (ctx.hasRestaurantUpgradeDraft) return "pick_restaurant_upgrades";
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "next_phase";
+  return "leisure";
 }
 
 function nextAfterUpgrades(ctx: EodContext): EodState {
@@ -122,25 +127,25 @@ function nextAfterUpgrades(ctx: EodContext): EodState {
   if (ctx.hasRestaurantUpgradeDraft) return "pick_restaurant_upgrades";
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "next_phase";
+  return "leisure";
 }
 
 function nextAfterStocks(ctx: EodContext): EodState {
   if (ctx.hasRestaurantUpgradeDraft) return "pick_restaurant_upgrades";
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "next_phase";
+  return "leisure";
 }
 
 function nextAfterRestaurantUpgrades(ctx: EodContext): EodState {
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "next_phase";
+  return "leisure";
 }
 
 function nextAfterMenu(ctx: EodContext): EodState {
   if (ctx.hasTickets) return "shop";
-  return "next_phase";
+  return "leisure";
 }
 
 /**
