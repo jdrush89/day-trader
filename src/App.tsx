@@ -28,7 +28,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.104";
+const GAME_VERSION = "0.0.105";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -504,6 +504,9 @@ function App() {
         if (newState === "pick_upgrades") setMpUpgradeChoice(null);
         if (newState === "shop") {
           setShopOffering(generateShopOffering());
+          setEodInfoReadyPlayers(new Set());
+        }
+        if (newState === "leisure") {
           setEodInfoReadyPlayers(new Set());
         }
         if (newState === "pick_upgrades" || newState === "pick_stocks" ||
@@ -1474,11 +1477,8 @@ function App() {
       setShopOffering(generateShopOffering());
       setEodPhase("shop");
     } else {
-      // After trading-only EOD or no tickets — proceed to next phase
-      // Use skipRestaurantTransition when we just came from Shwendy's (restaurantState is non-null)
-      const skipRestaurant = restaurantState !== null;
-      setRestaurantState(null);
-      beginScheduledDayRef.current(stateOverride, skipRestaurant ? { skipRestaurantTransition: true } : undefined);
+      // No shop — go to leisure
+      setEodPhase("leisure");
     }
   }, [restaurantState, bossDay, gameState.tradingTickets, gameState.restaurantTickets]);
   goToShopOrNextDayRef.current = goToShopOrNextDay;
@@ -1515,10 +1515,11 @@ function App() {
       setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
       if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     } else {
+      const skipRestaurant = restaurantState !== null;
       setRestaurantState(null);
-      beginScheduledDay(undefined, { skipRestaurantTransition: true });
+      beginScheduledDay(undefined, skipRestaurant ? { skipRestaurantTransition: true } : undefined);
     }
-  }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer, beginScheduledDay]);
+  }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer, beginScheduledDay, restaurantState]);
 
   const handleChallengesContinue = useCallback(() => {
     // After challenges — use state machine to determine next phase
@@ -2424,7 +2425,7 @@ function App() {
             </div>
           </div>
         )}
-        {(isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop" || eodPhase === "leisure") && (
+        {(isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop") && (
           <div className="shop-phase">
             <h2>🎪 Ticket Shop</h2>
             <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
@@ -2664,7 +2665,7 @@ function App() {
             </div>
           )}
 
-          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop" || eodPhase === "leisure") && (
+          {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "shop" : eodPhase === "shop") && (
             <div className="shop-phase">
               <h2>🎪 Ticket Shop</h2>
               <p className="shop-balance">📈 Trading tickets: <strong>{gameState.tradingTickets}</strong> | 🍔 Restaurant tickets: <strong>{gameState.restaurantTickets}</strong></p>
