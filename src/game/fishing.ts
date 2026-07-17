@@ -37,7 +37,7 @@ export interface FishEntry {
 }
 
 export interface FishingState {
-  phase: "casting" | "waiting" | "reeling" | "result";
+  phase: "idle" | "casting" | "waiting" | "reeling" | "result";
   castTimer: number;
   waitTimer: number;
   // Meter positions (0 = bottom, 1 = top)
@@ -65,22 +65,22 @@ const FRICTION = 0.92;
 // Fish pool - various difficulties
 const FISH_POOL: FishType[] = [
   // Easy fish (large indicator, slow, forgiving)
-  { id: "goldfish", name: "Goldfish", icon: "🐠", size: 0.35, speed: 0.008, erratic: 0.02, duration: 200, catchThreshold: 0.35, difficulty: "Easy" },
-  { id: "sardine", name: "Sardine", icon: "🐟", size: 0.3, speed: 0.01, erratic: 0.03, duration: 180, catchThreshold: 0.38, difficulty: "Easy" },
-  { id: "catfish", name: "Catfish", icon: "🐡", size: 0.3, speed: 0.009, erratic: 0.025, duration: 200, catchThreshold: 0.36, difficulty: "Easy" },
+  { id: "goldfish", name: "Goldfish", icon: "🐠", size: 0.35, speed: 0.008, erratic: 0.02, duration: 300, catchThreshold: 0.35, difficulty: "Easy" },
+  { id: "sardine", name: "Sardine", icon: "🐟", size: 0.3, speed: 0.01, erratic: 0.03, duration: 260, catchThreshold: 0.38, difficulty: "Easy" },
+  { id: "catfish", name: "Catfish", icon: "🐡", size: 0.3, speed: 0.009, erratic: 0.025, duration: 300, catchThreshold: 0.36, difficulty: "Easy" },
 
   // Medium fish
-  { id: "bass", name: "Bass", icon: "🐟", size: 0.25, speed: 0.013, erratic: 0.04, duration: 180, catchThreshold: 0.42, difficulty: "Medium" },
-  { id: "trout", name: "Trout", icon: "🐠", size: 0.22, speed: 0.015, erratic: 0.05, duration: 160, catchThreshold: 0.4, difficulty: "Medium" },
-  { id: "salmon", name: "Salmon", icon: "🐟", size: 0.22, speed: 0.014, erratic: 0.045, duration: 170, catchThreshold: 0.43, difficulty: "Medium" },
+  { id: "bass", name: "Bass", icon: "🐟", size: 0.25, speed: 0.013, erratic: 0.04, duration: 260, catchThreshold: 0.42, difficulty: "Medium" },
+  { id: "trout", name: "Trout", icon: "🐠", size: 0.22, speed: 0.015, erratic: 0.05, duration: 240, catchThreshold: 0.4, difficulty: "Medium" },
+  { id: "salmon", name: "Salmon", icon: "🐟", size: 0.22, speed: 0.014, erratic: 0.045, duration: 260, catchThreshold: 0.43, difficulty: "Medium" },
 
   // Hard fish (small indicator, fast, demanding)
-  { id: "swordfish", name: "Swordfish", icon: "🗡️", size: 0.18, speed: 0.018, erratic: 0.06, duration: 150, catchThreshold: 0.48, difficulty: "Hard" },
-  { id: "tuna", name: "Tuna", icon: "🐟", size: 0.16, speed: 0.02, erratic: 0.07, duration: 140, catchThreshold: 0.45, difficulty: "Hard" },
-  { id: "marlin", name: "Marlin", icon: "🏆", size: 0.14, speed: 0.022, erratic: 0.08, duration: 130, catchThreshold: 0.5, difficulty: "Hard" },
+  { id: "swordfish", name: "Swordfish", icon: "🗡️", size: 0.18, speed: 0.018, erratic: 0.06, duration: 220, catchThreshold: 0.48, difficulty: "Hard" },
+  { id: "tuna", name: "Tuna", icon: "🐟", size: 0.16, speed: 0.02, erratic: 0.07, duration: 200, catchThreshold: 0.45, difficulty: "Hard" },
+  { id: "marlin", name: "Marlin", icon: "🏆", size: 0.14, speed: 0.022, erratic: 0.08, duration: 200, catchThreshold: 0.5, difficulty: "Hard" },
 
   // Legendary
-  { id: "whale", name: "Whale Shark", icon: "🐋", size: 0.12, speed: 0.025, erratic: 0.09, duration: 120, catchThreshold: 0.55, difficulty: "Legendary" },
+  { id: "whale", name: "Whale Shark", icon: "🐋", size: 0.12, speed: 0.025, erratic: 0.09, duration: 180, catchThreshold: 0.55, difficulty: "Legendary" },
 ];
 
 // Fish-based recipes that can be unlocked
@@ -201,7 +201,7 @@ function generateReward(fish: FishType, availableUpgrades: string[]): FishingRew
 
 export function createFishingState(): FishingState {
   return {
-    phase: "casting",
+    phase: "idle",
     castTimer: 40, // 2 seconds
     waitTimer: 60 + Math.floor(Math.random() * 80), // 3-7 seconds wait
     polePosition: 0.5,
@@ -238,7 +238,14 @@ export function pickFish(day: number, acquiredUpgrades: string[]): FishEntry {
   return { fish, reward };
 }
 
+export function castLine(state: FishingState): FishingState {
+  if (state.phase !== "idle") return state;
+  return { ...state, phase: "casting" };
+}
+
 export function fishingTick(state: FishingState, day: number, acquiredUpgrades: string[]): FishingState {
+  if (state.phase === "idle") return state;
+
   if (state.phase === "result") {
     const resultTimer = state.resultTimer - 1;
     if (resultTimer <= 0) return { ...state, resultTimer: 0 };

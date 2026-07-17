@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FishingState, FishingReward, createFishingState, fishingTick, applyReel } from "../game/fishing";
+import { FishingState, FishingReward, createFishingState, fishingTick, applyReel, castLine } from "../game/fishing";
 
 interface FishingProps {
   day: number;
@@ -13,9 +13,9 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
   const lastMouseAngle = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Tick loop
+  // Tick loop — only run after casting
   useEffect(() => {
-    if (finished) return;
+    if (finished || state.phase === "idle") return;
     const interval = setInterval(() => {
       setState((prev) => {
         const next = fishingTick(prev, day, acquiredUpgrades);
@@ -57,6 +57,10 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
     lastMouseAngle.current = null;
   }, []);
 
+  const handleCast = useCallback(() => {
+    setState((prev) => castLine(prev));
+  }, []);
+
   const fish = state.currentFish?.fish;
   const progressPct = fish ? Math.min(100, (state.overlapTicks / (fish.duration * fish.catchThreshold)) * 100) : 0;
 
@@ -64,6 +68,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
     <div className="fishing-container" ref={containerRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
       <div className="fishing-header">
         <h2>🎣 Fishing</h2>
+        {state.phase === "idle" && <p className="fishing-status">Ready to fish! Cast your line when you&apos;re ready.</p>}
         {state.phase === "casting" && <p className="fishing-status">Casting line...</p>}
         {state.phase === "waiting" && <p className="fishing-status">Waiting for a bite...</p>}
         {state.phase === "reeling" && fish && (
@@ -79,7 +84,15 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
       </div>
 
       <div className="fishing-game-area">
+        {/* Cast button */}
+        {state.phase === "idle" && (
+          <button className="fishing-cast-btn" onClick={handleCast}>
+            🎣 Cast Line
+          </button>
+        )}
+
         {/* Vertical meter */}
+        {state.phase !== "idle" && (
         <div className="fishing-meter">
           <div className="fishing-meter-track">
             {/* Fish indicator (right side) */}
@@ -105,6 +118,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
             )}
           </div>
         </div>
+        )}
 
         {/* Progress bar */}
         {state.phase === "reeling" && fish && (

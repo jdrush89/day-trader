@@ -239,6 +239,7 @@
   cursor: pointer;
   transition: all 0.2s;
   min-width: 140px;
+  color: #e0e8f0;
 }
 
 .leisure-choice:hover {
@@ -254,6 +255,7 @@
 .leisure-choice-label {
   font-size: 1.1rem;
   font-weight: 500;
+  color: #e0e8f0;
 }
 
 .leisure-waiting {
@@ -264,4 +266,23 @@
   border-radius: 8px;
   font-size: 0.95rem;
   opacity: 0.8;
+}
+
+/* Cast button */
+.fishing-cast-btn {
+  padding: 24px 48px;
+  font-size: 1.8rem;
+  background: linear-gradient(135deg, #1a5a8a, #2a7aba);
+  border: 3px solid #64c8ff;
+  border-radius: 16px;
+  color: #e0e8f0;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 40px;
+}
+
+.fishing-cast-btn:hover {
+  background: linear-gradient(135deg, #2a7aba, #3a9ada);
+  border-color: #a0dfff;
+  transform: scale(1.05);
 }
