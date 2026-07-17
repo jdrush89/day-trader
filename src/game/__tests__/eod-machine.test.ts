@@ -59,11 +59,11 @@ describe("eodTransition", () => {
     });
 
     it("goes to next_phase when nothing needed", () => {
-      expect(eodTransition("waiting", { type: "all_ready" }, ctx())).toBe("next_phase");
+      expect(eodTransition("waiting", { type: "all_ready" }, ctx())).toBe("leisure");
     });
 
     it("tickets without restaurant state → next_phase (no shop)", () => {
-      expect(eodTransition("waiting", { type: "all_ready" }, ctx({ hasTickets: true, hasRestaurantState: false }))).toBe("next_phase");
+      expect(eodTransition("waiting", { type: "all_ready" }, ctx({ hasTickets: true, hasRestaurantState: false }))).toBe("leisure");
     });
   });
 
@@ -77,7 +77,7 @@ describe("eodTransition", () => {
     });
 
     it("stocks → next_phase when no restaurant options", () => {
-      expect(eodTransition("pick_stocks", { type: "all_chosen" }, ctx())).toBe("next_phase");
+      expect(eodTransition("pick_stocks", { type: "all_chosen" }, ctx())).toBe("leisure");
     });
 
     it("stocks → shop when tickets available (after restaurant)", () => {
@@ -93,13 +93,13 @@ describe("eodTransition", () => {
     });
 
     it("menu → next_phase when no tickets", () => {
-      expect(eodTransition("pick_menu", { type: "all_chosen" }, ctx())).toBe("next_phase");
+      expect(eodTransition("pick_menu", { type: "all_chosen" }, ctx())).toBe("leisure");
     });
   });
 
   describe("shop", () => {
     it("shop → next_phase when all ready", () => {
-      expect(eodTransition("shop", { type: "all_ready" }, ctx())).toBe("next_phase");
+      expect(eodTransition("shop", { type: "all_ready" }, ctx())).toBe("leisure");
     });
   });
 
@@ -124,7 +124,7 @@ describe("eodTransition", () => {
       expect(state).toBe("pick_stocks");
 
       state = eodTransition(state, { type: "all_chosen" }, context);
-      expect(state).toBe("next_phase");
+      expect(state).toBe("leisure");
     });
   });
 
@@ -140,7 +140,7 @@ describe("eodTransition", () => {
       state = eodTransition(state, { type: "all_ready" }, tradingCtx); // → upgrades
       state = eodTransition(state, { type: "all_chosen" }, tradingCtx); // → stocks
       state = eodTransition(state, { type: "all_chosen" }, tradingCtx); // → next_phase (go to restaurant)
-      expect(state).toBe("next_phase");
+      expect(state).toBe("leisure");
 
       // Restaurant shift happens...
       state = "restaurant";
@@ -167,7 +167,7 @@ describe("eodTransition", () => {
       expect(state).toBe("shop");
 
       state = eodTransition(state, { type: "all_ready" }, restaurantCtx); // → next_phase
-      expect(state).toBe("next_phase");
+      expect(state).toBe("leisure");
     });
   });
 
