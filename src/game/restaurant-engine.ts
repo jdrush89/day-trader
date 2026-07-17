@@ -1401,13 +1401,14 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
   const newContributors = { ...state.orderContributors };
   delete newContributors[order.id];
 
-  // Insider orders stay in slot for schmoozing
+  // Insider orders stay in slot for schmoozing with a fresh 20s timer
   if (order.isInsider && !state.insiderServed) {
     const rounds = pickSchmoozeRounds(3);
     const { options, correctIndex } = shuffleOptions(rounds[0]);
     orderSlots[slotIndex] = {
       ...order,
       served: true,
+      patienceRemaining: 20,
       schmoozing: {
         rounds,
         currentRound: 0,

@@ -679,6 +679,12 @@ export function tick(state: GameState): GameState {
       const impact: NewsImpact = { description: `INSIDER: 90% chance of strong price ${tip.direction === "up" ? "surge" : "crash"} in ${tip.symbol}`, effects: [{ symbol: tip.symbol, direction: tip.direction, strength: "strong" }], probability: 0.9, delay: 5, duration: 40, ticksRemaining: 45 };
       newNews.push({ id: `insider-impact-${tip.id}`, headline: "", body: "", category: "business", timestamp: Date.now(), affectedStocks: [tip.symbol], sentiment: tip.direction === "up" ? "positive" : "negative", impact });
     }
+    // Schmooze tip always comes true (probability 1.0)
+    const schmoozeTip = workingState.schmoozeActiveTip;
+    if (schmoozeTip && !newNews.some((n) => n.id === `insider-impact-${schmoozeTip.id}`)) {
+      const impact: NewsImpact = { description: `SCHMOOZE TIP: Guaranteed strong price ${schmoozeTip.direction === "up" ? "surge" : "crash"} in ${schmoozeTip.symbol}`, effects: [{ symbol: schmoozeTip.symbol, direction: schmoozeTip.direction, strength: "strong" }], probability: 1.0, delay: 5, duration: 40, ticksRemaining: 45 };
+      newNews.push({ id: `insider-impact-${schmoozeTip.id}`, headline: "", body: "", category: "business", timestamp: Date.now(), affectedStocks: [schmoozeTip.symbol], sentiment: schmoozeTip.direction === "up" ? "positive" : "negative", impact });
+    }
   }
 
   if (hasUpgrade(workingState, "dark_pool") && (institutionalOrders.length === 0 || newTimeOfDay % 25 === 0)) institutionalOrders = generateInstitutionalOrders(workingState.stocks);
