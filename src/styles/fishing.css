@@ -1,8 +1,21 @@
+/* Full-screen leisure overlay */
+.leisure-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Fishing Mini-Game */
 .fishing-container {
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
   height: 100%;
   padding: 20px;
   background: linear-gradient(180deg, #1a2a3a 0%, #0d1b2a 50%, #1b3a4b 100%);
@@ -41,7 +54,7 @@
 .fishing-meter {
   position: relative;
   width: 80px;
-  height: 300px;
+  height: min(500px, 60vh);
   border: 2px solid #4a6a8a;
   border-radius: 8px;
   background: linear-gradient(180deg, #0a1929 0%, #1a3a5a 50%, #0a2a4a 100%);
@@ -190,6 +203,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
   height: 100%;
   padding: 30px;
   background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);

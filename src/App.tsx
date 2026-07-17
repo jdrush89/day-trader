@@ -28,7 +28,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.105";
+const GAME_VERSION = "0.0.106";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -74,6 +74,7 @@ function App() {
   const [localEodInfoStep, setLocalEodInfoStep] = useState<"summary" | "challenges" | "shop" | "waiting" | "leisure" | null>(null); // per-player EOD info screen navigation (MP only)
   const [eodInfoReadyPlayers, setEodInfoReadyPlayers] = useState<Set<string>>(new Set()); // players done with info screens
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
+  const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | null>(null); // leisure phase sub-state
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
   const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
   const tradeTrackerRef = useRef<TradeTracker>(createTradeTracker());
@@ -507,6 +508,7 @@ function App() {
           setEodInfoReadyPlayers(new Set());
         }
         if (newState === "leisure") {
+          setLeisureActivity(null);
           setEodInfoReadyPlayers(new Set());
         }
         if (newState === "pick_upgrades" || newState === "pick_stocks" ||
@@ -1473,18 +1475,26 @@ function App() {
     // Shop only shows after restaurant/boss day (last phase of the full day) and if player has any tickets
     const tickets = stateOverride ?? gameState;
     const hasAnyTickets = tickets.tradingTickets > 0 || tickets.restaurantTickets > 0;
-    if ((restaurantState !== null || bossDay) && hasAnyTickets) {
+    const isEndOfFullDay = restaurantState !== null || bossDay;
+    if (isEndOfFullDay && hasAnyTickets) {
       setShopOffering(generateShopOffering());
       setEodPhase("shop");
-    } else {
-      // No shop — go to leisure
+    } else if (isEndOfFullDay) {
+      // End of full day, no shop — go to leisure
+      setLeisureActivity(null);
       setEodPhase("leisure");
+    } else {
+      // After trading-only EOD — proceed to restaurant phase (no leisure)
+      const skipRestaurant = restaurantState !== null;
+      setRestaurantState(null);
+      beginScheduledDayRef.current(stateOverride, skipRestaurant ? { skipRestaurantTransition: true } : undefined);
     }
   }, [restaurantState, bossDay, gameState.tradingTickets, gameState.restaurantTickets]);
   goToShopOrNextDayRef.current = goToShopOrNextDay;
 
   const handleShopContinue = useCallback(() => {
     // After shop, go to leisure
+    setLeisureActivity(null);
     setEodPhase("leisure");
   }, []);
 
@@ -1592,6 +1602,7 @@ function App() {
       }
     } else if (localEodInfoStep === "shop") {
       // After shop, go to leisure
+      setLeisureActivity(null);
       setLocalEodInfoStep("leisure");
       setEodPhase("leisure");
     } else if (localEodInfoStep === "leisure") {
@@ -2460,13 +2471,32 @@ function App() {
           </div>
         )}
         {(isMultiplayer ? localEodInfoStep === "leisure" : eodPhase === "leisure") && (
-          <div className="end-of-day-overlay">
-            <Fishing
-              day={gameState.day}
-              acquiredUpgrades={gameState.acquiredUpgrades}
-              onComplete={handleLeisureComplete}
-            />
-          </div>
+          leisureActivity === "fishing" ? (
+            <div className="leisure-fullscreen">
+              <Fishing
+                day={gameState.day}
+                acquiredUpgrades={gameState.acquiredUpgrades}
+                onComplete={handleLeisureComplete}
+              />
+            </div>
+          ) : (
+            <div className="leisure-fullscreen">
+              <div className="leisure-container">
+                <h2>🌙 Evening Leisure</h2>
+                <p>Pick an activity to wind down after a long day.</p>
+                <div className="leisure-choices">
+                  <button className="leisure-choice" onClick={() => setLeisureActivity("fishing")}>
+                    <span className="leisure-choice-icon">🎣</span>
+                    <span className="leisure-choice-label">Go Fishing</span>
+                  </button>
+                  <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
+                    <span className="leisure-choice-icon">😴</span>
+                    <span className="leisure-choice-label">Skip &amp; Rest</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
         )}
         {/* Multiplayer: waiting for other players after restaurant info screens */}
         {isMultiplayer && localEodInfoStep === "waiting" && (
@@ -2701,13 +2731,32 @@ function App() {
           )}
 
           {!gameState.marketOpen && !gameState.gameOver && (isMultiplayer ? localEodInfoStep === "leisure" : eodPhase === "leisure") && (
-            <div className="end-of-day-overlay">
-              <Fishing
-                day={gameState.day}
-                acquiredUpgrades={gameState.acquiredUpgrades}
-                onComplete={handleLeisureComplete}
-              />
-            </div>
+            leisureActivity === "fishing" ? (
+              <div className="leisure-fullscreen">
+                <Fishing
+                  day={gameState.day}
+                  acquiredUpgrades={gameState.acquiredUpgrades}
+                  onComplete={handleLeisureComplete}
+                />
+              </div>
+            ) : (
+              <div className="leisure-fullscreen">
+                <div className="leisure-container">
+                  <h2>🌙 Evening Leisure</h2>
+                  <p>Pick an activity to wind down after a long day.</p>
+                  <div className="leisure-choices">
+                    <button className="leisure-choice" onClick={() => setLeisureActivity("fishing")}>
+                      <span className="leisure-choice-icon">🎣</span>
+                      <span className="leisure-choice-label">Go Fishing</span>
+                    </button>
+                    <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
+                      <span className="leisure-choice-icon">😴</span>
+                      <span className="leisure-choice-label">Skip &amp; Rest</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
           )}
 
           {/* Multiplayer: waiting for other players after info screens */}

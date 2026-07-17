@@ -26,7 +26,7 @@ describe("MP Flow: Day 2 trading → restaurant transition", () => {
     });
 
     const result = eodTransition("pick_stocks", { type: "all_chosen" }, ctx);
-    expect(result).toBe("leisure");
+    expect(result).toBe("next_phase");
   });
 
   it("if stale restaurant options leaked, would incorrectly go to pick_restaurant_upgrades", () => {
@@ -158,7 +158,7 @@ describe("MP Flow: Full 3-day simulation", () => {
     state = eodTransition(state, { type: "all_chosen" }, ctx);
     expect(state).toBe("pick_stocks");
     state = eodTransition(state, { type: "all_chosen" }, ctx);
-    expect(state).toBe("leisure"); // → transition to restaurant
+    expect(state).toBe("next_phase"); // → transition to restaurant
 
     // Day 1: Restaurant shift
     state = "restaurant";
@@ -208,6 +208,6 @@ describe("MP Flow: Full 3-day simulation", () => {
     state = eodTransition(state, { type: "all_chosen" }, ctx);
     state = eodTransition(state, { type: "all_chosen" }, ctx);
     // Should go to restaurant, NOT get stuck
-    expect(state).toBe("leisure");
+    expect(state).toBe("next_phase");
   });
 });

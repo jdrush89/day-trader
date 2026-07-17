@@ -117,7 +117,9 @@ function nextPickOrShopOrDone(ctx: EodContext): EodState {
   if (ctx.hasRestaurantUpgradeDraft) return "pick_restaurant_upgrades";
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "leisure";
+  // Leisure only at end of full day (after restaurant/boss), not after trading-only EOD
+  if (ctx.hasRestaurantState || ctx.isBossDay) return "leisure";
+  return "next_phase";
 }
 
 function nextAfterUpgrades(ctx: EodContext): EodState {
@@ -127,25 +129,29 @@ function nextAfterUpgrades(ctx: EodContext): EodState {
   if (ctx.hasRestaurantUpgradeDraft) return "pick_restaurant_upgrades";
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "leisure";
+  if (ctx.hasRestaurantState || ctx.isBossDay) return "leisure";
+  return "next_phase";
 }
 
 function nextAfterStocks(ctx: EodContext): EodState {
   if (ctx.hasRestaurantUpgradeDraft) return "pick_restaurant_upgrades";
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "leisure";
+  if (ctx.hasRestaurantState || ctx.isBossDay) return "leisure";
+  return "next_phase";
 }
 
 function nextAfterRestaurantUpgrades(ctx: EodContext): EodState {
   if (ctx.hasMenuDraft) return "pick_menu";
   if (ctx.hasTickets && (ctx.hasRestaurantState || ctx.isBossDay)) return "shop";
-  return "leisure";
+  if (ctx.hasRestaurantState || ctx.isBossDay) return "leisure";
+  return "next_phase";
 }
 
 function nextAfterMenu(ctx: EodContext): EodState {
   if (ctx.hasTickets) return "shop";
-  return "leisure";
+  if (ctx.hasRestaurantState || ctx.isBossDay) return "leisure";
+  return "next_phase";
 }
 
 /**
