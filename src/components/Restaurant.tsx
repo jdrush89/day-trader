@@ -843,7 +843,9 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
             );
           }
 
-          const patiencePct = Math.max(0, Math.min(100, (order.patienceRemaining / order.menuItem.patience) * 100));
+          const patiencePct = order.schmoozing
+            ? Math.max(0, Math.min(100, (order.schmoozing.timer / order.schmoozing.timerMax) * 100))
+            : Math.max(0, Math.min(100, (order.patienceRemaining / order.menuItem.patience) * 100));
           const currentStep = getCurrentStep(order);
           const miniProgress = getSlotMiniProgress(order);
           // Check if other players are focused on this order

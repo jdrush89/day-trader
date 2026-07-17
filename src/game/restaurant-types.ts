@@ -118,6 +118,8 @@ export interface ActiveOrder {
     success: boolean;
     resultMessage?: string;
     resultTimer?: number;
+    timer: number;
+    timerMax: number;
   };
 }
 

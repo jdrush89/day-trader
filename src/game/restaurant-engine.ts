@@ -659,20 +659,20 @@ function markRhythmResult(order: ActiveOrder, index: number, result: "hit" | "mi
 }
 
 function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], patienceMultiplier = 1, cookSpeedMultiplier = 1): ActiveOrder {
-  // Schmoozing orders still tick patience, but nothing else
+  // Schmoozing orders use their own timer, not patience
   if (order.schmoozing) {
     // If showing a result message, count down the timer
     if (order.schmoozing.resultTimer != null && order.schmoozing.resultTimer > 0) {
       const resultTimer = order.schmoozing.resultTimer - 1;
       if (resultTimer <= 0) {
-        // Timer expired — remove order from slot
         return { ...order, failed: true, failedTimer: 0 };
       }
       return { ...order, schmoozing: { ...order.schmoozing, resultTimer } };
     }
-    const patienceRemaining = Math.max(0, order.patienceRemaining - dt * patienceMultiplier);
-    if (patienceRemaining <= 0) return { ...order, patienceRemaining: 0, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
-    return { ...order, patienceRemaining };
+    // Count down schmooze timer
+    const timer = Math.max(0, order.schmoozing.timer - dt);
+    if (timer <= 0) return { ...order, failed: true, failedTimer: TICKS_PER_SECOND * 2 };
+    return { ...order, schmoozing: { ...order.schmoozing, timer } };
   }
   if (order.served) return order;
   if (order.failed) return { ...order, failedTimer: order.failedTimer - dt * TICKS_PER_SECOND };
@@ -1405,10 +1405,10 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
   if (order.isInsider && !state.insiderServed) {
     const rounds = pickSchmoozeRounds(3);
     const { options, correctIndex } = shuffleOptions(rounds[0]);
+    const schmoozeTime = 20;
     orderSlots[slotIndex] = {
       ...order,
       served: true,
-      patienceRemaining: 20,
       schmoozing: {
         rounds,
         currentRound: 0,
@@ -1417,6 +1417,8 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
         selected: null,
         failed: false,
         success: false,
+        timer: schmoozeTime,
+        timerMax: schmoozeTime,
       },
     };
   } else {
@@ -1473,7 +1475,7 @@ export function selectSchmoozeOption(
         failed: true,
         selected: optionIndex,
         resultMessage: `"${selectedText}?! Get out of my face."`,
-        resultTimer: TICKS_PER_SECOND * 5,
+        resultTimer: TICKS_PER_SECOND * 10,
       },
     };
     return {
@@ -1511,7 +1513,7 @@ export function selectSchmoozeOption(
       success: true,
       selected: optionIndex,
       resultMessage: "The insider whispers a tip for tomorrow...",
-      resultTimer: TICKS_PER_SECOND * 5,
+      resultTimer: TICKS_PER_SECOND * 10,
     },
   };
   return {
