@@ -29,7 +29,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.113";
+const GAME_VERSION = "0.0.114";
 
 function calculateNetWorth(state: GameState): number {
   const portfolioValue = state.portfolio.reduce((sum, pos) => {

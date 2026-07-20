@@ -1,0 +1,848 @@
+/* ===== Mobile Responsive Overrides ===== */
+
+/* Medium screens (tablets, small laptops) */
+@media (max-width: 900px) {
+  .main-layout {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .game-container {
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .monitors-area {
+    flex-direction: column;
+    overflow: visible;
+    flex: none;
+  }
+
+  .monitor {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    min-height: 320px;
+    height: auto;
+  }
+
+  .monitor-bezel {
+    height: auto;
+    min-height: 300px;
+  }
+
+  .monitor-screen {
+    min-height: 260px;
+  }
+
+  .sidebar-area {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .sidebar {
+    width: 100%;
+    max-width: none;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .orders-flyout.open {
+    width: 100%;
+    max-width: none;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+
+  .orders-tab-strip {
+    width: 100%;
+    flex-direction: row;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding: 6px;
+  }
+
+  .orders-tab-label {
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+  }
+
+  /* End of day overlay */
+  .end-of-day {
+    min-width: 0;
+    width: 90vw;
+    max-width: 500px;
+    padding: 20px;
+  }
+
+  .transition-overlay {
+    min-width: 0;
+    width: 90vw;
+    max-width: 450px;
+    padding: 1.5rem 2rem;
+  }
+
+  /* Stock draft cards */
+  .stock-draft-options {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .upgrade-draft-options {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* Shop */
+  .shop-items {
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .shop-item-card {
+    width: 100%;
+    max-width: 300px;
+  }
+
+  /* EOD movers */
+  .eod-movers {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* MP lobby */
+  .mp-lobby-card {
+    min-width: 0;
+    width: 90vw;
+    max-width: 420px;
+    padding: 24px;
+  }
+
+  /* SEC wheel */
+  .sec-wheel-container {
+    padding: 24px;
+    max-width: 90vw;
+  }
+
+  .sec-wheel-canvas-wrap {
+    width: 240px;
+    height: 240px;
+  }
+
+  .sec-wheel-canvas-wrap canvas {
+    width: 240px !important;
+    height: 240px !important;
+  }
+
+  /* Casino roulette */
+  .roulette-number-grid {
+    gap: 4px;
+  }
+
+  .roulette-cell {
+    min-height: 40px;
+    padding: 6px 4px;
+    font-size: 0.85rem;
+  }
+
+  /* Header */
+  .game-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 10px;
+  }
+
+  .header-controls {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .time-bar {
+    width: 140px;
+  }
+
+  /* Tutorial card */
+  .tutorial-card {
+    width: 90vw;
+    max-width: 360px;
+  }
+
+  /* Debug panel */
+  .debug-panel {
+    width: 95vw;
+    max-width: 550px;
+    padding: 1rem;
+  }
+}
+
+/* Small screens (phones) */
+@media (max-width: 600px) {
+  body {
+    font-size: 14px;
+  }
+
+  .game-header h1 {
+    font-size: 0.85rem;
+  }
+
+  .game-header {
+    padding: 4px 8px;
+  }
+
+  .header-controls {
+    gap: 6px;
+  }
+
+  .time-bar {
+    width: 100px;
+    height: 16px;
+  }
+
+  .speed-controls button {
+    padding: 3px 6px;
+    font-size: 0.65rem;
+  }
+
+  .upgrade-icons {
+    display: none;
+  }
+
+  .boss-stats {
+    flex-wrap: wrap;
+  }
+
+  /* Monitor adjustments */
+  .monitors-area {
+    padding: 6px;
+    gap: 8px;
+  }
+
+  .monitor-bezel {
+    padding: 2px;
+    min-height: 260px;
+  }
+
+  .monitor-screen {
+    padding: 8px;
+    min-height: 220px;
+  }
+
+  .monitor-controls {
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 4px 2px;
+  }
+
+  .channel-btn {
+    padding: 4px 6px;
+    font-size: 0.6rem;
+  }
+
+  /* Stock chart */
+  .chart-svg {
+    height: 140px;
+  }
+
+  .stock-symbol {
+    font-size: 1rem;
+  }
+
+  .stock-price {
+    font-size: 1.2rem;
+  }
+
+  .chart-trade-buttons {
+    flex-wrap: wrap;
+  }
+
+  .chart-trade-btn {
+    font-size: 0.65rem;
+    padding: 5px 4px;
+  }
+
+  .stock-selector {
+    gap: 3px;
+  }
+
+  .stock-tab {
+    padding: 3px 6px;
+    font-size: 0.65rem;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    max-height: 50vh;
+  }
+
+  .trading-panel {
+    padding: 8px;
+  }
+
+  .account-summary {
+    gap: 4px;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+
+  .buy-grid {
+    max-height: 150px;
+  }
+
+  /* End of day */
+  .end-of-day {
+    width: 95vw;
+    padding: 16px;
+    border-radius: 8px;
+  }
+
+  .end-of-day h2 {
+    font-size: 1.1rem;
+  }
+
+  .eod-pnl-value {
+    font-size: 1.3rem;
+  }
+
+  .eod-stat-row {
+    font-size: 0.75rem;
+  }
+
+  .pnl-graph-legend {
+    gap: 8px;
+  }
+
+  .pnl-legend-item {
+    font-size: 0.7rem;
+  }
+
+  /* Game over */
+  .game-over {
+    width: 90vw;
+    padding: 20px;
+  }
+
+  /* Transition overlay */
+  .transition-overlay {
+    width: 95vw;
+    padding: 1rem 1.5rem;
+  }
+
+  .transition-title {
+    font-size: 2rem;
+  }
+
+  .transition-sub {
+    font-size: 1rem;
+  }
+
+  /* Pause menu */
+  .pause-menu {
+    padding: 24px;
+    width: 90vw;
+    max-width: 320px;
+  }
+
+  .pause-menu-btn {
+    width: 100%;
+  }
+
+  /* Shop phase */
+  .shop-phase {
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  .shop-phase h2 {
+    font-size: 1.4rem;
+  }
+
+  .shop-balance {
+    font-size: 1.1rem;
+  }
+
+  .shop-item-card {
+    width: 100%;
+    max-width: 260px;
+    padding: 1rem;
+  }
+
+  .shop-item-icon {
+    font-size: 2rem;
+  }
+
+  .shop-item-name {
+    font-size: 0.95rem;
+  }
+
+  .shop-item-desc {
+    font-size: 0.8rem;
+  }
+
+  /* Stock draft / upgrade draft */
+  .stock-draft,
+  .upgrade-draft {
+    width: 95vw;
+    padding: 16px;
+  }
+
+  .stock-draft h2,
+  .upgrade-draft h2 {
+    font-size: 1.2rem;
+  }
+
+  .draft-card-symbol {
+    font-size: 1.1rem;
+  }
+
+  .upgrade-card-icon {
+    font-size: 1.5rem;
+  }
+
+  /* SEC wheel */
+  .sec-wheel-container {
+    padding: 16px;
+    width: 95vw;
+  }
+
+  .sec-wheel-container h2 {
+    font-size: 1.1rem;
+  }
+
+  .sec-wheel-canvas-wrap {
+    width: 200px;
+    height: 200px;
+  }
+
+  .sec-wheel-canvas-wrap canvas {
+    width: 200px !important;
+    height: 200px !important;
+  }
+
+  .sec-wheel-spin-btn {
+    padding: 10px 24px;
+    font-size: 1rem;
+  }
+
+  /* MP lobby */
+  .mp-lobby-card {
+    width: 95vw;
+    padding: 16px;
+  }
+
+  .mp-lobby-card h2 {
+    font-size: 1.2rem;
+  }
+
+  .mp-mode-btn {
+    padding: 12px 14px;
+  }
+
+  .mp-room-value {
+    font-size: 1.2rem;
+  }
+
+  /* Multiplayer feed */
+  .mp-feed {
+    width: 180px;
+    bottom: 8px;
+    right: 8px;
+  }
+
+  /* Tutorial */
+  .tutorial-card {
+    width: 95vw;
+    max-width: 320px;
+    padding: 1rem;
+  }
+
+  .tutorial-body {
+    font-size: 0.75rem;
+  }
+
+  /* Challenge indicators */
+  .challenge-indicators {
+    display: none;
+  }
+
+  /* Challenge results */
+  .challenge-results {
+    max-width: 95vw;
+  }
+
+  .challenge-intro-list {
+    max-width: 95vw;
+  }
+
+  .challenge-intro-item {
+    padding: 10px 12px;
+  }
+
+  /* Insider feed */
+  .insider-tip-container {
+    padding: 1rem;
+  }
+
+  .insider-message-bubble {
+    padding: 0.8rem;
+  }
+
+  /* Options trading form */
+  .order-form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .order-select,
+  .order-input {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .option-field {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  /* Title screen */
+  .title-start-btn {
+    font-size: 1.2rem;
+    padding: 0.6rem 2rem;
+  }
+
+  /* Fishing */
+  .fishing-container {
+    padding: 12px;
+  }
+
+  .fishing-header h2 {
+    font-size: 1.3rem;
+  }
+
+  .fishing-cast-btn {
+    padding: 18px 36px;
+    font-size: 1.4rem;
+    margin-top: 20px;
+  }
+
+  .fishing-meter {
+    width: 60px;
+    height: min(400px, 55vh);
+  }
+
+  /* Casino */
+  .casino-container {
+    padding: 12px;
+  }
+
+  .casino-header h2 {
+    font-size: 1.4rem;
+  }
+
+  .casino-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .casino-progress {
+    grid-template-columns: 1fr;
+  }
+
+  .casino-blackjack-table {
+    grid-template-columns: 1fr;
+  }
+
+  .casino-slots-grid {
+    max-width: 240px;
+    gap: 6px;
+  }
+
+  .casino-slot-cell {
+    font-size: 1.5rem;
+  }
+
+  .casino-action-btn {
+    padding: 10px 18px;
+    font-size: 0.9rem;
+  }
+
+  .casino-game-card,
+  .casino-summary {
+    padding: 14px;
+  }
+
+  .casino-game-card h3,
+  .casino-summary h3 {
+    font-size: 1.2rem;
+  }
+
+  .roulette-table {
+    max-width: 100%;
+  }
+
+  .roulette-number-grid {
+    gap: 3px;
+  }
+
+  .roulette-cell {
+    min-height: 34px;
+    padding: 4px 2px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+  }
+
+  .roulette-even-money-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .casino-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .casino-roulette-wheel {
+    width: 120px;
+    height: 120px;
+  }
+
+  .casino-wheel-number {
+    font-size: 1.8rem;
+  }
+
+  /* Leisure container */
+  .leisure-container {
+    padding: 16px;
+  }
+
+  .leisure-container h2 {
+    font-size: 1.4rem;
+  }
+
+  .leisure-choices {
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  .leisure-choice {
+    width: 100%;
+    min-width: 0;
+    padding: 14px 20px;
+  }
+
+  /* Restaurant */
+  .restaurant-screen {
+    padding: 8px;
+    gap: 10px;
+    min-height: auto;
+    overflow-y: auto;
+  }
+
+  .restaurant-header {
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    align-items: stretch;
+    text-align: center;
+  }
+
+  .restaurant-header h1 {
+    font-size: 1.3rem;
+  }
+
+  .restaurant-header-stats {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .restaurant-stat-box,
+  .restaurant-summary-chip {
+    min-width: 90px;
+    padding: 6px 10px;
+  }
+
+  .restaurant-stat-box strong,
+  .restaurant-summary-chip strong {
+    font-size: 1rem;
+  }
+
+  .restaurant-queue {
+    grid-template-columns: 1fr;
+  }
+
+  .restaurant-work-area {
+    grid-template-columns: 1fr;
+  }
+
+  .restaurant-items-bar {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+  }
+
+  /* Schmooze */
+  .schmooze-option {
+    padding: 8px;
+    font-size: 0.78rem;
+  }
+
+  /* Boss day intro */
+  .boss-intro-reqs {
+    padding: 0.75rem;
+  }
+
+  .boss-intro-req {
+    font-size: 0.9rem;
+  }
+
+  /* Debug panel */
+  .debug-panel {
+    width: 98vw;
+    padding: 0.75rem;
+    max-height: 90vh;
+  }
+
+  .debug-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Very small screens (small phones) */
+@media (max-width: 380px) {
+  .game-header h1 {
+    font-size: 0.75rem;
+  }
+
+  .time-bar {
+    width: 80px;
+  }
+
+  .channel-btn {
+    padding: 3px 4px;
+    font-size: 0.55rem;
+  }
+
+  .chart-trade-btn {
+    font-size: 0.6rem;
+  }
+
+  .casino-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .roulette-even-money-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Ensure overlays are scrollable on short screens */
+@media (max-height: 600px) {
+  .pause-overlay,
+  .game-over-overlay,
+  .end-of-day-overlay {
+    overflow-y: auto;
+    padding: 16px;
+    align-items: flex-start;
+  }
+
+  .sec-wheel-overlay {
+    overflow-y: auto;
+    padding: 16px;
+    align-items: flex-start;
+  }
+
+  .shop-phase {
+    overflow-y: auto;
+    justify-content: flex-start;
+    padding-top: 1rem;
+  }
+
+  .leisure-fullscreen {
+    overflow-y: auto;
+  }
+
+  .fishing-container,
+  .casino-container,
+  .leisure-container {
+    overflow-y: auto;
+    height: auto;
+    min-height: 100%;
+  }
+}
+
+/* Touch-friendly targets */
+@media (pointer: coarse) {
+  .channel-btn {
+    min-height: 32px;
+    min-width: 32px;
+    padding: 6px 10px;
+  }
+
+  .chart-trade-btn {
+    min-height: 36px;
+    padding: 8px 6px;
+  }
+
+  .stock-tab {
+    min-height: 32px;
+    padding: 6px 10px;
+  }
+
+  .buy-btn {
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+
+  .sell-btn {
+    min-height: 28px;
+    padding: 4px 8px;
+  }
+
+  .order-cancel-btn {
+    min-height: 28px;
+    padding: 4px 8px;
+  }
+
+  .speed-controls button {
+    min-height: 28px;
+    min-width: 28px;
+  }
+
+  .casino-action-btn {
+    min-height: 44px;
+  }
+
+  .roulette-cell {
+    min-height: 44px;
+  }
+
+  .schmooze-option {
+    min-height: 40px;
+    padding: 10px 12px;
+  }
+
+  .leisure-choice {
+    min-height: 60px;
+  }
+
+  .order-slot {
+    min-height: 56px;
+  }
+
+  .title-start-btn {
+    min-height: 44px;
+  }
+
+  .fishing-cast-btn {
+    min-height: 56px;
+  }
+
+  .fishing-continue-btn {
+    min-height: 44px;
+  }
+}
