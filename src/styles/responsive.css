@@ -28,17 +28,19 @@
     min-width: 0;
     max-width: none;
     width: 100%;
+    height: 320px;
     min-height: 320px;
-    height: auto;
+    max-height: 320px;
+    flex-shrink: 0;
   }
 
   .monitor-bezel {
-    height: auto;
-    min-height: 300px;
+    height: 100%;
   }
 
   .monitor-screen {
-    min-height: 260px;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .sidebar-area {
@@ -53,11 +55,22 @@
     border-top: 1px solid var(--border);
   }
 
+  /* Orders flyout: collapse to zero height when closed, expand when open */
+  .orders-flyout {
+    width: 100% !important;
+    height: 0;
+    border-left: none;
+    transition: height 0.25s ease;
+  }
+
   .orders-flyout.open {
     width: 100%;
     max-width: none;
+    height: auto;
+    max-height: 50vh;
     border-left: none;
     border-top: 1px solid var(--border);
+    overflow-y: auto;
   }
 
   .orders-tab-strip {
@@ -224,14 +237,18 @@
     gap: 8px;
   }
 
+  .monitor {
+    height: 280px;
+    min-height: 280px;
+    max-height: 280px;
+  }
+
   .monitor-bezel {
     padding: 2px;
-    min-height: 260px;
   }
 
   .monitor-screen {
     padding: 8px;
-    min-height: 220px;
   }
 
   .monitor-controls {
@@ -278,11 +295,13 @@
 
   /* Sidebar */
   .sidebar {
-    max-height: 50vh;
+    max-height: none;
   }
 
   .trading-panel {
     padding: 8px;
+    height: auto;
+    overflow: visible;
   }
 
   .account-summary {
@@ -291,8 +310,15 @@
     margin-bottom: 8px;
   }
 
+  .positions-scroll {
+    overflow: visible;
+    max-height: none;
+  }
+
   .buy-grid {
-    max-height: 150px;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
   }
 
   /* End of day */
