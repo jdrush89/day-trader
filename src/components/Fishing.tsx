@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FishingState, FishingReward, createFishingState, fishingTick, applyReel, castLine } from "../game/fishing";
+import { UPGRADE_POOL } from "../game/upgrades";
 
 interface FishingProps {
   day: number;
@@ -23,51 +24,52 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
         const next = fishingTick(prev, day, acquiredUpgrades);
         if (next.phase === "result" && next.resultTimer <= 0 && !finished) {
           setFinished(true);
-          const reward = next.caught && next.currentFish ? next.currentFish.reward : null;
-          setTimeout(() => onComplete(reward), 0);
         }
         return next;
       });
     }, 50); // 20 ticks/s
     return () => clearInterval(interval);
-  }, [day, acquiredUpgrades, onComplete, finished, started]);
+  }, [day, acquiredUpgrades, finished, started]);
 
-  // Mouse rotation detection
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (state.phase !== "reeling") return;
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
+  // Global mouse rotation detection (works anywhere on screen)
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (state.phase !== "reeling") return;
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
 
-    if (lastMouseAngle.current !== null) {
-      let delta = angle - lastMouseAngle.current;
-      // Normalize to [-PI, PI]
-      if (delta > Math.PI) delta -= 2 * Math.PI;
-      if (delta < -Math.PI) delta += 2 * Math.PI;
-      // Clockwise rotation = positive power
-      if (delta > 0.02) {
-        setState((prev) => applyReel(prev, Math.min(delta * 2, 1)));
+      if (lastMouseAngle.current !== null) {
+        let delta = angle - lastMouseAngle.current;
+        if (delta > Math.PI) delta -= 2 * Math.PI;
+        if (delta < -Math.PI) delta += 2 * Math.PI;
+        if (delta > 0.02) {
+          setState((prev) => applyReel(prev, Math.min(delta * 2, 1)));
+        }
       }
-    }
-    lastMouseAngle.current = angle;
-  }, [state.phase]);
+      lastMouseAngle.current = angle;
+    };
 
-  // Reset angle on mouse leave
-  const handleMouseLeave = useCallback(() => {
-    lastMouseAngle.current = null;
-  }, []);
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [state.phase]);
 
   const handleCast = useCallback(() => {
     setState((prev) => castLine(prev));
   }, []);
 
+  const handleContinue = useCallback(() => {
+    const reward = state.caught && state.currentFish ? state.currentFish.reward : null;
+    onComplete(reward);
+  }, [state.caught, state.currentFish, onComplete]);
+
   const fish = state.currentFish?.fish;
   const progressPct = fish ? Math.min(100, (state.overlapTicks / (fish.duration * fish.catchThreshold)) * 100) : 0;
 
   return (
-    <div className="fishing-container" ref={containerRef} onMouseMove={handleMouseMove} onMouseLeave={handleMouseLeave}>
+    <div className="fishing-container" ref={containerRef}>
       <div className="fishing-header">
         <h2>🎣 Fishing</h2>
         {state.phase === "idle" && <p className="fishing-status">Ready to fish! Cast your line when you&apos;re ready.</p>}
@@ -94,10 +96,9 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
         )}
 
         {/* Vertical meter */}
-        {state.phase !== "idle" && (
+        {state.phase !== "idle" && !finished && (
         <div className="fishing-meter">
           <div className="fishing-meter-track">
-            {/* Fish indicator (right side) */}
             {state.phase === "reeling" && fish && (
               <div
                 className="fishing-fish-indicator"
@@ -109,7 +110,6 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
                 <span className="fish-icon">{fish.icon}</span>
               </div>
             )}
-            {/* Pole indicator (left side) */}
             {(state.phase === "reeling" || state.phase === "waiting") && (
               <div
                 className="fishing-pole-indicator"
@@ -138,7 +138,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
         )}
 
         {/* Result display */}
-        {state.phase === "result" && state.currentFish && (
+        {finished && state.currentFish && (
           <div className="fishing-result">
             {state.caught ? (
               <div className="fishing-reward">
@@ -153,6 +153,9 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
                 <p className="fishing-hint">Keep the pole indicator inside the fish zone to fill the catch meter.</p>
               </div>
             )}
+            <button className="fishing-continue-btn" onClick={handleContinue}>
+              Continue →
+            </button>
           </div>
         )}
 
@@ -176,8 +179,19 @@ function RewardDisplay({ reward }: { reward: FishingReward }) {
       return <div className="reward-item">💵 +${reward.amount}</div>;
     case "ticket":
       return <div className="reward-item">🎟️ +1 Store Ticket</div>;
-    case "upgrade":
-      return <div className="reward-item">⬆️ Upgrade: {reward.upgradeId}</div>;
+    case "upgrade": {
+      const upgrade = UPGRADE_POOL.find((u) => u.id === reward.upgradeId);
+      if (!upgrade) return <div className="reward-item">⬆️ Upgrade: {reward.upgradeId}</div>;
+      return (
+        <div className="reward-item fishing-upgrade-card">
+          <div className="fishing-upgrade-icon">{upgrade.icon}</div>
+          <div className="fishing-upgrade-info">
+            <div className="fishing-upgrade-name">{upgrade.name}</div>
+            <div className="fishing-upgrade-desc">{upgrade.description}</div>
+          </div>
+        </div>
+      );
+    }
     case "recipe":
       return <div className="reward-item">📖 New Recipe: {reward.recipe?.icon} {reward.recipe?.name}</div>;
     default:

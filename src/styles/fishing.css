@@ -286,3 +286,45 @@
   border-color: #a0dfff;
   transform: scale(1.05);
 }
+
+/* Continue button */
+.fishing-continue-btn {
+  margin-top: 20px;
+  padding: 12px 32px;
+  font-size: 1.1rem;
+  background: linear-gradient(135deg, #2a6a2a, #3a8a3a);
+  border: 2px solid #4aff4a;
+  border-radius: 10px;
+  color: #e0e8f0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.fishing-continue-btn:hover {
+  background: linear-gradient(135deg, #3a8a3a, #4aaa4a);
+  transform: scale(1.05);
+}
+
+/* Upgrade card in reward */
+.fishing-upgrade-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.fishing-upgrade-icon {
+  font-size: 2rem;
+}
+
+.fishing-upgrade-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #64c8ff;
+}
+
+.fishing-upgrade-desc {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-top: 2px;
+}
