@@ -13,9 +13,11 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
   const lastMouseAngle = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const started = state.phase !== "idle";
+
   // Tick loop — only run after casting
   useEffect(() => {
-    if (finished || state.phase === "idle") return;
+    if (finished || !started) return;
     const interval = setInterval(() => {
       setState((prev) => {
         const next = fishingTick(prev, day, acquiredUpgrades);
@@ -28,7 +30,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
       });
     }, 50); // 20 ticks/s
     return () => clearInterval(interval);
-  }, [day, acquiredUpgrades, onComplete, finished]);
+  }, [day, acquiredUpgrades, onComplete, finished, started]);
 
   // Mouse rotation detection
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
