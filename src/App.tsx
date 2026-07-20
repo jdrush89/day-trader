@@ -23,12 +23,26 @@ import type { MpSaveData, PlayerSaveData } from "./game/save";
 import { createTradeTracker, recordBuy, recordSell, recordShort, recordCover, recordOptionBuy, recordOptionSell, recordOptionClose, computeEODUnrealized, buildPnLSeries, type TradeTracker, type PlayerPnLSeries } from "./game/trade-log";
 import { PnLGraph } from "./components/PnLGraph";
 import { Fishing } from "./components/Fishing";
+import { Casino } from "./components/Casino";
 import { FishingReward } from "./game/fishing";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.111";
+const GAME_VERSION = "0.0.112";
+
+function calculateNetWorth(state: GameState): number {
+  const portfolioValue = state.portfolio.reduce((sum, pos) => {
+    const stock = state.stocks.find((st) => st.symbol === pos.symbol);
+    return sum + (stock ? stock.price * pos.shares : 0);
+  }, 0);
+  const shortCollateral = state.shorts.reduce((sum, pos) => sum + pos.entryPrice * pos.shares, 0);
+  const shortLiability = state.shorts.reduce((sum, pos) => {
+    const stock = state.stocks.find((st) => st.symbol === pos.symbol);
+    return sum + (stock ? stock.price * pos.shares : 0);
+  }, 0);
+  return state.cash + portfolioValue + shortCollateral - shortLiability + getOptionsValue(state);
+}
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -74,7 +88,7 @@ function App() {
   const [localEodInfoStep, setLocalEodInfoStep] = useState<"summary" | "challenges" | "shop" | "waiting" | "leisure" | null>(null); // per-player EOD info screen navigation (MP only)
   const [eodInfoReadyPlayers, setEodInfoReadyPlayers] = useState<Set<string>>(new Set()); // players done with info screens
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
-  const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | null>(null); // leisure phase sub-state
+  const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | "casino" | null>(null); // leisure phase sub-state
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
   const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
   const tradeTrackerRef = useRef<TradeTracker>(createTradeTracker());
@@ -1531,6 +1545,13 @@ function App() {
     }
   }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
 
+  const handleCasinoComplete = useCallback((netChange: number) => {
+    if (netChange !== 0) {
+      setGameState((prev) => ({ ...prev, cash: Math.round((prev.cash + netChange) * 100) / 100 }));
+    }
+    handleLeisureComplete(null);
+  }, [handleLeisureComplete]);
+
   const handleChallengesContinue = useCallback(() => {
     // After challenges — use state machine to determine next phase
     const ctx = buildEodContext({
@@ -2314,7 +2335,7 @@ function App() {
             return Math.round(m.required + loansDue);
           })()}
           milestoneDaysLeft={getMilestone(gameState.day, gameState.playerCount) ? getMilestone(gameState.day, gameState.playerCount)!.checkDay - gameState.day : 0}
-          netWorth={gameState.cash + gameState.portfolio.reduce((sum: number, pos) => { const s = gameState.stocks.find((st) => st.symbol === pos.symbol); return sum + (s ? s.price * pos.shares : 0); }, 0) + gameState.shorts.reduce((sum: number, pos) => sum + pos.entryPrice * pos.shares, 0) - gameState.shorts.reduce((sum: number, sp) => { const s = gameState.stocks.find((st) => st.symbol === sp.symbol); return sum + (s ? s.price * sp.shares : 0); }, 0) + getOptionsValue(gameState)}
+          netWorth={calculateNetWorth(gameState)}
           speed={speed}
           onSpeedChange={handleSetSpeed}
           acquiredRestaurantUpgrades={effectiveRestaurantUpgrades}
@@ -2479,6 +2500,13 @@ function App() {
                 onComplete={handleLeisureComplete}
               />
             </div>
+          ) : leisureActivity === "casino" ? (
+            <div className="leisure-fullscreen">
+              <Casino
+                netWorth={calculateNetWorth(gameState)}
+                onComplete={handleCasinoComplete}
+              />
+            </div>
           ) : (
             <div className="leisure-fullscreen">
               <div className="leisure-container">
@@ -2488,6 +2516,10 @@ function App() {
                   <button className="leisure-choice" onClick={() => setLeisureActivity("fishing")}>
                     <span className="leisure-choice-icon">🎣</span>
                     <span className="leisure-choice-label">Go Fishing</span>
+                  </button>
+                  <button className="leisure-choice" onClick={() => setLeisureActivity("casino")}>
+                    <span className="leisure-choice-icon">🎰</span>
+                    <span className="leisure-choice-label">Casino</span>
                   </button>
                   <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
                     <span className="leisure-choice-icon">😴</span>
@@ -2739,6 +2771,13 @@ function App() {
                   onComplete={handleLeisureComplete}
                 />
               </div>
+            ) : leisureActivity === "casino" ? (
+              <div className="leisure-fullscreen">
+                <Casino
+                  netWorth={calculateNetWorth(gameState)}
+                  onComplete={handleCasinoComplete}
+                />
+              </div>
             ) : (
               <div className="leisure-fullscreen">
                 <div className="leisure-container">
@@ -2748,6 +2787,10 @@ function App() {
                     <button className="leisure-choice" onClick={() => setLeisureActivity("fishing")}>
                       <span className="leisure-choice-icon">🎣</span>
                       <span className="leisure-choice-label">Go Fishing</span>
+                    </button>
+                    <button className="leisure-choice" onClick={() => setLeisureActivity("casino")}>
+                      <span className="leisure-choice-icon">🎰</span>
+                      <span className="leisure-choice-label">Casino</span>
                     </button>
                     <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
                       <span className="leisure-choice-icon">😴</span>
