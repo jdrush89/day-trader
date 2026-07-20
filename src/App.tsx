@@ -29,7 +29,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.112";
+const GAME_VERSION = "0.0.113";
 
 function calculateNetWorth(state: GameState): number {
   const portfolioValue = state.portfolio.reduce((sum, pos) => {
@@ -1547,10 +1547,27 @@ function App() {
 
   const handleCasinoComplete = useCallback((netChange: number) => {
     if (netChange !== 0) {
-      setGameState((prev) => ({ ...prev, cash: Math.round((prev.cash + netChange) * 100) / 100 }));
+      setGameState((prev) => {
+        const updated = { ...prev, cash: Math.round((prev.cash + netChange) * 100) / 100 };
+        // Must pass the updated state directly to avoid stale closure
+        if (!isMultiplayer) {
+          setTimeout(() => {
+            setRestaurantState(null);
+            beginScheduledDayRef.current(updated, { skipRestaurantTransition: true });
+          }, 0);
+        }
+        return updated;
+      });
+      if (isMultiplayer) {
+        setLocalEodInfoStep("waiting");
+        const myId = mpState.localPlayer?.id ?? "host";
+        setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
+        if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+      }
+    } else {
+      handleLeisureComplete(null);
     }
-    handleLeisureComplete(null);
-  }, [handleLeisureComplete]);
+  }, [handleLeisureComplete, isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
 
   const handleChallengesContinue = useCallback(() => {
     // After challenges — use state machine to determine next phase

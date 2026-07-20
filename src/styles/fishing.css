@@ -554,36 +554,118 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.casino-slot-cell.is-spinning {
+  animation: slot-spin 0.1s steps(1) infinite;
+  opacity: 0.7;
+}
+
 .casino-slot-cell.is-winning {
   border-color: #ffd166;
   box-shadow: inset 0 0 18px rgba(255, 209, 102, 0.3);
 }
 
-.casino-roulette-controls {
+.casino-roulette-layout {
   display: grid;
-  gap: 12px;
-  max-width: 420px;
+  gap: 16px;
+}
+
+.roulette-table {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
   margin: 0 auto;
 }
 
-.casino-field {
+.roulette-number-grid {
   display: grid;
-  gap: 6px;
-  text-align: left;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.casino-field select,
-.casino-field input {
-  padding: 10px 12px;
-  border-radius: 8px;
+.roulette-outside-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.roulette-dozen-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.roulette-even-money-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.roulette-cell {
+  min-height: 52px;
+  padding: 10px 8px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(10, 10, 24, 0.8);
+  background: rgba(255, 255, 255, 0.06);
   color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+
+.roulette-cell:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.roulette-cell:disabled {
+  cursor: default;
+}
+
+.roulette-cell.is-red {
+  background: #8b1a1a;
+}
+
+.roulette-cell.is-black {
+  background: #1a1a1a;
+}
+
+.roulette-cell.is-green {
+  background: #1a6b1a;
+}
+
+.roulette-cell.roulette-cell-zero {
+  grid-column: 1 / -1;
+}
+
+.roulette-cell.roulette-cell-outside {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.roulette-cell.roulette-cell-outside.is-red {
+  background: #8b1a1a;
+}
+
+.roulette-cell.roulette-cell-outside.is-black {
+  background: #1a1a1a;
+}
+
+.roulette-cell.is-selected {
+  border: 2px solid gold;
+  box-shadow: 0 0 0 1px rgba(255, 215, 0, 0.18);
+}
+
+.roulette-cell.is-winner {
+  animation: roulette-win-pulse 1s ease-in-out infinite;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.3);
+}
+
+.roulette-cell.is-bet-win {
+  box-shadow: inset 0 0 0 2px rgba(143, 255, 176, 0.55);
+}
+
+.roulette-cell.is-bet-loss {
+  opacity: 0.68;
 }
 
 .casino-roulette-preview {
+  display: grid;
+  gap: 4px;
   font-size: 0.95rem;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 .casino-roulette-wheel {
@@ -619,6 +701,55 @@
 .casino-wheel-color {
   font-size: 0.95rem;
   letter-spacing: 0.08em;
+}
+
+.casino-roulette-bets {
+  display: grid;
+  gap: 8px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.casino-roulette-bet {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.casino-roulette-bet.is-win {
+  border: 1px solid rgba(143, 255, 176, 0.35);
+}
+
+.casino-roulette-bet.is-loss {
+  border: 1px solid rgba(255, 156, 168, 0.22);
+}
+
+.casino-roulette-bet-status {
+  white-space: nowrap;
+}
+
+@keyframes slot-spin {
+  0% {
+    transform: translateY(-6px);
+    filter: blur(2px);
+  }
+  100% {
+    transform: translateY(6px);
+    filter: blur(1px);
+  }
+}
+
+@keyframes roulette-win-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
 }
 
 .casino-summary-grid {
@@ -660,5 +791,14 @@
 
   .casino-bet-copy {
     flex-direction: column;
+  }
+
+  .roulette-even-money-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .casino-roulette-bet {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

@@ -19,7 +19,7 @@ export interface BlackjackState {
 }
 
 export interface SlotsState {
-  phase: "betting" | "result";
+  phase: "betting" | "spinning" | "result";
   bet: number;
   grid: string[][];
   matchingRows: number[];
@@ -30,20 +30,33 @@ export interface SlotsState {
   outcome: "win" | "lose" | "skipped" | null;
 }
 
-export type RouletteBetType = "red" | "black" | "odd" | "even" | "dozen1" | "dozen2" | "dozen3" | "single";
+export type RouletteBetType = "red" | "black" | "odd" | "even" | "dozen1" | "dozen2" | "dozen3" | "half1" | "half2" | "single";
 export type RouletteColor = "red" | "black" | "green";
+
+export interface RouletteBet {
+  type: RouletteBetType;
+  number?: number;
+  amount: number;
+}
+
+export interface RouletteResolvedBet extends RouletteBet {
+  label: string;
+  won: boolean;
+  payoutRatio: number;
+  netChange: number;
+}
 
 export interface RouletteState {
   phase: "betting" | "result";
   bet: number;
-  betType: RouletteBetType;
-  singleNumber: number;
+  bets: RouletteBet[];
   resultNumber: number | null;
   resultColor: RouletteColor | null;
   outcome: "win" | "lose" | "skipped" | null;
   payoutRatio: number;
   netChange: number;
   message: string;
+  resolvedBets: RouletteResolvedBet[];
 }
 
 export interface CasinoState {
@@ -78,6 +91,10 @@ function roundMoney(amount: number): number {
   return Math.round(amount * 100) / 100;
 }
 
+function roundDownMoney(amount: number): number {
+  return Math.floor(amount * 100) / 100;
+}
+
 function sanitizeBet(bet: number, maxBet: number): number {
   if (maxBet <= 0) return 0;
   const clamped = Math.max(0, Math.min(maxBet, bet));
@@ -110,6 +127,27 @@ function shuffle<T>(items: T[]): T[] {
 function drawCard(deck: Card[]): { card: Card; deck: Card[] } {
   const [card, ...rest] = deck;
   return { card, deck: rest };
+}
+
+function syncRouletteBetAmounts(roulette: RouletteState, bet = roulette.bet): RouletteState {
+  if (roulette.bets.length === 0) {
+    return {
+      ...roulette,
+      bet,
+      bets: roulette.bets.map((entry) => ({ ...entry, amount: 0 })),
+    };
+  }
+
+  const amount = roundDownMoney(bet / roulette.bets.length);
+  return {
+    ...roulette,
+    bet,
+    bets: roulette.bets.map((entry) => ({ ...entry, amount })),
+  };
+}
+
+function isSameRouletteBet(left: Pick<RouletteBet, "type" | "number">, right: Pick<RouletteBet, "type" | "number">): boolean {
+  return left.type === right.type && left.number === right.number;
 }
 
 export function getCardLabel(card: Card): string {
@@ -204,14 +242,14 @@ export function createCasinoState(netWorth: number): CasinoState {
     roulette: {
       phase: "betting",
       bet: 0,
-      betType: "red",
-      singleNumber: 7,
+      bets: [],
       resultNumber: null,
       resultColor: null,
       outcome: null,
       payoutRatio: 0,
       netChange: 0,
       message: "",
+      resolvedBets: [],
     },
   };
 }
@@ -225,7 +263,7 @@ export function setCasinoBet(state: CasinoState, bet: number): CasinoState {
     return { ...state, slots: { ...state.slots, bet: sanitized } };
   }
   if (state.stage === "roulette" && state.roulette.phase === "betting") {
-    return { ...state, roulette: { ...state.roulette, bet: sanitized } };
+    return { ...state, roulette: syncRouletteBetAmounts(state.roulette, sanitized) };
   }
   return state;
 }
@@ -383,29 +421,29 @@ export function spinSlots(state: CasinoState): CasinoState {
     outcome = "win";
   }
 
+  return {
+    ...state,
+    slots: {
+      ...state.slots,
+      bet,
+      phase: "spinning",
+      grid,
+      matchingRows,
+      matchingDiagonals,
+      payoutMultiplier,
+      netChange: roundMoney(netChange),
+      message,
+      outcome,
+    },
+  };
+}
+
+export function finishSlotsAnimation(state: CasinoState): CasinoState {
+  if (state.stage !== "slots" || state.slots.phase !== "spinning") return state;
   return finishSlots(state, {
     ...state.slots,
-    bet,
     phase: "result",
-    grid,
-    matchingRows,
-    matchingDiagonals,
-    payoutMultiplier,
-    netChange: roundMoney(netChange),
-    message,
-    outcome,
   });
-}
-
-export function setRouletteBetType(state: CasinoState, betType: RouletteBetType): CasinoState {
-  if (state.stage !== "roulette" || state.roulette.phase !== "betting") return state;
-  return { ...state, roulette: { ...state.roulette, betType } };
-}
-
-export function setRouletteSingleNumber(state: CasinoState, singleNumber: number): CasinoState {
-  if (state.stage !== "roulette" || state.roulette.phase !== "betting") return state;
-  const clamped = Math.max(0, Math.min(36, Math.round(singleNumber)));
-  return { ...state, roulette: { ...state.roulette, singleNumber: clamped } };
 }
 
 export function getRouletteColor(number: number): RouletteColor {
@@ -413,8 +451,8 @@ export function getRouletteColor(number: number): RouletteColor {
   return RED_NUMBERS.has(number) ? "red" : "black";
 }
 
-export function getRouletteBetLabel(roulette: RouletteState): string {
-  switch (roulette.betType) {
+export function getRouletteBetPositionLabel(bet: Pick<RouletteBet, "type" | "number">): string {
+  switch (bet.type) {
     case "red":
       return "Red";
     case "black":
@@ -424,20 +462,30 @@ export function getRouletteBetLabel(roulette: RouletteState): string {
     case "even":
       return "Even";
     case "dozen1":
-      return "1st Dozen (1-12)";
+      return "1st 12";
     case "dozen2":
-      return "2nd Dozen (13-24)";
+      return "2nd 12";
     case "dozen3":
-      return "3rd Dozen (25-36)";
+      return "3rd 12";
+    case "half1":
+      return "1-18";
+    case "half2":
+      return "19-36";
     case "single":
-      return `Single ${roulette.singleNumber}`;
+      return `${bet.number ?? 0}`;
   }
 }
 
-function rouletteWin(roulette: RouletteState, number: number, color: RouletteColor): { won: boolean; payoutRatio: number } {
-  switch (roulette.betType) {
+export function getRouletteBetLabel(roulette: RouletteState): string {
+  if (roulette.bets.length === 0) return "No positions selected";
+  if (roulette.bets.length === 1) return getRouletteBetPositionLabel(roulette.bets[0]);
+  return `${roulette.bets.length} positions selected`;
+}
+
+function rouletteWin(bet: Pick<RouletteBet, "type" | "number">, number: number, color: RouletteColor): { won: boolean; payoutRatio: number } {
+  switch (bet.type) {
     case "single":
-      return { won: roulette.singleNumber === number, payoutRatio: 35 };
+      return { won: bet.number === number, payoutRatio: 35 };
     case "red":
       return { won: color === "red", payoutRatio: 1 };
     case "black":
@@ -452,7 +500,35 @@ function rouletteWin(roulette: RouletteState, number: number, color: RouletteCol
       return { won: number >= 13 && number <= 24, payoutRatio: 2 };
     case "dozen3":
       return { won: number >= 25 && number <= 36, payoutRatio: 2 };
+    case "half1":
+      return { won: number >= 1 && number <= 18, payoutRatio: 1 };
+    case "half2":
+      return { won: number >= 19 && number <= 36, payoutRatio: 1 };
   }
+}
+
+export function toggleRouletteBet(state: CasinoState, betType: RouletteBetType, number?: number): CasinoState {
+  if (state.stage !== "roulette" || state.roulette.phase !== "betting") return state;
+  const nextBet: RouletteBet = { type: betType, number, amount: 0 };
+  const exists = state.roulette.bets.some((entry) => isSameRouletteBet(entry, nextBet));
+  const bets = exists
+    ? state.roulette.bets.filter((entry) => !isSameRouletteBet(entry, nextBet))
+    : [...state.roulette.bets, nextBet];
+
+  return {
+    ...state,
+    roulette: syncRouletteBetAmounts({
+      ...state.roulette,
+      bets,
+      resolvedBets: [],
+      resultNumber: null,
+      resultColor: null,
+      outcome: null,
+      payoutRatio: 0,
+      netChange: 0,
+      message: "",
+    }),
+  };
 }
 
 export function spinRoulette(state: CasinoState): CasinoState {
@@ -469,28 +545,43 @@ export function spinRoulette(state: CasinoState): CasinoState {
       payoutRatio: 0,
       netChange: 0,
       message: "You stepped away before placing a roulette bet.",
+      resolvedBets: [],
     });
   }
 
+  if (state.roulette.bets.length === 0) {
+    return state;
+  }
+
+  const roulette = syncRouletteBetAmounts(state.roulette, bet);
   const resultNumber = Math.floor(Math.random() * 37);
   const resultColor = getRouletteColor(resultNumber);
-  const { won, payoutRatio } = rouletteWin(state.roulette, resultNumber, resultColor);
-  const netChange = won ? roundMoney(bet * payoutRatio) : -bet;
-  const label = getRouletteBetLabel(state.roulette);
-  const message = won
-    ? `The wheel lands on ${resultNumber}. ${label} hits for ${payoutRatio}:1.`
-    : `The wheel lands on ${resultNumber}. ${label} misses.`;
+  const resolvedBets = roulette.bets.map((entry) => {
+    const { won, payoutRatio } = rouletteWin(entry, resultNumber, resultColor);
+    return {
+      ...entry,
+      label: getRouletteBetPositionLabel(entry),
+      won,
+      payoutRatio,
+      netChange: won ? roundMoney(entry.amount * payoutRatio) : roundMoney(-entry.amount),
+    } satisfies RouletteResolvedBet;
+  });
+  const winningBets = resolvedBets.filter((entry) => entry.won).length;
+  const netChange = roundMoney(resolvedBets.reduce((sum, entry) => sum + entry.netChange, 0));
+  const message = winningBets > 0
+    ? `The wheel lands on ${resultNumber} ${resultColor}. ${winningBets} of ${resolvedBets.length} bets hit.`
+    : `The wheel lands on ${resultNumber} ${resultColor}. ${getRouletteBetLabel(roulette)} miss.`;
 
   return finishRoulette(state, {
-    ...state.roulette,
-    bet,
+    ...roulette,
     phase: "result",
     resultNumber,
     resultColor,
-    outcome: won ? "win" : "lose",
-    payoutRatio,
+    outcome: winningBets > 0 ? "win" : "lose",
+    payoutRatio: winningBets > 0 ? Math.max(...resolvedBets.filter((entry) => entry.won).map((entry) => entry.payoutRatio)) : 0,
     netChange,
     message,
+    resolvedBets,
   });
 }
 

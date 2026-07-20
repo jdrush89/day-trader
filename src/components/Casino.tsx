@@ -1,19 +1,21 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   advanceCasino,
   blackjackHit,
   blackjackStand,
   createCasinoState,
+  finishSlotsAnimation,
   getBlackjackValue,
   getCardLabel,
   getCasinoMaxBet,
   getRouletteBetLabel,
+  getRouletteBetPositionLabel,
+  getRouletteColor,
   setCasinoBet,
-  setRouletteBetType,
-  setRouletteSingleNumber,
   spinRoulette,
   spinSlots,
   startBlackjack,
+  toggleRouletteBet,
   type CasinoState,
   type RouletteBetType,
 } from "../game/casino";
@@ -23,20 +25,47 @@ interface CasinoProps {
   onComplete: (netChange: number) => void;
 }
 
-const ROULETTE_OPTIONS: Array<{ value: RouletteBetType; label: string }> = [
-  { value: "red", label: "Red (1:1)" },
-  { value: "black", label: "Black (1:1)" },
-  { value: "odd", label: "Odd (1:1)" },
-  { value: "even", label: "Even (1:1)" },
-  { value: "dozen1", label: "1st Dozen 1-12 (2:1)" },
-  { value: "dozen2", label: "2nd Dozen 13-24 (2:1)" },
-  { value: "dozen3", label: "3rd Dozen 25-36 (2:1)" },
-  { value: "single", label: "Single Number (35:1)" },
+const SLOT_SYMBOLS = ["🍒", "🍋", "🔔", "💎", "⭐", "🍀"];
+const ROULETTE_NUMBER_ROWS = Array.from({ length: 12 }, (_, rowIndex) => [rowIndex * 3 + 1, rowIndex * 3 + 2, rowIndex * 3 + 3]);
+const ROULETTE_DOZEN_BETS: Array<{ type: RouletteBetType; label: string }> = [
+  { type: "dozen1", label: "1st 12" },
+  { type: "dozen2", label: "2nd 12" },
+  { type: "dozen3", label: "3rd 12" },
 ];
+const ROULETTE_OUTSIDE_BETS: Array<{ type: RouletteBetType; label: string }> = [
+  { type: "half1", label: "1-18" },
+  { type: "even", label: "Even" },
+  { type: "red", label: "Red" },
+  { type: "black", label: "Black" },
+  { type: "odd", label: "Odd" },
+  { type: "half2", label: "19-36" },
+];
+
+function createRandomSlotsGrid(): string[][] {
+  return Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => SLOT_SYMBOLS[Math.floor(Math.random() * SLOT_SYMBOLS.length)]));
+}
+
+function isRouletteBetSelected(state: CasinoState["roulette"], betType: RouletteBetType, number?: number): boolean {
+  return state.bets.some((bet) => bet.type === betType && bet.number === number);
+}
+
+function getRouletteCellStatus(state: CasinoState["roulette"], betType: RouletteBetType, number?: number): "win" | "lose" | null {
+  const resolvedBet = state.resolvedBets.find((bet) => bet.type === betType && bet.number === number);
+  if (!resolvedBet) return null;
+  return resolvedBet.won ? "win" : "lose";
+}
 
 export function Casino({ netWorth, onComplete }: CasinoProps) {
   const [state, setState] = useState<CasinoState>(() => createCasinoState(netWorth));
   const maxBet = getCasinoMaxBet(netWorth);
+
+  useEffect(() => {
+    if (state.stage !== "slots" || state.slots.phase !== "spinning") return undefined;
+    const timeoutId = window.setTimeout(() => {
+      setState((prev) => finishSlotsAnimation(prev));
+    }, 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [state.stage, state.slots.phase]);
 
   const formatMoney = useCallback((amount: number) => {
     const prefix = amount >= 0 ? "+" : "-";
@@ -121,8 +150,7 @@ export function Casino({ netWorth, onComplete }: CasinoProps) {
         {state.stage === "roulette" && (
           <RouletteView
             state={state}
-            onTypeChange={(betType) => setState((prev) => setRouletteBetType(prev, betType))}
-            onNumberChange={(value) => setState((prev) => setRouletteSingleNumber(prev, value))}
+            onToggleBet={(betType, number) => setState((prev) => toggleRouletteBet(prev, betType, number))}
             onSpin={() => setState((prev) => spinRoulette(prev))}
             onContinue={handleAdvance}
             formatMoney={formatMoney}
@@ -233,25 +261,46 @@ function BlackjackView({ state, onDeal, onHit, onStand, onContinue }: { state: C
 
 function SlotsView({ state, onSpin, onContinue, formatMoney }: { state: CasinoState; onSpin: () => void; onContinue: () => void; formatMoney: (amount: number) => string; }) {
   const slots = state.slots;
+  const [displayGrid, setDisplayGrid] = useState<string[][]>(slots.grid);
+
+  useEffect(() => {
+    if (slots.phase !== "spinning") {
+      setDisplayGrid(slots.grid);
+      return undefined;
+    }
+
+    setDisplayGrid(createRandomSlotsGrid());
+    const intervalId = window.setInterval(() => {
+      setDisplayGrid(createRandomSlotsGrid());
+    }, 100);
+    return () => window.clearInterval(intervalId);
+  }, [slots.grid, slots.phase]);
+
   return (
     <div className="casino-game-card">
       <h3>🎰 Slots</h3>
       <p className="casino-game-copy">Match a row for 2x, all rows for 3x, or sneak in a diagonal-only 1.5x.</p>
       <div className="casino-slots-grid">
-        {slots.grid.map((row, rowIndex) => row.map((symbol, colIndex) => {
-          const rowMatch = slots.matchingRows.includes(rowIndex);
-          const mainDiag = slots.matchingDiagonals.includes("main") && rowIndex === colIndex;
-          const antiDiag = slots.matchingDiagonals.includes("anti") && rowIndex + colIndex === 2;
+        {displayGrid.map((row, rowIndex) => row.map((symbol, colIndex) => {
+          const showMatches = slots.phase === "result";
+          const rowMatch = showMatches && slots.matchingRows.includes(rowIndex);
+          const mainDiag = showMatches && slots.matchingDiagonals.includes("main") && rowIndex === colIndex;
+          const antiDiag = showMatches && slots.matchingDiagonals.includes("anti") && rowIndex + colIndex === 2;
           return (
-            <div key={`${rowIndex}-${colIndex}`} className={`casino-slot-cell${rowMatch || mainDiag || antiDiag ? " is-winning" : ""}`}>
+            <div
+              key={`${rowIndex}-${colIndex}`}
+              className={`casino-slot-cell${rowMatch || mainDiag || antiDiag ? " is-winning" : ""}${slots.phase === "spinning" ? " is-spinning" : ""}`}
+            >
               {symbol}
             </div>
           );
         }))}
       </div>
-      {slots.phase === "betting" ? (
+      {slots.phase === "betting" && (
         <button className="casino-action-btn" onClick={onSpin}>{slots.bet > 0 ? "Spin Reels" : "Skip Slots"}</button>
-      ) : (
+      )}
+      {slots.phase === "spinning" && <div className="casino-result-copy">Reels spinning...</div>}
+      {slots.phase === "result" && (
         <>
           <div className="casino-result-copy">{slots.message}</div>
           <div className="casino-result-amount">Result: <strong className={slots.netChange >= 0 ? "casino-positive" : "casino-negative"}>{formatMoney(slots.netChange)}</strong></div>
@@ -262,44 +311,113 @@ function SlotsView({ state, onSpin, onContinue, formatMoney }: { state: CasinoSt
   );
 }
 
-function RouletteView({ state, onTypeChange, onNumberChange, onSpin, onContinue, formatMoney }: { state: CasinoState; onTypeChange: (betType: RouletteBetType) => void; onNumberChange: (value: number) => void; onSpin: () => void; onContinue: () => void; formatMoney: (amount: number) => string; }) {
+function RouletteView({ state, onToggleBet, onSpin, onContinue, formatMoney }: { state: CasinoState; onToggleBet: (betType: RouletteBetType, number?: number) => void; onSpin: () => void; onContinue: () => void; formatMoney: (amount: number) => string; }) {
   const roulette = state.roulette;
+  const selectedCount = roulette.bets.length;
+  const amountPerPosition = selectedCount > 0 ? roulette.bets[0]?.amount ?? 0 : 0;
+  const allocatedBet = amountPerPosition * selectedCount;
+  const unallocated = Math.max(0, roulette.bet - allocatedBet);
+  const bettingLocked = roulette.phase !== "betting";
+
   return (
     <div className="casino-game-card">
       <h3>🎡 Roulette</h3>
-      <p className="casino-game-copy">Pick your lane: even-money colors/parity, a dozen, or chase a 35:1 straight-up hit.</p>
-      {roulette.phase === "betting" && (
-        <div className="casino-roulette-controls">
-          <label className="casino-field">
-            <span>Bet Type</span>
-            <select value={roulette.betType} onChange={(event) => onTypeChange(event.target.value as RouletteBetType)}>
-              {ROULETTE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </label>
-          {roulette.betType === "single" && (
-            <label className="casino-field">
-              <span>Number</span>
-              <input type="number" min={0} max={36} value={roulette.singleNumber} onChange={(event) => onNumberChange(Number(event.target.value))} />
-            </label>
-          )}
-          <div className="casino-roulette-preview">Current bet: <strong>{getRouletteBetLabel(roulette)}</strong></div>
-          <button className="casino-action-btn" onClick={onSpin}>{roulette.bet > 0 ? "Spin Wheel" : "Skip Roulette"}</button>
-        </div>
-      )}
-
-      {roulette.phase === "result" && (
-        <>
-          <div className={`casino-roulette-wheel is-${roulette.resultColor ?? "green"}`}>
-            <span className="casino-wheel-number">{roulette.resultNumber ?? "—"}</span>
-            <span className="casino-wheel-color">{roulette.resultColor ?? "skip"}</span>
+      <p className="casino-game-copy">Build your board by clicking the table. Your total wager is split evenly across every selected position.</p>
+      <div className="casino-roulette-layout">
+        <div className="roulette-table">
+          <button
+            type="button"
+            className={`roulette-cell roulette-cell-zero is-green${isRouletteBetSelected(roulette, "single", 0) ? " is-selected" : ""}${roulette.resultNumber === 0 ? " is-winner" : ""}${getRouletteCellStatus(roulette, "single", 0) === "win" ? " is-bet-win" : ""}${getRouletteCellStatus(roulette, "single", 0) === "lose" ? " is-bet-loss" : ""}`}
+            onClick={() => onToggleBet("single", 0)}
+            disabled={bettingLocked}
+          >
+            0
+          </button>
+          <div className="roulette-number-grid">
+            {ROULETTE_NUMBER_ROWS.flat().map((number) => {
+              const color = getRouletteColor(number);
+              const selected = isRouletteBetSelected(roulette, "single", number);
+              const resultStatus = getRouletteCellStatus(roulette, "single", number);
+              return (
+                <button
+                  key={number}
+                  type="button"
+                  className={`roulette-cell is-${color}${selected ? " is-selected" : ""}${roulette.resultNumber === number ? " is-winner" : ""}${resultStatus === "win" ? " is-bet-win" : ""}${resultStatus === "lose" ? " is-bet-loss" : ""}`}
+                  onClick={() => onToggleBet("single", number)}
+                  disabled={bettingLocked}
+                >
+                  {number}
+                </button>
+              );
+            })}
           </div>
-          <div className="casino-result-copy">{roulette.message}</div>
-          <div className="casino-result-amount">Result: <strong className={roulette.netChange >= 0 ? "casino-positive" : "casino-negative"}>{formatMoney(roulette.netChange)}</strong></div>
-          <button className="casino-action-btn casino-continue-btn" onClick={onContinue}>Cash Out →</button>
-        </>
-      )}
+          <div className="roulette-outside-grid roulette-dozen-grid">
+            {ROULETTE_DOZEN_BETS.map((bet) => {
+              const resultStatus = getRouletteCellStatus(roulette, bet.type);
+              return (
+                <button
+                  key={bet.type}
+                  type="button"
+                  className={`roulette-cell roulette-cell-outside${isRouletteBetSelected(roulette, bet.type) ? " is-selected" : ""}${resultStatus === "win" ? " is-bet-win" : ""}${resultStatus === "lose" ? " is-bet-loss" : ""}`}
+                  onClick={() => onToggleBet(bet.type)}
+                  disabled={bettingLocked}
+                >
+                  {bet.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="roulette-outside-grid roulette-even-money-grid">
+            {ROULETTE_OUTSIDE_BETS.map((bet) => {
+              const resultStatus = getRouletteCellStatus(roulette, bet.type);
+              return (
+                <button
+                  key={bet.type}
+                  type="button"
+                  className={`roulette-cell roulette-cell-outside${bet.type === "red" ? " is-red" : bet.type === "black" ? " is-black" : ""}${isRouletteBetSelected(roulette, bet.type) ? " is-selected" : ""}${resultStatus === "win" ? " is-bet-win" : ""}${resultStatus === "lose" ? " is-bet-loss" : ""}`}
+                  onClick={() => onToggleBet(bet.type)}
+                  disabled={bettingLocked}
+                >
+                  {bet.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="casino-roulette-preview">
+          <div>Selected: <strong>{getRouletteBetLabel(roulette)}</strong></div>
+          <div>Per position: <strong>${amountPerPosition.toFixed(2)}</strong>{unallocated > 0 ? <span> • ${unallocated.toFixed(2)} unallocated</span> : null}</div>
+        </div>
+
+        {roulette.phase === "betting" && (
+          <button className="casino-action-btn" onClick={onSpin} disabled={roulette.bet > 0 && selectedCount === 0}>
+            {roulette.bet > 0 ? "Spin Wheel" : "Skip Roulette"}
+          </button>
+        )}
+
+        {roulette.phase === "result" && (
+          <>
+            <div className={`casino-roulette-wheel is-${roulette.resultColor ?? "green"}`}>
+              <span className="casino-wheel-number">{roulette.resultNumber ?? "—"}</span>
+              <span className="casino-wheel-color">{roulette.resultColor ?? "skip"}</span>
+            </div>
+            <div className="casino-result-copy">{roulette.message}</div>
+            <div className="casino-result-amount">Result: <strong className={roulette.netChange >= 0 ? "casino-positive" : "casino-negative"}>{formatMoney(roulette.netChange)}</strong></div>
+            {roulette.resolvedBets.length > 0 && (
+              <div className="casino-roulette-bets">
+                {roulette.resolvedBets.map((bet) => (
+                  <div key={`${bet.type}-${bet.number ?? "outside"}`} className={`casino-roulette-bet${bet.won ? " is-win" : " is-loss"}`}>
+                    <span>{getRouletteBetPositionLabel(bet)} • ${bet.amount.toFixed(2)}</span>
+                    <strong className="casino-roulette-bet-status">{bet.won ? "Won" : "Lost"} {formatMoney(bet.netChange)}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="casino-action-btn casino-continue-btn" onClick={onContinue}>Cash Out →</button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
