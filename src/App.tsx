@@ -28,7 +28,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.109";
+const GAME_VERSION = "0.0.110";
 
 function App() {
   const [showTitle, setShowTitle] = useState(true);
@@ -1525,11 +1525,11 @@ function App() {
       setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
       if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     } else {
-      const skipRestaurant = restaurantState !== null;
+      // Leisure always happens at end of full day — go to next trading day
       setRestaurantState(null);
-      beginScheduledDay(undefined, skipRestaurant ? { skipRestaurantTransition: true } : undefined);
+      beginScheduledDayRef.current(undefined, { skipRestaurantTransition: true });
     }
-  }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer, beginScheduledDay, restaurantState]);
+  }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
 
   const handleChallengesContinue = useCallback(() => {
     // After challenges — use state machine to determine next phase

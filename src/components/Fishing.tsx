@@ -35,18 +35,18 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (state.phase !== "reeling") return;
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
+      // Use viewport center as reference point for rotation
+      const cx = window.innerWidth / 2;
+      const cy = window.innerHeight / 2;
       const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
 
       if (lastMouseAngle.current !== null) {
         let delta = angle - lastMouseAngle.current;
         if (delta > Math.PI) delta -= 2 * Math.PI;
         if (delta < -Math.PI) delta += 2 * Math.PI;
-        if (delta > 0.02) {
-          setState((prev) => applyReel(prev, Math.min(delta * 2, 1)));
+        // Clockwise rotation = positive power
+        if (delta > 0.01) {
+          setState((prev) => applyReel(prev, Math.min(delta * 3, 1.5)));
         }
       }
       lastMouseAngle.current = angle;
