@@ -11,7 +11,6 @@ interface FishingProps {
 export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
   const [state, setState] = useState<FishingState>(createFishingState);
   const [finished, setFinished] = useState(false);
-  const lastMouseAngle = useRef<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const started = state.phase !== "idle";
@@ -31,25 +30,39 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
     return () => clearInterval(interval);
   }, [day, acquiredUpgrades, finished, started]);
 
-  // Global mouse rotation detection (works anywhere on screen)
+  // Global mouse rotation detection — tracks circular motion anywhere
+  // Uses cross product of consecutive movement vectors to detect clockwise turns
+  const lastPos = useRef<{ x: number; y: number } | null>(null);
+  const lastDir = useRef<{ dx: number; dy: number } | null>(null);
+
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (state.phase !== "reeling") return;
-      // Use viewport center as reference point for rotation
-      const cx = window.innerWidth / 2;
-      const cy = window.innerHeight / 2;
-      const angle = Math.atan2(e.clientY - cy, e.clientX - cx);
+      if (state.phase !== "reeling") {
+        lastPos.current = null;
+        lastDir.current = null;
+        return;
+      }
 
-      if (lastMouseAngle.current !== null) {
-        let delta = angle - lastMouseAngle.current;
-        if (delta > Math.PI) delta -= 2 * Math.PI;
-        if (delta < -Math.PI) delta += 2 * Math.PI;
-        // Clockwise rotation = positive power
-        if (delta > 0.01) {
-          setState((prev) => applyReel(prev, Math.min(delta * 3, 1.5)));
+      const pos = { x: e.clientX, y: e.clientY };
+      if (lastPos.current) {
+        const dx = pos.x - lastPos.current.x;
+        const dy = pos.y - lastPos.current.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist > 2 && lastDir.current) {
+          // Cross product: positive = clockwise turn
+          const cross = lastDir.current.dx * dy - lastDir.current.dy * dx;
+          if (cross > 0) {
+            const power = Math.min(cross / 200, 1.5);
+            setState((prev) => applyReel(prev, power));
+          }
+        }
+
+        if (dist > 2) {
+          lastDir.current = { dx: dx / dist, dy: dy / dist };
         }
       }
-      lastMouseAngle.current = angle;
+      lastPos.current = pos;
     };
 
     window.addEventListener("mousemove", handleMouseMove);

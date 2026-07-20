@@ -286,7 +286,7 @@ export function fishingTick(state: FishingState, day: number, acquiredUpgrades: 
     if (totalTicks >= fish.duration) {
       const ratio = state.overlapTicks / fish.duration;
       const caught = ratio >= fish.catchThreshold;
-      return { ...state, phase: "result", caught, totalTicks, resultTimer: 80 };
+      return { ...state, phase: "result", caught, totalTicks, resultTimer: 0 };
     }
 
     // Update pole position (gravity + reel)
