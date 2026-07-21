@@ -2,20 +2,28 @@
 
 /* Medium screens (tablets, small laptops) */
 @media (max-width: 900px) {
-  .main-layout {
-    flex-direction: column;
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
   body {
     overflow-y: auto;
     overflow-x: hidden;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  #root {
+    height: auto;
+    min-height: 100vh;
   }
 
   .game-container {
     height: auto;
     min-height: 100vh;
+  }
+
+  .main-layout {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: none;
   }
 
   .monitors-area {
