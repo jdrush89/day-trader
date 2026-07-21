@@ -37,18 +37,28 @@
     max-width: none;
     width: 100%;
     min-height: 300px;
-    height: auto;
-    max-height: none;
+    max-height: 530px;
+    height: 530px;
     flex-shrink: 0;
+    overflow: hidden;
   }
 
   .monitor-bezel {
-    height: auto;
-    min-height: 280px;
+    height: 100%;
+    overflow: hidden;
   }
 
   .monitor-screen {
-    min-height: 240px;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  /* Social feed needs internal scroll so posts don't force expansion */
+  .social-feed-view,
+  .biz-news-view,
+  .global-news-view {
+    overflow-y: auto;
+    min-height: 0;
   }
 
   .sidebar-area {
@@ -247,6 +257,8 @@
 
   .monitor {
     min-height: 260px;
+    max-height: 500px;
+    height: 500px;
   }
 
   .monitor-bezel {
