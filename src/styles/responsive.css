@@ -32,10 +32,12 @@
     min-height: 320px;
     max-height: 320px;
     flex-shrink: 0;
+    overflow: hidden;
   }
 
   .monitor-bezel {
     height: 100%;
+    overflow: hidden;
   }
 
   .monitor-screen {
