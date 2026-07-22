@@ -890,3 +890,100 @@
     min-height: 44px;
   }
 }
+
+/* ============================================================
+   Touch-friendly restaurant mini-game controls
+   ============================================================ */
+.touch-controls {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 12px;
+  padding: 8px 0;
+}
+
+.touch-controls.chop-controls,
+.touch-controls.chore-touch {
+  gap: 14px;
+}
+
+.touch-controls.memorize-pad {
+  gap: 8px;
+}
+
+.touch-controls.chore-arrows {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.touch-controls.chore-arrows .chore-arrows-row {
+  display: flex;
+  gap: 6px;
+}
+
+.touch-btn {
+  min-height: 48px;
+  min-width: 68px;
+  padding: 12px 18px;
+  font-size: 1rem;
+  font-weight: 700;
+  border-radius: 10px;
+  border: 2px solid #4a90e2;
+  background: #1a2530;
+  color: #e8f0fa;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.08s ease, background 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.touch-btn:active {
+  transform: scale(0.94);
+  background: #2a3f55;
+}
+
+.touch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.touch-btn.primary {
+  background: #2e7d32;
+  border-color: #66bb6a;
+}
+
+.touch-btn.urgent {
+  background: #c62828;
+  border-color: #ef5350;
+  animation: touch-pulse 0.6s ease-in-out infinite alternate;
+}
+
+.touch-btn.big {
+  min-height: 64px;
+  min-width: 120px;
+  font-size: 1.15rem;
+}
+
+.touch-btn.keypad {
+  min-width: 52px;
+  min-height: 52px;
+  padding: 8px;
+  font-family: monospace;
+  font-size: 1.2rem;
+}
+
+.ingredient-chip.touch-tappable {
+  cursor: pointer;
+  transition: transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.ingredient-chip.touch-tappable:active {
+  transform: scale(0.95);
+}
+
+@keyframes touch-pulse {
+  from { box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.6); }
+  to { box-shadow: 0 0 0 8px rgba(239, 83, 80, 0); }
+}

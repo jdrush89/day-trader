@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 import {
   acceptOrder,
   handleChopKey,
@@ -124,7 +124,7 @@ function renderRhythmResult(result: RhythmResult, isActive: boolean): string {
   return isActive ? "active" : "pending";
 }
 
-function renderStepInstruction(order: ActiveOrder) {
+function renderStepInstruction(order: ActiveOrder, isTouch: boolean, triggerKey: (key: string) => void, triggerKeyDown?: (key: string) => void, triggerKeyUp?: (key: string) => void) {
   const step = getCurrentStep(order);
   if (!step) return null;
 
@@ -150,12 +150,12 @@ function renderStepInstruction(order: ActiveOrder) {
       <div className="restaurant-step-card">
         <div className="restaurant-step-title">{step.label}</div>
         <div className="restaurant-step-copy">
-          {!order.prepStarted && "Press G to start cooking."}
+          {!order.prepStarted && (isTouch ? "Tap START to begin cooking." : "Press G to start cooking.")}
           {order.prepStarted && step.type === "grill" && !order.flipped && !flipReady && !pastFlipZone && !readyToPlate && "Watch the grill and flip on time."}
-          {flipReady && "Press F now to flip!"}
+          {flipReady && (isTouch ? "Tap FLIP now!" : "Press F now to flip!")}
           {order.burnt && "🔥 Burnt! This order is lost."}
-          {inBurnZone && !order.burnt && `⚠️ Remove NOW! Press G or Enter. Burns in ${burnTimeLeft.toFixed(1)}s`}
-          {readyToPlate && !inBurnZone && !order.burnt && "Done! Press G or Enter to remove."}
+          {inBurnZone && !order.burnt && (isTouch ? `⚠️ Remove NOW! Tap PLATE. Burns in ${burnTimeLeft.toFixed(1)}s` : `⚠️ Remove NOW! Press G or Enter. Burns in ${burnTimeLeft.toFixed(1)}s`)}
+          {readyToPlate && !inBurnZone && !order.burnt && (isTouch ? "Done! Tap PLATE to remove." : "Done! Press G or Enter to remove.")}
           {order.prepStarted && step.type === "fry" && !readyToPlate && "Keep an eye on the fryer."}
         </div>
         <div className={`cook-meter ${inBurnZone ? "burn-warning" : ""}`}>
@@ -168,8 +168,19 @@ function renderStepInstruction(order: ActiveOrder) {
         </div>
         <div className="cook-meta">
           <span>{(order.prepProgress / 20).toFixed(1)}s / {(step.duration / 20).toFixed(1)}s</span>
-          {step.type === "grill" && <span>{order.flipped ? "✅ Flipped" : "Press F to flip"}</span>}
+          {step.type === "grill" && <span>{order.flipped ? "✅ Flipped" : (isTouch ? "Tap FLIP" : "Press F to flip")}</span>}
         </div>
+        {isTouch && (
+          <div className="touch-controls">
+            {!order.prepStarted && <button type="button" className="touch-btn primary" onClick={() => triggerKey("g")}>▶️ Start</button>}
+            {order.prepStarted && step.type === "grill" && !order.flipped && (
+              <button type="button" className={`touch-btn ${flipReady ? "urgent" : ""}`} disabled={!flipReady} onClick={() => triggerKey("f")}>🔄 Flip</button>
+            )}
+            {order.prepStarted && readyToPlate && !order.burnt && (
+              <button type="button" className={`touch-btn ${inBurnZone ? "urgent" : "primary"}`} onClick={() => triggerKey("Enter")}>🍽️ Plate</button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -179,7 +190,7 @@ function renderStepInstruction(order: ActiveOrder) {
     return (
       <div className="restaurant-step-card">
         <div className="restaurant-step-title">{step.label}</div>
-        <div className="restaurant-step-copy">Alternate ← and → rapidly!</div>
+        <div className="restaurant-step-copy">{isTouch ? "Tap LEFT and RIGHT alternately!" : "Alternate ← and → rapidly!"}</div>
         <div className="task-meter">
           <div className="task-meter-fill chop" style={{ width: `${progressPct}%` }} />
         </div>
@@ -187,6 +198,12 @@ function renderStepInstruction(order: ActiveOrder) {
           <span>{order.chopCount}/{step.target} chops</span>
           <span>Last: {order.lastChopKey ? order.lastChopKey.toUpperCase() : "—"}</span>
         </div>
+        {isTouch && (
+          <div className="touch-controls chop-controls">
+            <button type="button" className={`touch-btn big ${order.lastChopKey === "right" ? "primary" : ""}`} onClick={() => triggerKey("ArrowLeft")}>⬅️ Left</button>
+            <button type="button" className={`touch-btn big ${order.lastChopKey === "left" ? "primary" : ""}`} onClick={() => triggerKey("ArrowRight")}>Right ➡️</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -196,7 +213,7 @@ function renderStepInstruction(order: ActiveOrder) {
     return (
       <div className="restaurant-step-card mix-card">
         <div className="restaurant-step-title">{step.label}</div>
-        <div className="restaurant-step-copy">{step.label.toLowerCase().includes("toss") ? "Shake the mouse back and forth!" : "Swirl the mouse in circles!"}</div>
+        <div className="restaurant-step-copy">{isTouch ? (step.label.toLowerCase().includes("toss") ? "Drag your finger back and forth on the ring!" : "Drag your finger in circles on the ring!") : (step.label.toLowerCase().includes("toss") ? "Shake the mouse back and forth!" : "Swirl the mouse in circles!")}</div>
         <div className="mix-ring" style={{ "--mix-progress": `${progressPct}%` } as CSSProperties}>
           <div className="mix-ring-inner">{Math.round(progressPct)}%</div>
         </div>
@@ -210,10 +227,11 @@ function renderStepInstruction(order: ActiveOrder) {
   if (step.type === "rhythm") {
     const totalDuration = step.hits[step.hits.length - 1].targetTick + step.hits[step.hits.length - 1].window;
     const beatPct = Math.min(100, (order.prepProgress / totalDuration) * 100);
+    const currentHit = step.hits[order.rhythmHitIndex];
     return (
       <div className="restaurant-step-card rhythm-card">
         <div className="restaurant-step-title">{step.label}</div>
-        <div className="restaurant-step-copy">Hit each key when the beat reaches its target zone. Misses still move the sequence forward.</div>
+        <div className="restaurant-step-copy">{isTouch ? "Tap the highlighted key when the beat reaches the zone." : "Hit each key when the beat reaches its target zone. Misses still move the sequence forward."}</div>
         <div className="rhythm-lane">
           <div className="rhythm-lane-progress" style={{ width: `${beatPct}%` }} />
           {step.hits.map((hit, index) => {
@@ -240,6 +258,11 @@ function renderStepInstruction(order: ActiveOrder) {
           <span>{order.rhythmHits}/{step.hits.length} hits</span>
           <span>Beat {(order.prepProgress / 20).toFixed(1)}s</span>
         </div>
+        {isTouch && currentHit && (
+          <div className="touch-controls">
+            <button type="button" className="touch-btn big primary" onClick={() => triggerKey(currentHit.key)}>Hit {currentHit.key.toUpperCase()}</button>
+          </div>
+        )}
       </div>
     );
   }
@@ -253,7 +276,9 @@ function renderStepInstruction(order: ActiveOrder) {
       <div className="restaurant-step-card hold-card">
         <div className="restaurant-step-title">{step.label}</div>
         <div className="restaurant-step-copy">
-          {order.holdStartTick == null ? `Hold ${step.key.toUpperCase()} to fill the meter, then release in the green zone.` : "Keep holding... release at the sweet spot!"}
+          {order.holdStartTick == null
+            ? (isTouch ? `Press and hold the button to fill the meter, then release in the green zone.` : `Hold ${step.key.toUpperCase()} to fill the meter, then release in the green zone.`)
+            : "Keep holding... release at the sweet spot!"}
         </div>
         <div className="hold-meter">
           <div className="hold-meter-zone" style={{ left: `${zoneLeft}%`, width: `${zoneWidth}%` }} />
@@ -263,6 +288,20 @@ function renderStepInstruction(order: ActiveOrder) {
           <span className={`keycap hold-key ${order.holdStartTick != null && !order.holdReleased ? "active" : ""}`}>{step.key.toUpperCase()}</span>
           <span className={`hold-status ${inZone ? "good" : ""}`}>{Math.round(fillPct)}%{inZone ? " — release!" : ""}</span>
         </div>
+        {isTouch && (
+          <div className="touch-controls">
+            <button
+              type="button"
+              className={`touch-btn big ${order.holdStartTick != null && !order.holdReleased ? (inZone ? "urgent" : "primary") : "primary"}`}
+              onPointerDown={(e) => { e.preventDefault(); triggerKeyDown?.(step.key); }}
+              onPointerUp={(e) => { e.preventDefault(); triggerKeyUp?.(step.key); }}
+              onPointerCancel={(e) => { e.preventDefault(); triggerKeyUp?.(step.key); }}
+              onPointerLeave={(e) => { if (order.holdStartTick != null && !order.holdReleased) { e.preventDefault(); triggerKeyUp?.(step.key); } }}
+            >
+              {order.holdStartTick != null && !order.holdReleased ? "🔒 Holding — release when green" : "👇 Press & hold"}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -271,6 +310,8 @@ function renderStepInstruction(order: ActiveOrder) {
     const showSequence = order.memorizeRevealed;
     const waiting = !showSequence && order.memorizeInputDelay > 0;
     const inputReady = !showSequence && order.memorizeInputDelay <= 0;
+    // Collect unique keys from the sequence for touch input pad
+    const uniqueKeys = Array.from(new Set(order.memorizeSequence.map((k) => k.toLowerCase())));
     return (
       <div className="restaurant-step-card memorize-card">
         <div className="restaurant-step-title">{step.label}</div>
@@ -280,8 +321,8 @@ function renderStepInstruction(order: ActiveOrder) {
             : waiting
               ? `Sequence hidden. Get ready... ${(order.memorizeInputDelay / 20).toFixed(1)}s`
               : order.memorizeInputIndex === 0 && order.memorizeSequence.length > 0
-                ? "Now type the sequence from memory!"
-                : "Repeat the hidden sequence from memory. One wrong key makes the order incorrect."}
+                ? (isTouch ? "Now tap the sequence from memory!" : "Now type the sequence from memory!")
+                : (isTouch ? "Repeat the hidden sequence. One wrong tap makes the order incorrect." : "Repeat the hidden sequence from memory. One wrong key makes the order incorrect.")}
         </div>
         <div className={`memorize-sequence ${showSequence ? "revealed" : "hidden"}`}>
           {order.memorizeSequence.map((key, index) => {
@@ -297,6 +338,13 @@ function renderStepInstruction(order: ActiveOrder) {
           <span>{showSequence ? "Remember it!" : waiting ? "⏳ Wait..." : inputReady ? `${order.memorizeInputIndex}/${step.sequenceLength} keys entered` : ""}</span>
           <span>{!order.orderCorrect ? "⚠️ No tip" : "Stay sharp"}</span>
         </div>
+        {isTouch && inputReady && (
+          <div className="touch-controls memorize-pad">
+            {uniqueKeys.map((k) => (
+              <button key={k} type="button" className="touch-btn keypad" onClick={() => triggerKey(k)}>{k.toUpperCase()}</button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -307,21 +355,33 @@ function renderStepInstruction(order: ActiveOrder) {
     <div className="restaurant-step-card">
       <div className="restaurant-step-title">{assembleStep.label}</div>
       <div className="restaurant-step-copy">
-        Press the key to add, or Space to skip.
+        {isTouch ? "Tap an ingredient to add, or Skip to skip." : "Press the key to add, or Space to skip."}
         {!order.orderCorrect && <span className="order-incorrect-badge"> ⚠️ Wrong ingredient!</span>}
       </div>
       <div className="ingredient-sequence">
         {assembleStep.ingredients.map((ingredient, index) => {
           const done = index < order.assembleIndex;
           const current = index === order.assembleIndex;
+          const clickable = isTouch && index >= order.assembleIndex;
           return (
-            <div key={`${ingredient.name}-${index}`} className={`ingredient-chip ${done ? "done" : ""} ${current ? "current" : ""}`}>
+            <div
+              key={`${ingredient.name}-${index}`}
+              className={`ingredient-chip ${done ? "done" : ""} ${current ? "current" : ""} ${clickable ? "touch-tappable" : ""}`}
+              onClick={clickable ? () => triggerKey(ingredient.key) : undefined}
+              role={clickable ? "button" : undefined}
+              tabIndex={clickable ? 0 : undefined}
+            >
               <span className="keycap">{ingredient.key.toUpperCase()}</span>
               <span>{ingredient.name}</span>
             </div>
           );
         })}
       </div>
+      {isTouch && (
+        <div className="touch-controls">
+          <button type="button" className="touch-btn" onClick={() => triggerKey(" ")}>⏭️ Skip</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -334,13 +394,13 @@ const CHORE_NAMES: Record<string, string> = {
   break_down_recycling: "♻️ Break Down Recycling",
 };
 
-function renderChoreInstruction(chore: ActiveChore) {
+function renderChoreInstruction(chore: ActiveChore, isTouch: boolean, triggerKey: (key: string) => void) {
   switch (chore.type) {
     case "wash_dishes":
       return (
         <div className="restaurant-step-card chore-card">
           <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
-          <div className="restaurant-step-copy">Scrub the spots off the plate! Move your mouse over the dirty spots.</div>
+          <div className="restaurant-step-copy">{isTouch ? "Scrub the spots off the plate! Drag your finger over the dirty spots." : "Scrub the spots off the plate! Move your mouse over the dirty spots."}</div>
           <div className="chore-interactive chore-dish">
             <div className="dish-plate">
               {chore.dishSpots.map((spot, i) => (
@@ -359,7 +419,7 @@ function renderChoreInstruction(chore: ActiveChore) {
       return (
         <div className="restaurant-step-card chore-card">
           <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
-          <div className="restaurant-step-copy">Click the trash bags to take them out!</div>
+          <div className="restaurant-step-copy">{isTouch ? "Tap the trash bags to take them out!" : "Click the trash bags to take them out!"}</div>
           <div className="chore-interactive chore-trash">
             {chore.trashBags.map((bag, i) => (
               <div key={i} className={`trash-bag ${bag.removed ? "removed" : ""}`} style={{ left: `${bag.x * 100}%`, top: `${bag.y * 100}%` }} />
@@ -373,7 +433,11 @@ function renderChoreInstruction(chore: ActiveChore) {
       );
 
     case "mop_floor": {
-      const phaseLabel = chore.mopPhase === "dunk" ? "Press ↓ to dunk the mop" : chore.mopPhase === "squeeze" ? `Press Space to squeeze (${chore.mopSqueezeCount}/3)` : `Alternate ← → to mop (${chore.mopSwipeCount}/6)`;
+      const phaseLabel = chore.mopPhase === "dunk"
+        ? (isTouch ? "Tap ↓ Dunk to dip the mop" : "Press ↓ to dunk the mop")
+        : chore.mopPhase === "squeeze"
+          ? (isTouch ? `Tap ⎵ Squeeze (${chore.mopSqueezeCount}/3)` : `Press Space to squeeze (${chore.mopSqueezeCount}/3)`)
+          : (isTouch ? `Tap ← → alternately to mop (${chore.mopSwipeCount}/6)` : `Alternate ← → to mop (${chore.mopSwipeCount}/6)`);
       return (
         <div className="restaurant-step-card chore-card">
           <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
@@ -391,6 +455,18 @@ function renderChoreInstruction(chore: ActiveChore) {
             <span>Cycle {chore.mopCycles}/{chore.mopCyclesNeeded}</span>
             <span>⏱️ {chore.timer.toFixed(1)}s</span>
           </div>
+          {isTouch && (
+            <div className="touch-controls chore-touch">
+              {chore.mopPhase === "dunk" && <button type="button" className="touch-btn big primary" onClick={() => triggerKey("ArrowDown")}>⬇️ Dunk</button>}
+              {chore.mopPhase === "squeeze" && <button type="button" className="touch-btn big primary" onClick={() => triggerKey(" ")}>⎵ Squeeze</button>}
+              {chore.mopPhase === "mop" && (
+                <>
+                  <button type="button" className="touch-btn big" onClick={() => triggerKey("ArrowLeft")}>⬅️ Left</button>
+                  <button type="button" className="touch-btn big" onClick={() => triggerKey("ArrowRight")}>Right ➡️</button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       );
     }
@@ -399,7 +475,7 @@ function renderChoreInstruction(chore: ActiveChore) {
       return (
         <div className="restaurant-step-card chore-card">
           <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
-          <div className="restaurant-step-copy">Press Space to stack the plate when it's aligned! {chore.plateMissed && "❌ Missed! Try again."}</div>
+          <div className="restaurant-step-copy">{isTouch ? "Tap Stack when the plate is aligned!" : "Press Space to stack the plate when it's aligned!"} {chore.plateMissed && "❌ Missed! Try again."}</div>
           <div className="chore-interactive chore-plates">
             <div className="plate-track">
               <div className="plate-target" style={{ left: `${chore.lastPlatePosition * 100}%` }} />
@@ -415,11 +491,18 @@ function renderChoreInstruction(chore: ActiveChore) {
             <span>{chore.platesStacked}/{chore.platesNeeded} plates stacked</span>
             <span>⏱️ {chore.timer.toFixed(1)}s</span>
           </div>
+          {isTouch && (
+            <div className="touch-controls chore-touch">
+              <button type="button" className="touch-btn big primary" onClick={() => triggerKey(" ")}>🥞 Stack!</button>
+            </div>
+          )}
         </div>
       );
 
     case "break_down_recycling": {
-      const phaseLabel = chore.recyclePhase === "click" ? `Click to dismantle boxes (${chore.recycleClicks}/${chore.recycleClicksNeeded})` : `Press arrow keys to flatten (${chore.recycleArrows}/${chore.recycleArrowsNeeded})`;
+      const phaseLabel = chore.recyclePhase === "click"
+        ? (isTouch ? `Tap the box to dismantle (${chore.recycleClicks}/${chore.recycleClicksNeeded})` : `Click to dismantle boxes (${chore.recycleClicks}/${chore.recycleClicksNeeded})`)
+        : (isTouch ? `Tap arrow buttons to flatten (${chore.recycleArrows}/${chore.recycleArrowsNeeded})` : `Press arrow keys to flatten (${chore.recycleArrows}/${chore.recycleArrowsNeeded})`);
       return (
         <div className="restaurant-step-card chore-card">
           <div className="restaurant-step-title">{CHORE_NAMES[chore.type]}</div>
@@ -437,6 +520,16 @@ function renderChoreInstruction(chore: ActiveChore) {
             <span>Cycle {chore.recycleCycles}/{chore.recycleCyclesNeeded}</span>
             <span>⏱️ {chore.timer.toFixed(1)}s</span>
           </div>
+          {isTouch && chore.recyclePhase === "arrows" && (
+            <div className="touch-controls chore-arrows">
+              <button type="button" className="touch-btn" onClick={() => triggerKey("ArrowUp")}>⬆️</button>
+              <div className="chore-arrows-row">
+                <button type="button" className="touch-btn" onClick={() => triggerKey("ArrowLeft")}>⬅️</button>
+                <button type="button" className="touch-btn" onClick={() => triggerKey("ArrowDown")}>⬇️</button>
+                <button type="button" className="touch-btn" onClick={() => triggerKey("ArrowRight")}>➡️</button>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -509,6 +602,24 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
   const localPlayerIdRef = useRef(localPlayerId);
   localPlayerIdRef.current = localPlayerId;
   const choreContainerRef = useRef<HTMLDivElement>(null);
+
+  // Detect touch device for showing tap-friendly controls
+  const isTouch = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+  }, []);
+
+  // Dispatch a synthetic keyboard event so touch buttons flow through the same
+  // handlers as physical keys (including peer forwarding, chore focus, etc.)
+  const triggerKey = useCallback((key: string) => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  }, []);
+  const triggerKeyDown = useCallback((key: string) => {
+    window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  }, []);
+  const triggerKeyUp = useCallback((key: string) => {
+    window.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
+  }, []);
 
   useEffect(() => {
     if (isPeer || paused || state.shiftOver) return; // Peers don't tick — they receive state from host
@@ -680,13 +791,40 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
     window.addEventListener("keyup", handleGlobalKeyUp);
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("click", handleClick);
+
+    // Touch device support: forward touch events as mouse events so the mix,
+    // wash_dishes, and take_out_trash mini-games work on phones/tablets.
+    const handleTouchMove = (event: TouchEvent) => {
+      if (paused || state.shiftOver) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      // Synthesize a MouseEvent-like object so the mousemove handler picks it up.
+      handleMouseMove({ clientX: touch.clientX, clientY: touch.clientY } as MouseEvent);
+    };
+    const handleTouchStart = (event: TouchEvent) => {
+      if (paused || state.shiftOver) return;
+      const touch = event.touches[0];
+      if (!touch) return;
+      // Only trigger chore click logic (trash bags etc.); regular UI buttons
+      // handle their own onClick so we don't want to double-fire those.
+      if (!state.choreFocused || !state.activeChore || state.activeChore.completed) return;
+      // Skip if the touch landed on an actual button/interactive control.
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("button, [role='button'], input, select, textarea, .touch-btn")) return;
+      handleClick({ clientX: touch.clientX, clientY: touch.clientY, target } as unknown as MouseEvent);
+    };
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchstart", handleTouchStart, { passive: true });
+
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleGlobalKeyUp);
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("click", handleClick);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchstart", handleTouchStart);
     };
-  }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver, state.numCounters, state.slotsPerCounter]);
+  }, [paused, setRestaurantState, state.orderSlots.length, state.shiftOver, state.numCounters, state.slotsPerCounter, state.choreFocused, state.activeChore]);
 
   return (
     <div className="restaurant-screen">
@@ -951,7 +1089,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         {/* Show chore instructions when chore is focused */}
         {state.choreFocused && state.activeChore && !state.activeChore.completed ? (
           <div className="chore-work-area" ref={choreContainerRef}>
-            {renderChoreInstruction(state.activeChore)}
+            {renderChoreInstruction(state.activeChore, isTouch, triggerKey)}
           </div>
         ) : activeOrder ? (
           <>
@@ -1061,7 +1199,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                   </div>
                 </div>
               ) : (
-                renderStepInstruction(activeOrder)
+                renderStepInstruction(activeOrder, isTouch, triggerKey, triggerKeyDown, triggerKeyUp)
               )}
             </div>
           </>
