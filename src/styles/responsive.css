@@ -721,6 +721,26 @@
 
   .restaurant-work-area {
     grid-template-columns: 1fr;
+    flex: none;
+    min-height: 0;
+  }
+
+  /* Ensure stats footer sits at the very bottom on mobile, below any
+     touch-control buttons rendered inside the step card. */
+  .restaurant-screen {
+    display: flex;
+    flex-direction: column;
+  }
+  .restaurant-footer {
+    order: 99;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-top: 8px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 163, 92, 0.15);
+  }
+  .restaurant-work-area .station-panel {
+    order: -1;
   }
 
   .restaurant-items-bar {
