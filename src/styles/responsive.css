@@ -1007,3 +1007,30 @@
   from { box-shadow: 0 0 0 0 rgba(239, 83, 80, 0.6); }
   to { box-shadow: 0 0 0 8px rgba(239, 83, 80, 0); }
 }
+
+/* ============================================================
+   Title screen — fit whole image on small/portrait screens
+   ============================================================ */
+@media (max-width: 900px) {
+  .title-screen-bg {
+    object-fit: contain;
+    background: #000;
+  }
+  .title-screen-overlay {
+    bottom: 2%;
+    left: 50%;
+    right: auto;
+    width: 92%;
+    max-width: 420px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.55);
+    border-radius: 12px;
+    gap: 0.6rem;
+  }
+  .title-menu-bottom {
+    bottom: 2%;
+  }
+  .title-start-btn {
+    width: 100%;
+  }
+}
