@@ -36,14 +36,14 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
   const lastDir = useRef<{ dx: number; dy: number } | null>(null);
 
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const processPointer = (clientX: number, clientY: number) => {
       if (state.phase !== "reeling") {
         lastPos.current = null;
         lastDir.current = null;
         return;
       }
 
-      const pos = { x: e.clientX, y: e.clientY };
+      const pos = { x: clientX, y: clientY };
       if (lastPos.current) {
         const dx = pos.x - lastPos.current.x;
         const dy = pos.y - lastPos.current.y;
@@ -65,8 +65,28 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
       lastPos.current = pos;
     };
 
+    const handleMouseMove = (e: MouseEvent) => processPointer(e.clientX, e.clientY);
+    const handleTouchMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      if (state.phase === "reeling") e.preventDefault();
+      processPointer(t.clientX, t.clientY);
+    };
+    const handleTouchEnd = () => {
+      lastPos.current = null;
+      lastDir.current = null;
+    };
+
     window.addEventListener("mousemove", handleMouseMove);
-    return () => window.removeEventListener("mousemove", handleMouseMove);
+    window.addEventListener("touchmove", handleTouchMove, { passive: false });
+    window.addEventListener("touchend", handleTouchEnd);
+    window.addEventListener("touchcancel", handleTouchEnd);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+      window.removeEventListener("touchcancel", handleTouchEnd);
+    };
   }, [state.phase]);
 
   const handleCast = useCallback(() => {
@@ -90,7 +110,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
         {state.phase === "waiting" && <p className="fishing-status">Waiting for a bite...</p>}
         {state.phase === "reeling" && fish && (
           <p className="fishing-status">
-            {fish.icon} {fish.name} ({fish.difficulty}) — Rotate mouse clockwise to reel!
+            {fish.icon} {fish.name} ({fish.difficulty}) — Swirl clockwise (mouse or finger) to reel!
           </p>
         )}
         {state.phase === "result" && (
@@ -178,7 +198,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
             <div className="reel-circle">
               <div className="reel-arrow">↻</div>
             </div>
-            <span>Rotate mouse</span>
+            <span>Swirl to reel</span>
           </div>
         )}
       </div>
