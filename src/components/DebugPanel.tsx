@@ -12,6 +12,7 @@ interface DebugPanelProps {
   setGameState: (updater: (prev: GameState) => GameState) => void;
   onClose: () => void;
   onSkipToDay?: (day: number, cash: number, tradingTickets: number, restaurantTickets: number, phase: "trading" | "restaurant") => void;
+  onJumpToEodPhase?: (phase: "shop" | "leisure") => void;
 }
 
 function generateStockFromCandidate(candidate: StockCandidate, day: number) {
@@ -36,7 +37,7 @@ function generateStockFromCandidate(candidate: StockCandidate, day: number) {
   };
 }
 
-export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: DebugPanelProps) {
+export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay, onJumpToEodPhase }: DebugPanelProps) {
   const [skipDay, setSkipDay] = useState(gameState.day + 1);
   const [skipCash, setSkipCash] = useState(gameState.cash);
   const [skipTradingTickets, setSkipTradingTickets] = useState(gameState.tradingTickets);
@@ -175,6 +176,16 @@ export function DebugPanel({ gameState, setGameState, onClose, onSkipToDay }: De
             Day {skipDay}: {isBoss ? "⚠️ Boss Day (trading + kitchen)" : "📈 Trading Day"}
           </p>
           <button className="debug-apply-btn" onClick={handleSkipToDay}>Apply & Resume</button>
+
+          {onJumpToEodPhase && (
+            <div className="debug-field" style={{ marginTop: "12px", borderTop: "1px solid #333", paddingTop: "12px" }}>
+              <label>Jump to EOD phase (current day):</label>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <button className="mode-btn" onClick={() => onJumpToEodPhase("shop")}>🎪 Shop</button>
+                <button className="mode-btn" onClick={() => onJumpToEodPhase("leisure")}>🎣 Leisure Pick</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -65,27 +65,27 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
       lastPos.current = pos;
     };
 
-    const handleMouseMove = (e: MouseEvent) => processPointer(e.clientX, e.clientY);
-    const handleTouchMove = (e: TouchEvent) => {
-      const t = e.touches[0];
-      if (!t) return;
-      if (state.phase === "reeling") e.preventDefault();
-      processPointer(t.clientX, t.clientY);
+    // Pointer Events unify mouse + touch + pen and are widely supported.
+    // Listening on the document catches every movement anywhere on the page.
+    const handlePointerMove = (e: PointerEvent) => {
+      if (state.phase === "reeling" && e.pointerType !== "mouse") {
+        // Prevent the page from scrolling while the player is swirling.
+        e.preventDefault();
+      }
+      processPointer(e.clientX, e.clientY);
     };
-    const handleTouchEnd = () => {
+    const handlePointerEnd = () => {
       lastPos.current = null;
       lastDir.current = null;
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("touchmove", handleTouchMove, { passive: false });
-    window.addEventListener("touchend", handleTouchEnd);
-    window.addEventListener("touchcancel", handleTouchEnd);
+    document.addEventListener("pointermove", handlePointerMove, { passive: false });
+    document.addEventListener("pointerup", handlePointerEnd);
+    document.addEventListener("pointercancel", handlePointerEnd);
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("touchmove", handleTouchMove);
-      window.removeEventListener("touchend", handleTouchEnd);
-      window.removeEventListener("touchcancel", handleTouchEnd);
+      document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("pointerup", handlePointerEnd);
+      document.removeEventListener("pointercancel", handlePointerEnd);
     };
   }, [state.phase]);
 
@@ -102,7 +102,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
   const progressPct = fish ? Math.min(100, (state.overlapTicks / (fish.duration * fish.catchThreshold)) * 100) : 0;
 
   return (
-    <div className="fishing-container" ref={containerRef}>
+    <div className={`fishing-container ${state.phase === "reeling" ? "no-touch-scroll" : ""}`} ref={containerRef}>
       <div className="fishing-header">
         <h2>🎣 Fishing</h2>
         {state.phase === "idle" && <p className="fishing-status">Ready to fish! Cast your line when you&apos;re ready.</p>}

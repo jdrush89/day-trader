@@ -802,3 +802,11 @@
     align-items: flex-start;
   }
 }
+
+/* Disable browser scroll/pinch handling while reeling so the swirl gesture
+   is captured by our pointermove handler on touch devices. */
+.fishing-container.no-touch-scroll,
+.fishing-container.no-touch-scroll * {
+  touch-action: none;
+  -ms-touch-action: none;
+}

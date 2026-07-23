@@ -29,7 +29,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.123";
+const GAME_VERSION = "0.0.124";
 
 function calculateNetWorth(state: GameState): number {
   const portfolioValue = state.portfolio.reduce((sum, pos) => {
@@ -2274,6 +2274,19 @@ function App() {
                 setShowDebug(false);
                 setPaused(false);
                 setEodPhase("summary");
+              }}
+              onJumpToEodPhase={(phase) => {
+                // Ensure market is closed so EOD panels render
+                setGameState((prev) => ({ ...prev, marketOpen: false }));
+                setShowDebug(false);
+                setPaused(false);
+                if (phase === "shop") {
+                  setShopOffering(generateShopOffering());
+                  setEodPhase("shop");
+                } else {
+                  setLeisureActivity(null);
+                  setEodPhase("leisure");
+                }
               }}
             />
           ) : showOptions === "pause" ? (
