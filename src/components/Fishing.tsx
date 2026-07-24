@@ -30,10 +30,13 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
     return () => clearInterval(interval);
   }, [day, acquiredUpgrades, finished, started]);
 
-  // Global mouse rotation detection — tracks circular motion anywhere
-  // Uses cross product of consecutive movement vectors to detect clockwise turns
+  // Global mouse rotation detection — tracks circular motion anywhere on
+  // screen for desktop players (using cross-product of movement vectors).
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const lastDir = useRef<{ dx: number; dy: number } | null>(null);
+  // For the touch swirl pad we use angle-around-center detection, which is
+  // more robust to slow finger drags and can even reel with tiny circles.
+  const lastAngle = useRef<number | null>(null);
   const swirlPadRef = useRef<HTMLDivElement | null>(null);
 
   const isTouch = useMemo(() => {
@@ -41,7 +44,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
     return window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
   }, []);
 
-  const processPointer = useCallback((clientX: number, clientY: number) => {
+  const processMousePointer = useCallback((clientX: number, clientY: number) => {
     const pos = { x: clientX, y: clientY };
     if (lastPos.current) {
       const dx = pos.x - lastPos.current.x;
@@ -49,14 +52,12 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
       const dist = Math.sqrt(dx * dx + dy * dy);
 
       if (dist > 2 && lastDir.current) {
-        // Cross product: positive = clockwise turn
         const cross = lastDir.current.dx * dy - lastDir.current.dy * dx;
         if (cross > 0) {
           const power = Math.min(cross / 200, 1.5);
           setState((prev) => applyReel(prev, power));
         }
       }
-
       if (dist > 2) {
         lastDir.current = { dx: dx / dist, dy: dy / dist };
       }
@@ -64,55 +65,114 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
     lastPos.current = pos;
   }, []);
 
-  const resetPointer = useCallback(() => {
+  const resetMousePointer = useCallback(() => {
     lastPos.current = null;
     lastDir.current = null;
+  }, []);
+
+  const resetAngle = useCallback(() => {
+    lastAngle.current = null;
+  }, []);
+
+  // Angle-around-center detector for the touch swirl pad. Clockwise motion
+  // (positive angle delta in screen coords, since y grows downward) reels.
+  const processSwirl = useCallback((clientX: number, clientY: number) => {
+    const pad = swirlPadRef.current;
+    if (!pad) return;
+    const rect = pad.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const angle = Math.atan2(clientY - cy, clientX - cx);
+    if (lastAngle.current != null) {
+      let delta = angle - lastAngle.current;
+      // Normalize to [-PI, PI]
+      if (delta > Math.PI) delta -= 2 * Math.PI;
+      if (delta < -Math.PI) delta += 2 * Math.PI;
+      // Positive delta in screen coordinates = clockwise
+      if (delta > 0) {
+        const power = Math.min(delta * 2.5, 1.5);
+        setState((prev) => applyReel(prev, power));
+      }
+    }
+    lastAngle.current = angle;
   }, []);
 
   // Desktop: window mousemove for swirl detection anywhere on screen.
   useEffect(() => {
     if (state.phase !== "reeling") {
-      resetPointer();
+      resetMousePointer();
       return;
     }
-    const handleMouseMove = (e: MouseEvent) => processPointer(e.clientX, e.clientY);
+    const handleMouseMove = (e: MouseEvent) => processMousePointer(e.clientX, e.clientY);
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [state.phase, processPointer, resetPointer]);
+  }, [state.phase, processMousePointer, resetMousePointer]);
 
-  // Touch: attach a non-passive touchmove listener directly to the swirl pad
-  // so we can preventDefault before iOS Safari hijacks the drag for page
-  // scroll. We also handle pointermove so Android/Chrome + stylus works.
+  // Touch swirl pad: attach both pointer and touch listeners with
+  // preventDefault + pointer capture so the finger can leave the pad without
+  // losing the gesture, and iOS Safari can't hijack it for page scrolling.
   useEffect(() => {
-    if (state.phase !== "reeling") return;
+    if (state.phase !== "reeling") {
+      resetAngle();
+      return;
+    }
     const pad = swirlPadRef.current;
     if (!pad) return;
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      e.preventDefault();
+      try { pad.setPointerCapture(e.pointerId); } catch {}
+      resetAngle();
+      processSwirl(e.clientX, e.clientY);
+    };
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      e.preventDefault();
+      processSwirl(e.clientX, e.clientY);
+    };
+    const handlePointerEnd = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      try { pad.releasePointerCapture(e.pointerId); } catch {}
+      resetAngle();
+    };
+
+    // Touch-event fallback for browsers where preventDefault on
+    // pointerdown is ignored (older iOS Safari).
+    const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      if (!t) return;
+      resetAngle();
+      processSwirl(t.clientX, t.clientY);
+    };
     const handleTouchMove = (e: TouchEvent) => {
       e.preventDefault();
       const t = e.touches[0];
       if (!t) return;
-      processPointer(t.clientX, t.clientY);
+      processSwirl(t.clientX, t.clientY);
     };
-    const handlePointerMove = (e: PointerEvent) => {
-      if (e.pointerType === "mouse") return; // desktop path handles mouse
-      processPointer(e.clientX, e.clientY);
-    };
-    const handleEnd = () => resetPointer();
-    pad.addEventListener("touchmove", handleTouchMove, { passive: false });
+    const handleTouchEnd = () => resetAngle();
+
+    pad.addEventListener("pointerdown", handlePointerDown);
     pad.addEventListener("pointermove", handlePointerMove);
-    pad.addEventListener("pointerup", handleEnd);
-    pad.addEventListener("pointercancel", handleEnd);
-    pad.addEventListener("touchend", handleEnd);
-    pad.addEventListener("touchcancel", handleEnd);
+    pad.addEventListener("pointerup", handlePointerEnd);
+    pad.addEventListener("pointercancel", handlePointerEnd);
+    pad.addEventListener("touchstart", handleTouchStart, { passive: false });
+    pad.addEventListener("touchmove", handleTouchMove, { passive: false });
+    pad.addEventListener("touchend", handleTouchEnd);
+    pad.addEventListener("touchcancel", handleTouchEnd);
     return () => {
-      pad.removeEventListener("touchmove", handleTouchMove);
+      pad.removeEventListener("pointerdown", handlePointerDown);
       pad.removeEventListener("pointermove", handlePointerMove);
-      pad.removeEventListener("pointerup", handleEnd);
-      pad.removeEventListener("pointercancel", handleEnd);
-      pad.removeEventListener("touchend", handleEnd);
-      pad.removeEventListener("touchcancel", handleEnd);
+      pad.removeEventListener("pointerup", handlePointerEnd);
+      pad.removeEventListener("pointercancel", handlePointerEnd);
+      pad.removeEventListener("touchstart", handleTouchStart);
+      pad.removeEventListener("touchmove", handleTouchMove);
+      pad.removeEventListener("touchend", handleTouchEnd);
+      pad.removeEventListener("touchcancel", handleTouchEnd);
     };
-  }, [state.phase, processPointer, resetPointer]);
+  }, [state.phase, processSwirl, resetAngle]);
 
   // Lock the outer .leisure-fullscreen from scrolling while reeling on touch
   // so the browser can't hijack the swirl gesture for page scroll.
