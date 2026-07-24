@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FishingState, FishingReward, createFishingState, fishingTick, applyReel, castLine } from "../game/fishing";
 import { UPGRADE_POOL } from "../game/upgrades";
 
@@ -34,60 +34,95 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
   // Uses cross product of consecutive movement vectors to detect clockwise turns
   const lastPos = useRef<{ x: number; y: number } | null>(null);
   const lastDir = useRef<{ dx: number; dy: number } | null>(null);
+  const swirlPadRef = useRef<HTMLDivElement | null>(null);
 
+  const isTouch = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
+  }, []);
+
+  const processPointer = useCallback((clientX: number, clientY: number) => {
+    const pos = { x: clientX, y: clientY };
+    if (lastPos.current) {
+      const dx = pos.x - lastPos.current.x;
+      const dy = pos.y - lastPos.current.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      if (dist > 2 && lastDir.current) {
+        // Cross product: positive = clockwise turn
+        const cross = lastDir.current.dx * dy - lastDir.current.dy * dx;
+        if (cross > 0) {
+          const power = Math.min(cross / 200, 1.5);
+          setState((prev) => applyReel(prev, power));
+        }
+      }
+
+      if (dist > 2) {
+        lastDir.current = { dx: dx / dist, dy: dy / dist };
+      }
+    }
+    lastPos.current = pos;
+  }, []);
+
+  const resetPointer = useCallback(() => {
+    lastPos.current = null;
+    lastDir.current = null;
+  }, []);
+
+  // Desktop: window mousemove for swirl detection anywhere on screen.
   useEffect(() => {
-    const processPointer = (clientX: number, clientY: number) => {
-      if (state.phase !== "reeling") {
-        lastPos.current = null;
-        lastDir.current = null;
-        return;
-      }
+    if (state.phase !== "reeling") {
+      resetPointer();
+      return;
+    }
+    const handleMouseMove = (e: MouseEvent) => processPointer(e.clientX, e.clientY);
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [state.phase, processPointer, resetPointer]);
 
-      const pos = { x: clientX, y: clientY };
-      if (lastPos.current) {
-        const dx = pos.x - lastPos.current.x;
-        const dy = pos.y - lastPos.current.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-
-        if (dist > 2 && lastDir.current) {
-          // Cross product: positive = clockwise turn
-          const cross = lastDir.current.dx * dy - lastDir.current.dy * dx;
-          if (cross > 0) {
-            const power = Math.min(cross / 200, 1.5);
-            setState((prev) => applyReel(prev, power));
-          }
-        }
-
-        if (dist > 2) {
-          lastDir.current = { dx: dx / dist, dy: dy / dist };
-        }
-      }
-      lastPos.current = pos;
+  // Touch: attach a non-passive touchmove listener directly to the swirl pad
+  // so we can preventDefault before iOS Safari hijacks the drag for page
+  // scroll. We also handle pointermove so Android/Chrome + stylus works.
+  useEffect(() => {
+    if (state.phase !== "reeling") return;
+    const pad = swirlPadRef.current;
+    if (!pad) return;
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      const t = e.touches[0];
+      if (!t) return;
+      processPointer(t.clientX, t.clientY);
     };
-
-    // Pointer Events unify mouse + touch + pen and are widely supported.
-    // Listening on the document catches every movement anywhere on the page.
     const handlePointerMove = (e: PointerEvent) => {
-      if (state.phase === "reeling" && e.pointerType !== "mouse") {
-        // Prevent the page from scrolling while the player is swirling.
-        e.preventDefault();
-      }
+      if (e.pointerType === "mouse") return; // desktop path handles mouse
       processPointer(e.clientX, e.clientY);
     };
-    const handlePointerEnd = () => {
-      lastPos.current = null;
-      lastDir.current = null;
-    };
-
-    document.addEventListener("pointermove", handlePointerMove, { passive: false });
-    document.addEventListener("pointerup", handlePointerEnd);
-    document.addEventListener("pointercancel", handlePointerEnd);
+    const handleEnd = () => resetPointer();
+    pad.addEventListener("touchmove", handleTouchMove, { passive: false });
+    pad.addEventListener("pointermove", handlePointerMove);
+    pad.addEventListener("pointerup", handleEnd);
+    pad.addEventListener("pointercancel", handleEnd);
+    pad.addEventListener("touchend", handleEnd);
+    pad.addEventListener("touchcancel", handleEnd);
     return () => {
-      document.removeEventListener("pointermove", handlePointerMove);
-      document.removeEventListener("pointerup", handlePointerEnd);
-      document.removeEventListener("pointercancel", handlePointerEnd);
+      pad.removeEventListener("touchmove", handleTouchMove);
+      pad.removeEventListener("pointermove", handlePointerMove);
+      pad.removeEventListener("pointerup", handleEnd);
+      pad.removeEventListener("pointercancel", handleEnd);
+      pad.removeEventListener("touchend", handleEnd);
+      pad.removeEventListener("touchcancel", handleEnd);
     };
-  }, [state.phase]);
+  }, [state.phase, processPointer, resetPointer]);
+
+  // Lock the outer .leisure-fullscreen from scrolling while reeling on touch
+  // so the browser can't hijack the swirl gesture for page scroll.
+  useEffect(() => {
+    if (!isTouch || state.phase !== "reeling") return;
+    const parent = containerRef.current?.closest(".leisure-fullscreen");
+    if (!parent) return;
+    parent.classList.add("reel-lock");
+    return () => parent.classList.remove("reel-lock");
+  }, [isTouch, state.phase]);
 
   const handleCast = useCallback(() => {
     setState((prev) => castLine(prev));
@@ -110,7 +145,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
         {state.phase === "waiting" && <p className="fishing-status">Waiting for a bite...</p>}
         {state.phase === "reeling" && fish && (
           <p className="fishing-status">
-            {fish.icon} {fish.name} ({fish.difficulty}) — Swirl clockwise (mouse or finger) to reel!
+            {fish.icon} {fish.name} ({fish.difficulty}) — {isTouch ? "Swirl clockwise on the pad below to reel!" : "Rotate mouse clockwise to reel!"}
           </p>
         )}
         {state.phase === "result" && (
@@ -192,13 +227,26 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
           </div>
         )}
 
-        {/* Reel hint */}
-        {state.phase === "reeling" && (
+        {/* Reel hint / touch swirl pad */}
+        {state.phase === "reeling" && !isTouch && (
           <div className="fishing-reel-hint">
             <div className="reel-circle">
               <div className="reel-arrow">↻</div>
             </div>
             <span>Swirl to reel</span>
+          </div>
+        )}
+        {state.phase === "reeling" && isTouch && (
+          <div
+            ref={swirlPadRef}
+            className="fishing-swirl-pad"
+            style={{ touchAction: "none" }}
+            aria-label="Swirl your finger here to reel"
+          >
+            <div className="fishing-swirl-pad-inner">
+              <div className="reel-arrow">↻</div>
+              <span>Swirl finger here</span>
+            </div>
           </div>
         )}
       </div>

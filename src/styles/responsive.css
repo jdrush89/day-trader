@@ -1034,3 +1034,81 @@
     width: 100%;
   }
 }
+
+/* ============================================================
+   Fishing swirl pad (touch devices only)
+   ============================================================ */
+.fishing-swirl-pad {
+  margin-top: 12px;
+  width: min(320px, 90vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(100, 200, 255, 0.35), rgba(30, 60, 90, 0.65));
+  border: 3px dashed rgba(160, 220, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.35), 0 0 12px rgba(100, 200, 255, 0.4);
+}
+.fishing-swirl-pad-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+  color: #dff2ff;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.fishing-swirl-pad-inner .reel-arrow {
+  font-size: 3rem;
+  animation: swirl-spin 2s linear infinite;
+}
+@keyframes swirl-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* On touch devices during reeling, lock the leisure overlay so page
+   scroll cannot steal the swirl gesture. */
+.leisure-fullscreen.reel-lock {
+  overflow: hidden !important;
+  touch-action: none;
+}
+.fishing-container.no-touch-scroll {
+  overflow: hidden !important;
+  touch-action: none;
+}
+.fishing-container.no-touch-scroll .fishing-swirl-pad,
+.fishing-container.no-touch-scroll .fishing-swirl-pad * {
+  touch-action: none;
+}
+/* Shrink the meter on small touch screens so the swirl pad fits without scroll */
+@media (pointer: coarse) and (max-height: 900px) {
+  .fishing-meter {
+    height: min(220px, 30vh) !important;
+  }
+}
+
+/* ============================================================
+   Phase transition / title screens — no scroll on mobile
+   ============================================================ */
+.title-screen {
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
+@media (max-width: 900px) {
+  .title-screen {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow: hidden !important;
+  }
+  .transition-overlay {
+    max-height: 90dvh;
+    overflow-y: auto;
+  }
+}
