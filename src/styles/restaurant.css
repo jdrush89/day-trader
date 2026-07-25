@@ -535,6 +535,16 @@
   display: grid;
   place-items: center;
   background: conic-gradient(#ff9450 var(--mix-progress), rgba(255, 255, 255, 0.08) 0);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.chore-interactive,
+.dish-plate {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .mix-ring-inner {
@@ -855,8 +865,7 @@
 @media (max-height: 700px) {
   .restaurant-screen {
     min-height: 0;
-    height: 100vh;
-    overflow-y: auto;
+    height: auto;
     padding: 6px 10px;
     gap: 6px;
   }
@@ -981,8 +990,7 @@
 @media (max-width: 640px) {
   .restaurant-screen {
     min-height: 0;
-    height: 100vh;
-    overflow-y: auto;
+    height: auto;
     padding: 6px;
     gap: 6px;
   }
