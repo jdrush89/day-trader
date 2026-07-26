@@ -724,14 +724,43 @@
     grid-template-columns: 1fr;
   }
 
-  /* ===== Mobile restaurant: 2-column layout that fits the viewport =====
-     Left column: compact ticket queue (scrolls internally).
-     Right column: active station panel (also scrolls internally if the
-     step card is tall). Header spans the top, footer spans the bottom.
-     The whole screen is locked to 100dvh so nothing else has to scroll. */
+  /* Schmooze */
+  .schmooze-option {
+    padding: 8px;
+    font-size: 0.78rem;
+  }
+
+  /* Boss day intro */
+  .boss-intro-reqs {
+    padding: 0.75rem;
+  }
+
+  .boss-intro-req {
+    font-size: 0.9rem;
+  }
+
+  /* Debug panel */
+  .debug-panel {
+    width: 98vw;
+    padding: 0.75rem;
+    max-height: 90vh;
+  }
+
+  .debug-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ===== Restaurant tablet/mobile: 2-column layout that fits the viewport =====
+   Applies at ≤1100px (tablet and phone). Left column is a compact ticket
+   queue that scrolls internally; right column is the active station panel
+   that also scrolls internally if the step card is tall. Header spans the
+   top, footer spans the bottom. The whole screen is locked to 100dvh so
+   nothing else needs to scroll. */
+@media (max-width: 1100px) {
   .restaurant-screen {
     display: grid;
-    grid-template-columns: minmax(130px, 32%) minmax(0, 1fr);
+    grid-template-columns: minmax(160px, 30%) minmax(0, 1fr);
     grid-template-rows: auto auto minmax(0, 1fr) auto;
     row-gap: 6px;
     column-gap: 6px;
@@ -753,11 +782,15 @@
   .chore-banner {
     grid-column: 1 / -1;
     grid-row: 2;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
   }
 
   .restaurant-queue {
     grid-column: 1;
     grid-row: 3;
+    grid-template-columns: 1fr;
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
@@ -771,6 +804,7 @@
   .restaurant-work-area {
     grid-column: 2;
     grid-row: 3;
+    grid-template-columns: 1fr;
     overflow-y: auto;
     overflow-x: hidden;
     min-height: 0;
@@ -812,10 +846,10 @@
     background: rgba(10, 14, 23, 0.98);
   }
   .restaurant-footer .restaurant-summary-chip span {
-    font-size: 0.55rem;
+    font-size: 0.6rem;
   }
   .restaurant-footer .restaurant-summary-chip strong {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     margin-top: 2px;
   }
 
@@ -830,12 +864,12 @@
     min-width: 0;
   }
   .restaurant-queue .slot-title {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
     white-space: normal;
   }
   .restaurant-queue .slot-step,
   .restaurant-queue .slot-customization {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
   }
 
   /* Ticket panel gets compact in the right column */
@@ -843,55 +877,23 @@
     padding: 8px 10px;
   }
   .restaurant-work-area .ticket-header h2 {
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
   .restaurant-work-area .ticket-header span {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
   }
   .restaurant-work-area .ticket-steps {
     gap: 4px;
   }
   .restaurant-work-area .ticket-step {
     padding: 4px 8px;
-    font-size: 0.75rem;
+    font-size: 0.8rem;
   }
   .restaurant-work-area .station-panel {
     padding: 10px;
   }
   .restaurant-work-area .restaurant-step-card {
     padding: 10px;
-  }
-
-  .restaurant-items-bar {
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 4px 6px;
-  }
-
-  /* Schmooze */
-  .schmooze-option {
-    padding: 8px;
-    font-size: 0.78rem;
-  }
-
-  /* Boss day intro */
-  .boss-intro-reqs {
-    padding: 0.75rem;
-  }
-
-  .boss-intro-req {
-    font-size: 0.9rem;
-  }
-
-  /* Debug panel */
-  .debug-panel {
-    width: 98vw;
-    padding: 0.75rem;
-    max-height: 90vh;
-  }
-
-  .debug-grid {
-    grid-template-columns: 1fr 1fr;
   }
 }
 
