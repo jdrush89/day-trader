@@ -724,30 +724,82 @@
     grid-template-columns: 1fr;
   }
 
-  .restaurant-work-area {
-    grid-template-columns: 1fr;
-    display: flex;
-    flex-direction: column;
-    flex: none;
+  /* ===== Mobile restaurant: 2-column layout that fits the viewport =====
+     Left column: compact ticket queue (scrolls internally).
+     Right column: active station panel (also scrolls internally if the
+     step card is tall). Header spans the top, footer spans the bottom.
+     The whole screen is locked to 100dvh so nothing else has to scroll. */
+  .restaurant-screen {
+    display: grid;
+    grid-template-columns: minmax(130px, 32%) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    row-gap: 6px;
+    column-gap: 6px;
+    height: 100dvh;
+    max-height: 100dvh;
     min-height: 0;
+    overflow: hidden;
+    padding: 6px;
+    flex-direction: unset;
   }
 
-  /* Explicit grid layout so header / work area / footer never overlap and
-     the footer is guaranteed to be the last row. Using grid with named
-     areas removes any dependence on flex `order` which was previously
-     letting the summary chips render on top of the active station panel. */
-  .restaurant-screen {
+  .restaurant-header {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    padding: 8px 10px;
+  }
+
+  .restaurant-items-bar,
+  .chore-banner {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .restaurant-queue {
+    grid-column: 1;
+    grid-row: 3;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
     display: flex;
     flex-direction: column;
+    gap: 6px;
+    padding-right: 2px;
+    -webkit-overflow-scrolling: touch;
   }
+
+  .restaurant-work-area {
+    grid-column: 2;
+    grid-row: 3;
+    overflow-y: auto;
+    overflow-x: hidden;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 2px;
+    -webkit-overflow-scrolling: touch;
+    flex: none;
+  }
+
+  .restaurant-work-area .station-panel {
+    order: 1;
+  }
+  .restaurant-work-area .ticket-panel {
+    order: 2;
+  }
+
   .restaurant-footer {
-    order: 99;
-    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    grid-row: 4;
+    order: unset;
+    display: flex;
     flex-direction: row;
+    flex-wrap: nowrap;
     align-items: stretch;
     gap: 6px;
-    padding: 8px;
-    margin-top: 8px;
+    padding: 6px 8px;
+    margin-top: 0;
     border-top: 1px solid rgba(255, 163, 92, 0.15);
     background: var(--bg-dark);
     position: relative;
@@ -756,13 +808,58 @@
   .restaurant-footer .restaurant-summary-chip {
     flex: 1 1 0;
     min-width: 0;
+    padding: 4px 6px;
     background: rgba(10, 14, 23, 0.98);
   }
-  .restaurant-work-area .station-panel {
-    order: 1;
+  .restaurant-footer .restaurant-summary-chip span {
+    font-size: 0.55rem;
   }
+  .restaurant-footer .restaurant-summary-chip strong {
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+
+  /* Compact the queue slots since they now live in a narrow column */
+  .restaurant-queue .order-slot {
+    padding: 6px 8px;
+    gap: 6px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .restaurant-queue .slot-info {
+    min-width: 0;
+  }
+  .restaurant-queue .slot-title {
+    font-size: 0.75rem;
+    white-space: normal;
+  }
+  .restaurant-queue .slot-step,
+  .restaurant-queue .slot-customization {
+    font-size: 0.65rem;
+  }
+
+  /* Ticket panel gets compact in the right column */
   .restaurant-work-area .ticket-panel {
-    order: 2;
+    padding: 8px 10px;
+  }
+  .restaurant-work-area .ticket-header h2 {
+    font-size: 0.95rem;
+  }
+  .restaurant-work-area .ticket-header span {
+    font-size: 0.7rem;
+  }
+  .restaurant-work-area .ticket-steps {
+    gap: 4px;
+  }
+  .restaurant-work-area .ticket-step {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+  .restaurant-work-area .station-panel {
+    padding: 10px;
+  }
+  .restaurant-work-area .restaurant-step-card {
+    padding: 10px;
   }
 
   .restaurant-items-bar {
