@@ -31,7 +31,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.134";
+const GAME_VERSION = "0.0.135";
 
 function calculateNetWorth(state: GameState): number {
   const portfolioValue = state.portfolio.reduce((sum, pos) => {
@@ -1515,34 +1515,29 @@ function App() {
   }, []);
 
   const handleLeisureComplete = useCallback((reward: FishingReward | null) => {
-    let updatedState: GameState | null = null;
-    if (reward) {
-      setGameState((prev) => {
-        let next: GameState;
-        switch (reward.type) {
-          case "cash":
-            next = { ...prev, cash: Math.round((prev.cash + (reward.amount ?? 0)) * 100) / 100 };
-            break;
-          case "ticket":
-            next = { ...prev, tickets: prev.tickets + 1, tradingTickets: prev.tradingTickets + 1 };
-            break;
-          case "upgrade":
-            if (reward.upgradeId && !prev.acquiredUpgrades.includes(reward.upgradeId)) {
-              next = { ...prev, acquiredUpgrades: [...prev.acquiredUpgrades, reward.upgradeId] };
-            } else {
-              next = { ...prev, cash: prev.cash + 75 }; // fallback if already owned
-            }
-            break;
-          case "recipe":
-            next = { ...prev, cash: prev.cash + 50 };
-            break;
-          default:
-            next = prev;
-        }
-        updatedState = next;
-        return next;
-      });
-    }
+    // Compute the new state up front so we can pass it directly to
+    // beginScheduledDay — the setGameState updater doesn't run synchronously,
+    // so we can't rely on capturing a closure inside it.
+    const applyReward = (prev: GameState): GameState => {
+      if (!reward) return prev;
+      switch (reward.type) {
+        case "cash":
+          return { ...prev, cash: Math.round((prev.cash + (reward.amount ?? 0)) * 100) / 100 };
+        case "ticket":
+          return { ...prev, tickets: prev.tickets + 1, tradingTickets: prev.tradingTickets + 1 };
+        case "upgrade":
+          if (reward.upgradeId && !prev.acquiredUpgrades.includes(reward.upgradeId)) {
+            return { ...prev, acquiredUpgrades: [...prev.acquiredUpgrades, reward.upgradeId] };
+          }
+          return { ...prev, cash: prev.cash + 75 }; // fallback if already owned
+        case "recipe":
+          return { ...prev, cash: prev.cash + 50 };
+        default:
+          return prev;
+      }
+    };
+    const updatedState = applyReward(gameState);
+    if (reward) setGameState(updatedState);
     // Advance to next phase — signal readiness
     if (isMultiplayer) {
       setLocalEodInfoStep("waiting");
@@ -1551,14 +1546,10 @@ function App() {
       if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     } else {
       // Leisure always happens at end of full day — go to next trading day.
-      // Pass the freshly-updated state directly so the upgrade/cash/ticket
-      // reward isn't lost to a stale-closure read of `gameState`.
       setRestaurantState(null);
-      setTimeout(() => {
-        beginScheduledDayRef.current(updatedState ?? undefined, { skipRestaurantTransition: true });
-      }, 0);
+      beginScheduledDayRef.current(updatedState, { skipRestaurantTransition: true });
     }
-  }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
+  }, [gameState, isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
 
   const handleCasinoComplete = useCallback((netChange: number) => {
     if (netChange !== 0) {
