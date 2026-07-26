@@ -61,6 +61,7 @@ export interface Paddle {
   dashCooldown: number;
   swingTimer: number; // >0 when swinging
   swingCooldown: number;
+  swingHit: boolean;  // true when this swing has already smacked the ball
 }
 
 export interface Ball {
@@ -72,6 +73,7 @@ export interface Ball {
 
 export interface TennisState {
   phase: TennisPhase;
+  paused: boolean;
   playerScore: number;    // integer count of points won (0..N)
   opponentScore: number;
   playerAdvantage: boolean;
@@ -115,6 +117,7 @@ export function tennisScoreLabel(state: TennisState, side: "player" | "opponent"
 export function createTennisState(): TennisState {
   return {
     phase: "ready",
+    paused: false,
     playerScore: 0,
     opponentScore: 0,
     playerAdvantage: false,
@@ -128,6 +131,7 @@ export function createTennisState(): TennisState {
       dashCooldown: 0,
       swingTimer: 0,
       swingCooldown: 0,
+      swingHit: false,
     },
     opponent: {
       x: COURT_WIDTH - PADDLE_MARGIN - PADDLE_WIDTH / 2,
@@ -137,6 +141,7 @@ export function createTennisState(): TennisState {
       dashCooldown: 0,
       swingTimer: 0,
       swingCooldown: 0,
+      swingHit: false,
     },
     ball: resetBall("player"),
     serving: "player",
@@ -165,6 +170,7 @@ export function setInput(state: TennisState, patch: Partial<TennisState["input"]
 
 /** Triggered on Space keydown. Serves if ready, otherwise attempts a swing. */
 export function triggerSwingOrServe(state: TennisState): TennisState {
+  if (state.paused) return state;
   if (state.phase === "ready") {
     return { ...state, phase: "playing" };
   }
@@ -172,18 +178,25 @@ export function triggerSwingOrServe(state: TennisState): TennisState {
   if (state.player.swingCooldown > 0 || state.player.swingTimer > 0) return state;
   return {
     ...state,
-    player: { ...state.player, swingTimer: SWING_DURATION, swingCooldown: SWING_DURATION + SWING_COOLDOWN },
+    player: { ...state.player, swingTimer: SWING_DURATION, swingCooldown: SWING_DURATION + SWING_COOLDOWN, swingHit: false },
   };
 }
 
 /** Triggered on Shift keydown. */
 export function triggerDash(state: TennisState): TennisState {
   if (state.phase !== "playing") return state;
+  if (state.paused) return state;
   if (state.player.dashCooldown > 0 || state.player.dashTimer > 0) return state;
   return {
     ...state,
     player: { ...state.player, dashTimer: DASH_DURATION, dashCooldown: DASH_DURATION + DASH_COOLDOWN },
   };
+}
+
+/** Toggle pause. Only meaningful during ready/playing. */
+export function togglePause(state: TennisState): TennisState {
+  if (state.phase === "game_over" || state.phase === "point_scored") return state;
+  return { ...state, paused: !state.paused };
 }
 
 // ==== Geometry ====
@@ -224,6 +237,7 @@ function getSwungTipPosition(paddle: Paddle): { x: number; y: number } | null {
 // ==== Tick ====
 export function tennisTick(state: TennisState): TennisState {
   if (state.phase === "game_over") return state;
+  if (state.paused) return state;
 
   if (state.phase === "point_scored") {
     const timer = state.pointScoredTimer - 1;
@@ -293,6 +307,7 @@ function updatePlayerPaddle(paddle: Paddle, input: TennisState["input"]): Paddle
     dashCooldown: Math.max(0, paddle.dashCooldown - 1),
     swingTimer: Math.max(0, paddle.swingTimer - 1),
     swingCooldown: Math.max(0, paddle.swingCooldown - 1),
+    swingHit: paddle.swingTimer - 1 <= 0 ? false : paddle.swingHit,
   };
 }
 
@@ -346,7 +361,7 @@ function collideWithPaddle(ball: Ball, paddle: Paddle, side: "player" | "opponen
  */
 function maybeApplySwingHit(state: TennisState): TennisState {
   const p = state.player;
-  if (p.swingTimer <= 0) return state;
+  if (p.swingTimer <= 0 || p.swingHit) return state;
   const tip = getSwungTipPosition(p);
   if (!tip) return state;
   // Compute the swept arc's bounding rectangle (rough) and check distance
@@ -385,8 +400,9 @@ function maybeApplySwingHit(state: TennisState): TennisState {
       vx: dirX * speed,
       vy: dirY * speed,
     },
-    // End the swing early so we don't multi-hit the same ball
-    player: { ...p, swingTimer: 0 },
+    // Mark the swing as having connected so it can't smack the same ball
+    // twice, but keep swingTimer running so the animation still plays out.
+    player: { ...p, swingHit: true },
   };
 }
 
@@ -474,7 +490,7 @@ function awardPoint(state: TennisState, scorer: "player" | "opponent"): TennisSt
     lastScorer: scorer,
     serving,
     ball: resetBall(serving),
-    player: { ...state.player, y: COURT_HEIGHT / 2, vy: 0, swingTimer: 0, dashTimer: 0 },
+    player: { ...state.player, y: COURT_HEIGHT / 2, vy: 0, swingTimer: 0, dashTimer: 0, swingHit: false },
     opponent: { ...state.opponent, y: COURT_HEIGHT / 2, vy: 0 },
   };
 }
