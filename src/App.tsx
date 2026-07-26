@@ -31,7 +31,24 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.135";
+const GAME_VERSION = "0.0.136";
+
+const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
+  { id: "fishing",     icon: "🎣", label: "Go Fishing" },
+  { id: "casino",      icon: "🎰", label: "Casino" },
+  { id: "tennis",      icon: "🎾", label: "Play Tennis" },
+  { id: "quicktactoe", icon: "⚡", label: "Quick Tac Toe" },
+];
+
+function pickLeisureOptions(count = 3): string[] {
+  const pool = LEISURE_ACTIVITY_DEFS.map((a) => a.id);
+  const out: string[] = [];
+  for (let i = 0; i < count && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(idx, 1)[0]);
+  }
+  return out;
+}
 
 function calculateNetWorth(state: GameState): number {
   const portfolioValue = state.portfolio.reduce((sum, pos) => {
@@ -91,6 +108,7 @@ function App() {
   const [eodInfoReadyPlayers, setEodInfoReadyPlayers] = useState<Set<string>>(new Set()); // players done with info screens
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
   const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | "casino" | "tennis" | "quicktactoe" | null>(null); // leisure phase sub-state
+  const [leisureOptions, setLeisureOptions] = useState<string[]>([]); // 3 randomly-picked activity ids for this evening
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
   const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
   const tradeTrackerRef = useRef<TradeTracker>(createTradeTracker());
@@ -686,6 +704,20 @@ function App() {
         return;
       }
 
+      // Debug: on the leisure pick screen, fill in any missing activities
+      const onLeisurePick =
+        (isMultiplayer ? localEodInfoStep === "leisure" : eodPhase === "leisure") &&
+        leisureActivity === null;
+      if (e.key === "n" && onLeisurePick) {
+        setLeisureOptions((prev) => {
+          const all = LEISURE_ACTIVITY_DEFS.map((a) => a.id);
+          const missing = all.filter((id) => !prev.includes(id));
+          if (missing.length === 0) return prev;
+          return [...prev, ...missing];
+        });
+        return;
+      }
+
       // Debug fast-forward toggle (while not paused)
       if (e.key === "n" && !paused && (gameState.marketOpen || (restaurantState && !restaurantState.shiftOver))) {
         setDebugFF(true);
@@ -738,7 +770,7 @@ function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex, bossDay, bossView, paused, showDebug, showOptions]);
+  }, [activeMonitorId, restaurantState, showTitle, titleTutorial, menuFocusIndex, bossDay, bossView, paused, showDebug, showOptions, eodPhase, localEodInfoStep, isMultiplayer, leisureActivity]);
 
   // MP-aware save helper
   const doSave = useCallback((gs: GameState, type: "auto" | "manual" = "auto") => {
@@ -1498,6 +1530,7 @@ function App() {
     } else if (isEndOfFullDay) {
       // End of full day, no shop — go to leisure
       setLeisureActivity(null);
+      setLeisureOptions(pickLeisureOptions(3));
       setEodPhase("leisure");
     } else {
       // After trading-only EOD — proceed to restaurant phase (no leisure)
@@ -1511,6 +1544,7 @@ function App() {
   const handleShopContinue = useCallback(() => {
     // After shop, go to leisure
     setLeisureActivity(null);
+    setLeisureOptions(pickLeisureOptions(3));
     setEodPhase("leisure");
   }, []);
 
@@ -1647,6 +1681,7 @@ function App() {
     } else if (localEodInfoStep === "shop") {
       // After shop, go to leisure
       setLeisureActivity(null);
+      setLeisureOptions(pickLeisureOptions(3));
       setLocalEodInfoStep("leisure");
       setEodPhase("leisure");
     } else if (localEodInfoStep === "leisure") {
@@ -2291,6 +2326,7 @@ function App() {
                   setEodPhase("shop");
                 } else {
                   setLeisureActivity(null);
+                  setLeisureOptions(pickLeisureOptions(3));
                   setEodPhase("leisure");
                 }
               }}
@@ -2560,22 +2596,20 @@ function App() {
                 <h2>🌙 Evening Leisure</h2>
                 <p>Pick an activity to wind down after a long day.</p>
                 <div className="leisure-choices">
-                  <button className="leisure-choice" onClick={() => setLeisureActivity("fishing")}>
-                    <span className="leisure-choice-icon">🎣</span>
-                    <span className="leisure-choice-label">Go Fishing</span>
-                  </button>
-                  <button className="leisure-choice" onClick={() => setLeisureActivity("casino")}>
-                    <span className="leisure-choice-icon">🎰</span>
-                    <span className="leisure-choice-label">Casino</span>
-                  </button>
-                  <button className="leisure-choice" onClick={() => setLeisureActivity("tennis")}>
-                    <span className="leisure-choice-icon">🎾</span>
-                    <span className="leisure-choice-label">Play Tennis</span>
-                  </button>
-                  <button className="leisure-choice" onClick={() => setLeisureActivity("quicktactoe")}>
-                    <span className="leisure-choice-icon">⚡</span>
-                    <span className="leisure-choice-label">Quick Tac Toe</span>
-                  </button>
+                  {leisureOptions.map((id) => {
+                    const def = LEISURE_ACTIVITY_DEFS.find((a) => a.id === id);
+                    if (!def) return null;
+                    return (
+                      <button
+                        key={id}
+                        className="leisure-choice"
+                        onClick={() => setLeisureActivity(id as typeof leisureActivity)}
+                      >
+                        <span className="leisure-choice-icon">{def.icon}</span>
+                        <span className="leisure-choice-label">{def.label}</span>
+                      </button>
+                    );
+                  })}
                   <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
                     <span className="leisure-choice-icon">😴</span>
                     <span className="leisure-choice-label">Skip &amp; Rest</span>
@@ -2850,22 +2884,20 @@ function App() {
                   <h2>🌙 Evening Leisure</h2>
                   <p>Pick an activity to wind down after a long day.</p>
                   <div className="leisure-choices">
-                    <button className="leisure-choice" onClick={() => setLeisureActivity("fishing")}>
-                      <span className="leisure-choice-icon">🎣</span>
-                      <span className="leisure-choice-label">Go Fishing</span>
-                    </button>
-                    <button className="leisure-choice" onClick={() => setLeisureActivity("casino")}>
-                      <span className="leisure-choice-icon">🎰</span>
-                      <span className="leisure-choice-label">Casino</span>
-                    </button>
-                    <button className="leisure-choice" onClick={() => setLeisureActivity("tennis")}>
-                      <span className="leisure-choice-icon">🎾</span>
-                      <span className="leisure-choice-label">Play Tennis</span>
-                    </button>
-                    <button className="leisure-choice" onClick={() => setLeisureActivity("quicktactoe")}>
-                      <span className="leisure-choice-icon">⚡</span>
-                      <span className="leisure-choice-label">Quick Tac Toe</span>
-                    </button>
+                    {leisureOptions.map((id) => {
+                      const def = LEISURE_ACTIVITY_DEFS.find((a) => a.id === id);
+                      if (!def) return null;
+                      return (
+                        <button
+                          key={id}
+                          className="leisure-choice"
+                          onClick={() => setLeisureActivity(id as typeof leisureActivity)}
+                        >
+                          <span className="leisure-choice-icon">{def.icon}</span>
+                          <span className="leisure-choice-label">{def.label}</span>
+                        </button>
+                      );
+                    })}
                     <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
                       <span className="leisure-choice-icon">😴</span>
                       <span className="leisure-choice-label">Skip &amp; Rest</span>
