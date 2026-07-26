@@ -126,7 +126,7 @@ export function TradingPanel({ gameState, onBuy, onSell, onShort, onCover, onTog
         <div className="owned-upgrades">
           <div className="owned-upgrades-title">Upgrades</div>
           <div className="owned-upgrades-list">
-            {ownedUpgrades.map(({ card, count }) => <div key={card.id} className="owned-upgrade-chip" title={`${card.name}${count > 1 ? ` x${count}` : ""}`}><span>{card.icon}</span>{count > 1 && <span className="owned-upgrade-count">x{count}</span>}</div>)}
+            {ownedUpgrades.map(({ card, count }) => <div key={card.id} className="owned-upgrade-chip" data-tooltip={`${card.name}${count > 1 ? ` x${count}` : ""}: ${card.description}`}><span>{card.icon}</span>{count > 1 && <span className="owned-upgrade-count">x{count}</span>}</div>)}
           </div>
         </div>
       )}

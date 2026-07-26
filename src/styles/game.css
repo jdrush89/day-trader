@@ -2527,6 +2527,37 @@ body {
   border-radius: 999px;
   font-size: 0.8rem;
   background: rgba(88, 166, 255, 0.06);
+  position: relative;
+  cursor: default;
+}
+
+.owned-upgrade-chip[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  background: var(--bg-dark);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  width: max-content;
+  max-width: 240px;
+  white-space: normal;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.owned-upgrade-chip[data-tooltip]:hover::after {
+  opacity: 1;
 }
 
 .owned-upgrade-count { font-size: 0.65rem; color: var(--text-dim); }

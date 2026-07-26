@@ -31,7 +31,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.133";
+const GAME_VERSION = "0.0.134";
 
 function calculateNetWorth(state: GameState): number {
   const portfolioValue = state.portfolio.reduce((sum, pos) => {
@@ -1515,23 +1515,32 @@ function App() {
   }, []);
 
   const handleLeisureComplete = useCallback((reward: FishingReward | null) => {
+    let updatedState: GameState | null = null;
     if (reward) {
       setGameState((prev) => {
+        let next: GameState;
         switch (reward.type) {
           case "cash":
-            return { ...prev, cash: Math.round((prev.cash + (reward.amount ?? 0)) * 100) / 100 };
+            next = { ...prev, cash: Math.round((prev.cash + (reward.amount ?? 0)) * 100) / 100 };
+            break;
           case "ticket":
-            return { ...prev, tickets: prev.tickets + 1, tradingTickets: prev.tradingTickets + 1 };
+            next = { ...prev, tickets: prev.tickets + 1, tradingTickets: prev.tradingTickets + 1 };
+            break;
           case "upgrade":
             if (reward.upgradeId && !prev.acquiredUpgrades.includes(reward.upgradeId)) {
-              return { ...prev, acquiredUpgrades: [...prev.acquiredUpgrades, reward.upgradeId] };
+              next = { ...prev, acquiredUpgrades: [...prev.acquiredUpgrades, reward.upgradeId] };
+            } else {
+              next = { ...prev, cash: prev.cash + 75 }; // fallback if already owned
             }
-            return { ...prev, cash: prev.cash + 75 }; // fallback if already owned
+            break;
           case "recipe":
-            return { ...prev, cash: prev.cash + 50 }; // For now, give cash bonus
+            next = { ...prev, cash: prev.cash + 50 };
+            break;
           default:
-            return prev;
+            next = prev;
         }
+        updatedState = next;
+        return next;
       });
     }
     // Advance to next phase — signal readiness
@@ -1541,9 +1550,13 @@ function App() {
       setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
       if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
     } else {
-      // Leisure always happens at end of full day — go to next trading day
+      // Leisure always happens at end of full day — go to next trading day.
+      // Pass the freshly-updated state directly so the upgrade/cash/ticket
+      // reward isn't lost to a stale-closure read of `gameState`.
       setRestaurantState(null);
-      beginScheduledDayRef.current(undefined, { skipRestaurantTransition: true });
+      setTimeout(() => {
+        beginScheduledDayRef.current(updatedState ?? undefined, { skipRestaurantTransition: true });
+      }, 0);
     }
   }, [isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
 
