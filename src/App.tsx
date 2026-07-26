@@ -25,12 +25,13 @@ import { PnLGraph } from "./components/PnLGraph";
 import { Fishing } from "./components/Fishing";
 import { Casino } from "./components/Casino";
 import { Tennis } from "./components/Tennis";
+import { QuickTacToe } from "./components/QuickTacToe";
 import { FishingReward } from "./game/fishing";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.132";
+const GAME_VERSION = "0.0.133";
 
 function calculateNetWorth(state: GameState): number {
   const portfolioValue = state.portfolio.reduce((sum, pos) => {
@@ -89,7 +90,7 @@ function App() {
   const [localEodInfoStep, setLocalEodInfoStep] = useState<"summary" | "challenges" | "shop" | "waiting" | "leisure" | null>(null); // per-player EOD info screen navigation (MP only)
   const [eodInfoReadyPlayers, setEodInfoReadyPlayers] = useState<Set<string>>(new Set()); // players done with info screens
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
-  const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | "casino" | "tennis" | null>(null); // leisure phase sub-state
+  const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | "casino" | "tennis" | "quicktactoe" | null>(null); // leisure phase sub-state
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
   const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
   const tradeTrackerRef = useRef<TradeTracker>(createTradeTracker());
@@ -2545,6 +2546,10 @@ function App() {
                 onComplete={handleLeisureComplete}
               />
             </div>
+          ) : leisureActivity === "quicktactoe" ? (
+            <div className="leisure-fullscreen">
+              <QuickTacToe onComplete={handleLeisureComplete} />
+            </div>
           ) : (
             <div className="leisure-fullscreen">
               <div className="leisure-container">
@@ -2562,6 +2567,10 @@ function App() {
                   <button className="leisure-choice" onClick={() => setLeisureActivity("tennis")}>
                     <span className="leisure-choice-icon">🎾</span>
                     <span className="leisure-choice-label">Play Tennis</span>
+                  </button>
+                  <button className="leisure-choice" onClick={() => setLeisureActivity("quicktactoe")}>
+                    <span className="leisure-choice-icon">⚡</span>
+                    <span className="leisure-choice-label">Quick Tac Toe</span>
                   </button>
                   <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
                     <span className="leisure-choice-icon">😴</span>
@@ -2827,6 +2836,10 @@ function App() {
                   onComplete={handleLeisureComplete}
                 />
               </div>
+            ) : leisureActivity === "quicktactoe" ? (
+              <div className="leisure-fullscreen">
+                <QuickTacToe onComplete={handleLeisureComplete} />
+              </div>
             ) : (
               <div className="leisure-fullscreen">
                 <div className="leisure-container">
@@ -2844,6 +2857,10 @@ function App() {
                     <button className="leisure-choice" onClick={() => setLeisureActivity("tennis")}>
                       <span className="leisure-choice-icon">🎾</span>
                       <span className="leisure-choice-label">Play Tennis</span>
+                    </button>
+                    <button className="leisure-choice" onClick={() => setLeisureActivity("quicktactoe")}>
+                      <span className="leisure-choice-icon">⚡</span>
+                      <span className="leisure-choice-label">Quick Tac Toe</span>
                     </button>
                     <button className="leisure-choice" onClick={() => handleLeisureComplete(null)}>
                       <span className="leisure-choice-icon">😴</span>

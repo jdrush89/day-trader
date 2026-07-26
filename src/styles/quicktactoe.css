@@ -1,0 +1,240 @@
+/* Quick Tac Toe Mini-Game */
+.qtt-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 70% 20%, rgba(255, 200, 120, 0.12), transparent 55%),
+    linear-gradient(180deg, #1a1522 0%, #120e18 50%, #0a0710 100%);
+  color: #f0e8d8;
+  user-select: none;
+  gap: 14px;
+  box-sizing: border-box;
+}
+
+.qtt-header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 700px;
+}
+
+.qtt-stat {
+  min-width: 90px;
+  padding: 6px 14px;
+  background: rgba(20, 15, 30, 0.7);
+  border: 1px solid rgba(255, 200, 120, 0.3);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.qtt-stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(240, 232, 216, 0.55);
+}
+
+.qtt-stat-value {
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #ffd07a;
+}
+
+.qtt-stat-value.warn {
+  color: #ff7a7a;
+  animation: qtt-warn-pulse 0.6s ease-in-out infinite alternate;
+}
+
+@keyframes qtt-warn-pulse {
+  from { opacity: 0.7; }
+  to   { opacity: 1; }
+}
+
+.qtt-pause-btn {
+  padding: 6px 14px;
+  background: rgba(20, 15, 30, 0.7);
+  color: #f0e8d8;
+  border: 1px solid rgba(255, 200, 120, 0.35);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.qtt-pause-btn:hover:not(:disabled) {
+  background: rgba(255, 200, 120, 0.15);
+}
+
+.qtt-pause-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.qtt-board-wrap {
+  position: relative;
+  width: min(90vmin, 540px);
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(20, 15, 30, 0.6);
+  border: 2px solid rgba(255, 200, 120, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.qtt-board {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(255, 200, 120, 0.15);
+  box-sizing: border-box;
+  transition: background 0.2s;
+}
+
+.qtt-flash-won {
+  background: rgba(120, 255, 150, 0.4) !important;
+}
+
+.qtt-flash-cat {
+  background: rgba(150, 150, 150, 0.4) !important;
+}
+
+.qtt-cell {
+  background: rgba(15, 10, 22, 0.85);
+  border: none;
+  color: #f0e8d8;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+  font-weight: 800;
+  font-size: clamp(1rem, 6vmin, 2.5rem);
+  cursor: pointer;
+  transition: background 0.1s;
+  padding: 0;
+  line-height: 1;
+}
+
+.qtt-cell:hover:not(:disabled) {
+  background: rgba(255, 200, 120, 0.15);
+}
+
+.qtt-cell:disabled {
+  cursor: default;
+}
+
+.qtt-cell-x {
+  color: #7ee0ff;
+  text-shadow: 0 0 8px rgba(126, 224, 255, 0.6);
+}
+
+.qtt-cell-o {
+  color: #ff9aa0;
+  text-shadow: 0 0 8px rgba(255, 154, 160, 0.6);
+}
+
+.qtt-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 5, 10, 0.7);
+  padding: 16px;
+}
+
+.qtt-overlay-card {
+  background: linear-gradient(180deg, rgba(255, 200, 120, 0.15), rgba(20, 15, 30, 0.98));
+  border: 1px solid rgba(255, 200, 120, 0.4);
+  border-radius: 14px;
+  padding: 20px 24px;
+  text-align: center;
+  max-width: 420px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.6);
+}
+
+.qtt-overlay-card h3 {
+  margin: 0 0 8px 0;
+  color: #ffd07a;
+  font-size: 1.3rem;
+}
+
+.qtt-overlay-card p {
+  margin: 0 0 10px 0;
+  color: rgba(240, 232, 216, 0.85);
+}
+
+.qtt-overlay-card kbd {
+  padding: 1px 6px;
+  border: 1px solid rgba(255, 200, 120, 0.5);
+  border-radius: 4px;
+  background: rgba(15, 10, 22, 0.6);
+  font-family: monospace;
+}
+
+.qtt-rules {
+  text-align: left;
+  margin: 8px 0 14px 0;
+  padding-left: 18px;
+  color: rgba(240, 232, 216, 0.85);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.qtt-reward {
+  margin: 8px 0 14px 0;
+  padding: 10px;
+  background: rgba(15, 10, 22, 0.6);
+  border: 1px dashed rgba(255, 208, 122, 0.6);
+  border-radius: 10px;
+  color: #ffd07a;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.qtt-nowin {
+  color: rgba(240, 232, 216, 0.6);
+  font-style: italic;
+}
+
+.qtt-btn {
+  padding: 8px 22px;
+  background: linear-gradient(135deg, #ffd07a, #d0904a);
+  color: #1a1122;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.qtt-btn:hover {
+  filter: brightness(1.08);
+}
+
+.qtt-hint {
+  font-size: 0.8rem;
+  color: rgba(240, 232, 216, 0.55);
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  .qtt-container {
+    padding: 8px;
+    gap: 8px;
+  }
+  .qtt-stat {
+    min-width: 70px;
+    padding: 4px 8px;
+  }
+  .qtt-stat-value {
+    font-size: 1rem;
+  }
+}
