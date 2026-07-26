@@ -26,18 +26,20 @@ import { Fishing } from "./components/Fishing";
 import { Casino } from "./components/Casino";
 import { Tennis } from "./components/Tennis";
 import { QuickTacToe } from "./components/QuickTacToe";
+import { Bowling } from "./components/Bowling";
 import { FishingReward } from "./game/fishing";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.136";
+const GAME_VERSION = "0.0.137";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
   { id: "casino",      icon: "🎰", label: "Casino" },
   { id: "tennis",      icon: "🎾", label: "Play Tennis" },
   { id: "quicktactoe", icon: "⚡", label: "Quick Tac Toe" },
+  { id: "bowling",     icon: "🎳", label: "Go Bowling" },
 ];
 
 function pickLeisureOptions(count = 3): string[] {
@@ -107,7 +109,7 @@ function App() {
   const [localEodInfoStep, setLocalEodInfoStep] = useState<"summary" | "challenges" | "shop" | "waiting" | "leisure" | null>(null); // per-player EOD info screen navigation (MP only)
   const [eodInfoReadyPlayers, setEodInfoReadyPlayers] = useState<Set<string>>(new Set()); // players done with info screens
   const [shopOffering, setShopOffering] = useState<ConsumableItem[]>([]); // current shop items for sale
-  const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | "casino" | "tennis" | "quicktactoe" | null>(null); // leisure phase sub-state
+  const [leisureActivity, setLeisureActivity] = useState<"pick" | "fishing" | "casino" | "tennis" | "quicktactoe" | "bowling" | null>(null); // leisure phase sub-state
   const [leisureOptions, setLeisureOptions] = useState<string[]>([]); // 3 randomly-picked activity ids for this evening
   const [tradeTracker, setTradeTracker] = useState<TradeTracker>(createTradeTracker);
   const [pnlSeries, setPnlSeries] = useState<PlayerPnLSeries[]>([]);
@@ -2590,6 +2592,10 @@ function App() {
             <div className="leisure-fullscreen">
               <QuickTacToe onComplete={handleLeisureComplete} />
             </div>
+          ) : leisureActivity === "bowling" ? (
+            <div className="leisure-fullscreen">
+              <Bowling onComplete={handleLeisureComplete} />
+            </div>
           ) : (
             <div className="leisure-fullscreen">
               <div className="leisure-container">
@@ -2877,6 +2883,10 @@ function App() {
             ) : leisureActivity === "quicktactoe" ? (
               <div className="leisure-fullscreen">
                 <QuickTacToe onComplete={handleLeisureComplete} />
+              </div>
+            ) : leisureActivity === "bowling" ? (
+              <div className="leisure-fullscreen">
+                <Bowling onComplete={handleLeisureComplete} />
               </div>
             ) : (
               <div className="leisure-fullscreen">

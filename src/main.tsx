@@ -6,6 +6,7 @@ import "./styles/restaurant.css";
 import "./styles/fishing.css";
 import "./styles/tennis.css";
 import "./styles/quicktactoe.css";
+import "./styles/bowling.css";
 import "./styles/responsive.css";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
