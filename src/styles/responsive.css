@@ -726,12 +726,16 @@
 
   .restaurant-work-area {
     grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
     flex: none;
     min-height: 0;
   }
 
-  /* Ensure stats footer sits at the very bottom on mobile, below any
-     touch-control buttons rendered inside the step card. */
+  /* Explicit grid layout so header / work area / footer never overlap and
+     the footer is guaranteed to be the last row. Using grid with named
+     areas removes any dependence on flex `order` which was previously
+     letting the summary chips render on top of the active station panel. */
   .restaurant-screen {
     display: flex;
     flex-direction: column;
@@ -739,13 +743,26 @@
   .restaurant-footer {
     order: 99;
     flex-wrap: wrap;
+    flex-direction: row;
+    align-items: stretch;
     gap: 6px;
-    padding-top: 8px;
-    margin-top: 4px;
+    padding: 8px;
+    margin-top: 8px;
     border-top: 1px solid rgba(255, 163, 92, 0.15);
+    background: var(--bg-dark);
+    position: relative;
+    z-index: 2;
+  }
+  .restaurant-footer .restaurant-summary-chip {
+    flex: 1 1 0;
+    min-width: 0;
+    background: rgba(10, 14, 23, 0.98);
   }
   .restaurant-work-area .station-panel {
-    order: -1;
+    order: 1;
+  }
+  .restaurant-work-area .ticket-panel {
+    order: 2;
   }
 
   .restaurant-items-bar {
