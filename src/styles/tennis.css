@@ -1,0 +1,227 @@
+/* Tennis Mini-Game */
+.tennis-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(126, 224, 255, 0.12), transparent 55%),
+    linear-gradient(180deg, #0d1f2a 0%, #0a1720 50%, #071018 100%);
+  color: #e4f0fb;
+  user-select: none;
+  gap: 12px;
+  box-sizing: border-box;
+}
+
+.tennis-header {
+  text-align: center;
+  width: 100%;
+  max-width: 900px;
+}
+
+.tennis-score {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+.tennis-score-side {
+  min-width: 90px;
+  padding: 6px 14px;
+  background: rgba(10, 14, 23, 0.7);
+  border: 1px solid rgba(126, 224, 255, 0.28);
+  border-radius: 10px;
+}
+
+.tennis-score-label {
+  font-size: 0.75rem;
+  color: rgba(228, 240, 251, 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.tennis-score-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #fff09a;
+}
+
+.tennis-score-sep {
+  color: rgba(228, 240, 251, 0.4);
+  font-size: 1.4rem;
+}
+
+.tennis-controls-hint {
+  margin-top: 6px;
+  font-size: 0.85rem;
+  color: rgba(228, 240, 251, 0.65);
+}
+
+.tennis-controls-hint kbd {
+  padding: 1px 5px;
+  border: 1px solid rgba(126, 224, 255, 0.4);
+  border-radius: 4px;
+  background: rgba(10, 14, 23, 0.5);
+  font-size: 0.8rem;
+}
+
+.tennis-court-wrap {
+  position: relative;
+  width: min(100%, 900px);
+  aspect-ratio: 800 / 500;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(126, 224, 255, 0.25);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.tennis-court-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #0d2e18;
+  touch-action: none;
+}
+
+.tennis-touch-zone {
+  position: absolute;
+  left: 0;
+  width: 40%;
+  height: 50%;
+  background: transparent;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.tennis-touch-up { top: 0; }
+.tennis-touch-down { top: 50%; }
+
+.tennis-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(5, 10, 18, 0.65);
+  padding: 16px;
+}
+
+.tennis-overlay-flash {
+  background: rgba(5, 10, 18, 0.35);
+  pointer-events: none;
+}
+
+.tennis-overlay-card {
+  background: linear-gradient(180deg, rgba(126, 224, 255, 0.12), rgba(19, 26, 43, 0.98));
+  border: 1px solid rgba(126, 224, 255, 0.35);
+  border-radius: 14px;
+  padding: 20px 24px;
+  text-align: center;
+  max-width: 380px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+}
+
+.tennis-overlay-card h3 {
+  margin: 0 0 8px 0;
+  color: #fff09a;
+  font-size: 1.3rem;
+}
+
+.tennis-overlay-card p {
+  margin: 0 0 12px 0;
+  color: rgba(228, 240, 251, 0.85);
+  font-size: 0.95rem;
+}
+
+.tennis-overlay-card kbd {
+  padding: 1px 6px;
+  border: 1px solid rgba(126, 224, 255, 0.5);
+  border-radius: 4px;
+  background: rgba(10, 14, 23, 0.6);
+  font-family: monospace;
+}
+
+.tennis-btn {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #7ee0ff, #4aa8d0);
+  color: #06121a;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+.tennis-btn:hover {
+  filter: brightness(1.08);
+}
+
+.tennis-reward {
+  margin: 8px 0 14px 0;
+  padding: 10px;
+  background: rgba(10, 14, 23, 0.5);
+  border: 1px dashed rgba(255, 240, 154, 0.5);
+  border-radius: 10px;
+}
+
+.tennis-reward .reward-item {
+  color: #fff09a;
+  font-size: 1rem;
+}
+
+.tennis-reward .reward-item-desc {
+  color: rgba(228, 240, 251, 0.7);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.tennis-touch-actions {
+  display: flex;
+  gap: 12px;
+  width: min(100%, 500px);
+  justify-content: center;
+}
+
+.tennis-touch-btn {
+  flex: 1;
+  padding: 14px 8px;
+  background: rgba(10, 14, 23, 0.7);
+  color: #e4f0fb;
+  border: 1px solid rgba(126, 224, 255, 0.35);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tennis-touch-btn.primary {
+  background: linear-gradient(135deg, rgba(126, 224, 255, 0.4), rgba(74, 168, 208, 0.4));
+  border-color: rgba(126, 224, 255, 0.7);
+}
+
+.tennis-touch-btn:active {
+  filter: brightness(1.2);
+}
+
+/* Mobile tweaks */
+@media (max-width: 900px) {
+  .tennis-container {
+    padding: 8px;
+    gap: 8px;
+  }
+  .tennis-score-side {
+    min-width: 70px;
+    padding: 4px 10px;
+  }
+  .tennis-score-value {
+    font-size: 1.3rem;
+  }
+  .tennis-controls-hint {
+    font-size: 0.75rem;
+  }
+}
