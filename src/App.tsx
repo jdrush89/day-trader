@@ -28,11 +28,12 @@ import { Tennis } from "./components/Tennis";
 import { QuickTacToe } from "./components/QuickTacToe";
 import { Bowling } from "./components/Bowling";
 import { FishingReward } from "./game/fishing";
+import { startMusic, stopMusic, isMusicMuted, setMusicMuted } from "./game/music";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.139";
+const GAME_VERSION = "0.0.140";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -71,6 +72,14 @@ function App() {
   const [speed, setSpeed] = useState<number>(1);
   const [paused, setPaused] = useState(false);
   const [showOptions, setShowOptions] = useState<"title" | "pause" | null>(null);
+  const [musicMuted, setMusicMutedState] = useState<boolean>(() => isMusicMuted());
+  const toggleMusic = useCallback(() => {
+    setMusicMutedState((prev) => {
+      const next = !prev;
+      setMusicMuted(next);
+      return next;
+    });
+  }, []);
   const [textSize, setTextSize] = useState<number>(() => {
     const saved = localStorage.getItem("rogue-day-trader-text-size");
     return saved ? parseFloat(saved) : 100;
@@ -449,6 +458,17 @@ function App() {
   useEffect(() => {
     if (showChallengeIntro) setChallengeReadyPlayers(new Set());
   }, [showChallengeIntro]);
+
+  // Title-screen music lifecycle
+  useEffect(() => {
+    if (showTitle) {
+      startMusic();
+      setMusicMuted(isMusicMuted());
+    } else {
+      stopMusic();
+    }
+    return () => { stopMusic(); };
+  }, [showTitle]);
 
   // Challenge intro gate: when all players clicked "start", dismiss the challenge intro
   useEffect(() => {
@@ -2080,6 +2100,9 @@ function App() {
       return (
         <div className="title-screen">
           <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
+          <button className="music-toggle-floating" onClick={toggleMusic} aria-label={musicMuted ? "Unmute music" : "Mute music"} title={musicMuted ? "Unmute music" : "Mute music"}>
+            {musicMuted ? "🔇" : "🔊"}
+          </button>
           <div className="title-screen-overlay title-menu-bottom">
             <h2 className="tutorial-pick-title">📖 Choose a Tutorial</h2>
             <button className="title-start-btn" onClick={() => setTitleTutorial("trading")}>📈 Day Trading</button>
@@ -2094,6 +2117,9 @@ function App() {
       return (
         <div className="title-screen">
           <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
+          <button className="music-toggle-floating" onClick={toggleMusic} aria-label={musicMuted ? "Unmute music" : "Mute music"} title={musicMuted ? "Unmute music" : "Mute music"}>
+            {musicMuted ? "🔇" : "🔊"}
+          </button>
           <div className="title-screen-overlay title-menu-bottom">
             <h2 className="tutorial-pick-title">⚙️ Options</h2>
             <div className="options-row">
@@ -2102,6 +2128,12 @@ function App() {
                 <input type="range" min="60" max="150" step="5" value={textSize} onChange={(e) => setTextSize(Number(e.target.value))} className="options-slider" />
                 <span className="options-value">{textSize}%</span>
               </div>
+            </div>
+            <div className="options-row">
+              <label className="options-label">Music</label>
+              <button className="options-toggle-btn" onClick={toggleMusic}>
+                {musicMuted ? "🔇 Muted" : "🔊 On"}
+              </button>
             </div>
             <button className="title-start-btn title-back-btn" onClick={() => { setShowOptions(null); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>← Back</button>
           </div>
@@ -2112,6 +2144,9 @@ function App() {
     return (
       <div className="title-screen">
         <img src={titleScreen} alt="Day Trader" className="title-screen-bg" />
+        <button className="music-toggle-floating" onClick={toggleMusic} aria-label={musicMuted ? "Unmute music" : "Mute music"} title={musicMuted ? "Unmute music" : "Mute music"}>
+          {musicMuted ? "🔇" : "🔊"}
+        </button>
         <div className="title-screen-overlay title-menu-bottom">
           {savedGame && (
             <button className="title-start-btn title-resume-btn" onClick={handleResume}>
@@ -2342,6 +2377,12 @@ function App() {
                   <input type="range" min="60" max="150" step="5" value={textSize} onChange={(e) => setTextSize(Number(e.target.value))} className="options-slider" />
                   <span className="options-value">{textSize}%</span>
                 </div>
+              </div>
+              <div className="options-row">
+                <label className="options-label">Music</label>
+                <button className="options-toggle-btn" onClick={toggleMusic}>
+                  {musicMuted ? "🔇 Muted" : "🔊 On"}
+                </button>
               </div>
               <button className="pause-menu-btn" onClick={() => setShowOptions(null)}>← Back</button>
             </div>

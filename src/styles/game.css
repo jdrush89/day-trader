@@ -3028,6 +3028,43 @@ body {
   font-family: monospace;
 }
 
+.options-toggle-btn {
+  padding: 0.5rem 1rem;
+  background: #2a2a3e;
+  border: 2px solid #444;
+  border-radius: 6px;
+  color: #eee;
+  cursor: pointer;
+  font-size: 0.95rem;
+  min-width: 110px;
+}
+.options-toggle-btn:hover {
+  background: #3a3a4e;
+  border-color: var(--positive);
+}
+
+.music-toggle-floating {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-size: 1.4rem;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.music-toggle-floating:hover {
+  background: rgba(0,0,0,0.75);
+  border-color: rgba(255,255,255,0.8);
+}
+
 /* Debug Panel */
 .debug-panel {
   background: #1a1a2e;
