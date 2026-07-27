@@ -413,6 +413,9 @@ export function Bowling({ onComplete }: BowlingProps) {
 
   const startNextBall = useCallback(() => {
     setBallIndex((i) => i + 1);
+    // Sweep the fallen pins from the lane — only carry standing pins forward.
+    setPins((prev) => prev.filter((p) => p.standing));
+    setPinsAfterPrevBalls((prev) => prev.filter((p) => p.standing));
     setBall((b) => ({
       ...b,
       ballX: GUTTER + LANE_W / 2,
