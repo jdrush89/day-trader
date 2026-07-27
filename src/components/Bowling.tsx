@@ -29,7 +29,12 @@ type Pin = { id: number; x: number; y: number; standing: boolean; vx: number; vy
 function makePins(): Pin[] {
   const laneMidX = GUTTER + LANE_W / 2;
   const pins: Pin[] = [];
-  const rows: number[][] = [[1], [2, 3], [4, 5, 6], [7, 8, 9, 10]];
+  // Rows from BACK to FRONT (ball rolls up-lane toward smaller y).
+  // Back row (farthest from ball): 7 8 9 10
+  // Then:                          4 5 6
+  // Then:                          2 3
+  // Front (closest to ball):       1
+  const rows: number[][] = [[7, 8, 9, 10], [4, 5, 6], [2, 3], [1]];
   rows.forEach((row, r) => {
     const y = PIN_ROW_Y + r * PIN_ROW_SPACING;
     const totalWidth = (row.length - 1) * PIN_COL_SPACING;
