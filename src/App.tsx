@@ -28,12 +28,12 @@ import { Tennis } from "./components/Tennis";
 import { QuickTacToe } from "./components/QuickTacToe";
 import { Bowling } from "./components/Bowling";
 import { FishingReward } from "./game/fishing";
-import { startMusic, stopMusic, isMusicMuted, toggleMusicMute, getMusicVolume, setMusicVolume } from "./game/music";
+import { startMusic, stopMusic, isMusicMuted, toggleMusicMute, getMusicVolume, setMusicVolume, setTrack, type TrackId } from "./game/music";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.141";
+const GAME_VERSION = "0.0.142";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -463,17 +463,28 @@ function App() {
     if (showChallengeIntro) setChallengeReadyPlayers(new Set());
   }, [showChallengeIntro]);
 
-  // Title-screen music lifecycle
+  // Music: run all the time, pick the track that matches the current screen.
   useEffect(() => {
-    if (showTitle) {
-      startMusic();
-      setMusicVolumeState(getMusicVolume());
-      setMusicMutedState(isMusicMuted());
-    } else {
-      stopMusic();
-    }
-    return () => { stopMusic(); };
-  }, [showTitle]);
+    startMusic();
+    let track: TrackId = "trading";
+    if (showTitle) track = "title";
+    else if (paused) track = "pause";
+    else if (showChallengeIntro === "trading" || showTransition === "trading") track = "trading-start";
+    else if (showChallengeIntro === "restaurant" || showTransition === "restaurant") track = "restaurant-start";
+    else if (leisureActivity === "fishing") track = "leisure-fishing";
+    else if (leisureActivity === "casino") track = "leisure-casino";
+    else if (leisureActivity === "tennis") track = "leisure-tennis";
+    else if (leisureActivity === "quicktactoe") track = "leisure-quicktactoe";
+    else if (leisureActivity === "bowling") track = "leisure-bowling";
+    else if (eodPhase === "shop") track = "store";
+    else if (["summary","challenges","upgrades","stocks","restaurant-upgrades","menu-draft","leisure"].includes(eodPhase)) track = "eod";
+    else if (restaurantState !== null) track = "restaurant";
+    else track = "trading";
+    setTrack(track);
+  }, [showTitle, paused, showChallengeIntro, showTransition, leisureActivity, eodPhase, restaurantState]);
+
+  // Stop music entirely when the app unmounts.
+  useEffect(() => () => stopMusic(), []);
 
   // Challenge intro gate: when all players clicked "start", dismiss the challenge intro
   useEffect(() => {
