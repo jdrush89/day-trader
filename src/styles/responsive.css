@@ -2,6 +2,36 @@
 
 /* Medium screens (tablets, small laptops) */
 @media (max-width: 900px) {
+  .mobile-global-pause-btn {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    z-index: 1500;
+    display: flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 2px solid rgba(255, 255, 255, 0.65);
+    border-radius: 50%;
+    background: rgba(8, 12, 22, 0.82);
+    color: #fff;
+    font-size: 1.15rem;
+    line-height: 1;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+  }
+
+  .mobile-global-pause-btn:active {
+    transform: scale(0.94);
+  }
+
+  .leisure-pause-btn {
+    display: none;
+  }
+
   html, body {
     overflow-y: auto;
     overflow-x: hidden;

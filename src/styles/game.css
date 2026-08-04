@@ -1808,6 +1808,10 @@ body {
   background: rgba(0, 0, 0, 0.8);
 }
 
+.mobile-global-pause-btn {
+  display: none;
+}
+
 /* Pause Menu */
 .pause-menu {
   background: var(--bg-panel);
