@@ -33,7 +33,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.142";
+const GAME_VERSION = "0.0.143";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -463,6 +463,8 @@ function App() {
     if (showChallengeIntro) setChallengeReadyPlayers(new Set());
   }, [showChallengeIntro]);
 
+  const restaurantShiftActive = restaurantState !== null && !restaurantState.shiftOver;
+
   // Music: run all the time, pick the track that matches the current screen.
   useEffect(() => {
     startMusic();
@@ -477,11 +479,11 @@ function App() {
     else if (leisureActivity === "quicktactoe") track = "leisure-quicktactoe";
     else if (leisureActivity === "bowling") track = "leisure-bowling";
     else if (eodPhase === "shop") track = "store";
-    else if (["summary","challenges","upgrades","stocks","restaurant-upgrades","menu-draft","leisure"].includes(eodPhase)) track = "eod";
-    else if (restaurantState !== null) track = "restaurant";
-    else track = "trading";
+    else if (restaurantShiftActive && (!bossDay || bossView === "restaurant")) track = "restaurant-start";
+    else if (gameState.marketOpen) track = "trading";
+    else track = "eod";
     setTrack(track);
-  }, [showTitle, paused, showChallengeIntro, showTransition, leisureActivity, eodPhase, restaurantState]);
+  }, [showTitle, paused, showChallengeIntro, showTransition, leisureActivity, eodPhase, restaurantShiftActive, bossDay, bossView, gameState.marketOpen]);
 
   // Stop music entirely when the app unmounts.
   useEffect(() => () => stopMusic(), []);
@@ -724,7 +726,8 @@ function App() {
         return;
       }
 
-      if (e.key === "Escape") {
+      if (e.key === "Escape" || ((e.key === "p" || e.key === "P") && leisureActivity !== null)) {
+        e.preventDefault();
         if (showDebug) {
           setShowDebug(false);
         } else if (showOptions === "pause") {
@@ -2422,7 +2425,7 @@ function App() {
               setPaused(false); setRestaurantState(null); setShowTitle(true); setMenuFocusIndex(-1);
             }}>Save & Quit</button>
             <button className="pause-menu-btn restart" onClick={() => { setPaused(false); handleRestart(); }}>Start Over</button>
-            <p className="pause-hint">Press ESC to resume</p>
+            <p className="pause-hint">Press ESC or P to resume</p>
           </div>
           )}
         </div>
@@ -2631,6 +2634,8 @@ function App() {
                 day={gameState.day}
                 acquiredUpgrades={gameState.acquiredUpgrades}
                 onComplete={handleLeisureComplete}
+                paused={paused}
+                onPause={handleTogglePause}
               />
             </div>
           ) : leisureActivity === "casino" ? (
@@ -2638,6 +2643,8 @@ function App() {
               <Casino
                 netWorth={calculateNetWorth(gameState)}
                 onComplete={handleCasinoComplete}
+                paused={paused}
+                onPause={handleTogglePause}
               />
             </div>
           ) : leisureActivity === "tennis" ? (
@@ -2645,15 +2652,17 @@ function App() {
               <Tennis
                 acquiredUpgrades={gameState.acquiredUpgrades}
                 onComplete={handleLeisureComplete}
+                paused={paused}
+                onPause={handleTogglePause}
               />
             </div>
           ) : leisureActivity === "quicktactoe" ? (
             <div className="leisure-fullscreen">
-              <QuickTacToe onComplete={handleLeisureComplete} />
+              <QuickTacToe onComplete={handleLeisureComplete} paused={paused} onPause={handleTogglePause} />
             </div>
           ) : leisureActivity === "bowling" ? (
             <div className="leisure-fullscreen">
-              <Bowling onComplete={handleLeisureComplete} />
+              <Bowling onComplete={handleLeisureComplete} paused={paused} onPause={handleTogglePause} />
             </div>
           ) : (
             <div className="leisure-fullscreen">
@@ -2923,6 +2932,8 @@ function App() {
                   day={gameState.day}
                   acquiredUpgrades={gameState.acquiredUpgrades}
                   onComplete={handleLeisureComplete}
+                  paused={paused}
+                  onPause={handleTogglePause}
                 />
               </div>
             ) : leisureActivity === "casino" ? (
@@ -2930,6 +2941,8 @@ function App() {
                 <Casino
                   netWorth={calculateNetWorth(gameState)}
                   onComplete={handleCasinoComplete}
+                  paused={paused}
+                  onPause={handleTogglePause}
                 />
               </div>
             ) : leisureActivity === "tennis" ? (
@@ -2937,15 +2950,17 @@ function App() {
                 <Tennis
                   acquiredUpgrades={gameState.acquiredUpgrades}
                   onComplete={handleLeisureComplete}
+                  paused={paused}
+                  onPause={handleTogglePause}
                 />
               </div>
             ) : leisureActivity === "quicktactoe" ? (
               <div className="leisure-fullscreen">
-                <QuickTacToe onComplete={handleLeisureComplete} />
+                <QuickTacToe onComplete={handleLeisureComplete} paused={paused} onPause={handleTogglePause} />
               </div>
             ) : leisureActivity === "bowling" ? (
               <div className="leisure-fullscreen">
-                <Bowling onComplete={handleLeisureComplete} />
+                <Bowling onComplete={handleLeisureComplete} paused={paused} onPause={handleTogglePause} />
               </div>
             ) : (
               <div className="leisure-fullscreen">

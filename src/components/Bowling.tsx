@@ -3,6 +3,8 @@ import { FishingReward } from "../game/fishing";
 
 interface BowlingProps {
   onComplete: (reward: FishingReward | null) => void;
+  paused: boolean;
+  onPause: () => void;
 }
 
 // Lane geometry (canvas coords)
@@ -69,7 +71,7 @@ const BALL_MAX_SPEED = 12;          // px/tick at full power
 const FRICTION = 0.995;
 const PIN_FRICTION = 0.90;
 
-export function Bowling({ onComplete }: BowlingProps) {
+export function Bowling({ onComplete, paused, onPause }: BowlingProps) {
   const [phase, setPhase] = useState<Phase>("aim_position");
   const [ballIndex, setBallIndex] = useState(1); // 1, 2, or 3
   const [pinsAfterPrevBalls, setPinsAfterPrevBalls] = useState<Pin[]>(() => makePins());
@@ -84,13 +86,13 @@ export function Bowling({ onComplete }: BowlingProps) {
   const [ballScores, setBallScores] = useState<number[]>([]);
   const [isStrike, setIsStrike] = useState(false);
   const [isSpare, setIsSpare] = useState(false);
-  const [paused, setPaused] = useState(false);
   const rewardIssued = useRef(false);
 
   // Meter animation timers
   const angleSweepRef = useRef({ dir: 1, deg: -ANGLE_SWEEP_DEG });
   const powerSweepRef = useRef({ dir: 1, val: 0 });
   const spinStartRef = useRef(0);
+  const spinPausedAtRef = useRef(0);
   const spinAccumRef = useRef(0); // radians accumulated (signed)
   const spinLastAngleRef = useRef<number | null>(null);
   const spinCenterRef = useRef({ x: 0, y: 0 });
@@ -109,14 +111,6 @@ export function Bowling({ onComplete }: BowlingProps) {
   // ---- Position phase: arrows to move ----
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (paused && (e.key === "Escape" || e.key === "p" || e.key === "P")) {
-        setPaused(false);
-        return;
-      }
-      if (!paused && (e.key === "Escape" || e.key === "p" || e.key === "P")) {
-        if (phase !== "done") { setPaused(true); }
-        return;
-      }
       if (paused) return;
 
       if (phase === "aim_position") {
@@ -202,6 +196,19 @@ export function Bowling({ onComplete }: BowlingProps) {
   }, [phase, paused]);
 
   // ---- Spin window timer ----
+  useEffect(() => {
+    if (phase !== "spin") {
+      spinPausedAtRef.current = 0;
+      return;
+    }
+    if (paused && spinPausedAtRef.current === 0) {
+      spinPausedAtRef.current = performance.now();
+    } else if (!paused && spinPausedAtRef.current > 0) {
+      spinStartRef.current += performance.now() - spinPausedAtRef.current;
+      spinPausedAtRef.current = 0;
+    }
+  }, [phase, paused]);
+
   useEffect(() => {
     if (phase !== "spin" || paused) return;
     const id = window.setInterval(() => {
@@ -471,10 +478,10 @@ export function Bowling({ onComplete }: BowlingProps) {
         </div>
         <button
           className="bowl-pause-btn"
-          onClick={() => phase !== "done" && setPaused((p) => !p)}
+          onClick={onPause}
           disabled={phase === "done"}
         >
-          {paused ? "▶ Resume" : "⏸ Pause"}
+          ⏸ Pause
         </button>
       </div>
 
@@ -551,14 +558,6 @@ export function Bowling({ onComplete }: BowlingProps) {
             </div>
           )}
 
-          {paused && (
-            <div className="bowl-between">
-              <div className="bowl-between-card">
-                <h3>⏸ Paused</h3>
-                <button className="bowl-btn" onClick={() => setPaused(false)}>Resume</button>
-              </div>
-            </div>
-          )}
         </div>
 
         <div className="bowl-controls">

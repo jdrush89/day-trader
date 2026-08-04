@@ -22,11 +22,13 @@ import { UPGRADE_POOL } from "../game/upgrades";
 interface TennisProps {
   acquiredUpgrades: string[];
   onComplete: (reward: FishingReward | null) => void;
+  paused: boolean;
+  onPause: () => void;
 }
 
 const TICK_MS = 25; // 40Hz
 
-export function Tennis({ acquiredUpgrades, onComplete }: TennisProps) {
+export function Tennis({ acquiredUpgrades, onComplete, paused, onPause }: TennisProps) {
   const [state, setState] = useState<TennisState>(createTennisState);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -46,11 +48,7 @@ export function Tennis({ acquiredUpgrades, onComplete }: TennisProps) {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const k = e.key;
-      if (k === "Escape" || k === "p" || k === "P") {
-        e.preventDefault();
-        setState((prev) => togglePause(prev));
-        return;
-      }
+      if (paused) return;
       if (k === " " || k === "Spacebar") {
         e.preventDefault();
         setState((prev) => triggerSwingOrServe(prev));
@@ -82,7 +80,11 @@ export function Tennis({ acquiredUpgrades, onComplete }: TennisProps) {
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, []);
+  }, [paused]);
+
+  useEffect(() => {
+    setState((prev) => prev.paused === paused ? prev : togglePause(prev));
+  }, [paused]);
 
   // Tick loop
   useEffect(() => {
@@ -151,11 +153,11 @@ export function Tennis({ acquiredUpgrades, onComplete }: TennisProps) {
         </div>
         <button
           className="tennis-pause-btn"
-          onClick={() => setState((prev) => togglePause(prev))}
+          onClick={onPause}
           disabled={state.phase === "game_over"}
-          aria-label={state.paused ? "Resume" : "Pause"}
+          aria-label="Pause"
         >
-          {state.paused ? "▶ Resume" : "⏸ Pause"}
+          ⏸ Pause
         </button>
       </div>
 
@@ -195,15 +197,6 @@ export function Tennis({ acquiredUpgrades, onComplete }: TennisProps) {
           <div className="tennis-overlay tennis-overlay-flash">
             <div className="tennis-overlay-card">
               <h3>{pointScoredMessage}</h3>
-            </div>
-          </div>
-        )}
-        {state.paused && !showGameOver && (
-          <div className="tennis-overlay">
-            <div className="tennis-overlay-card">
-              <h3>⏸ Paused</h3>
-              <p>Press <kbd>Esc</kbd> or <kbd>P</kbd> to resume.</p>
-              <button className="tennis-btn" onClick={() => setState((prev) => togglePause(prev))}>Resume</button>
             </div>
           </div>
         )}

@@ -23,6 +23,8 @@ import {
 interface CasinoProps {
   netWorth: number;
   onComplete: (netChange: number) => void;
+  paused: boolean;
+  onPause: () => void;
 }
 
 const SLOT_SYMBOLS = ["🍒", "🍋", "🔔", "💎", "⭐", "🍀"];
@@ -55,17 +57,17 @@ function getRouletteCellStatus(state: CasinoState["roulette"], betType: Roulette
   return resolvedBet.won ? "win" : "lose";
 }
 
-export function Casino({ netWorth, onComplete }: CasinoProps) {
+export function Casino({ netWorth, onComplete, paused, onPause }: CasinoProps) {
   const [state, setState] = useState<CasinoState>(() => createCasinoState(netWorth));
   const maxBet = getCasinoMaxBet(netWorth);
 
   useEffect(() => {
-    if (state.stage !== "slots" || state.slots.phase !== "spinning") return undefined;
+    if (paused || state.stage !== "slots" || state.slots.phase !== "spinning") return undefined;
     const timeoutId = window.setTimeout(() => {
       setState((prev) => finishSlotsAnimation(prev));
     }, 2000);
     return () => window.clearTimeout(timeoutId);
-  }, [state.stage, state.slots.phase]);
+  }, [paused, state.stage, state.slots.phase]);
 
   const formatMoney = useCallback((amount: number) => {
     const prefix = amount >= 0 ? "+" : "-";
@@ -92,6 +94,7 @@ export function Casino({ netWorth, onComplete }: CasinoProps) {
     <div className="casino-container">
       <div className="casino-header">
         <h2>🎰 Casino Night</h2>
+        <button className="leisure-pause-btn" onClick={onPause}>⏸ Pause</button>
         <p className="casino-subtitle">Three quick tables: blackjack, slots, then roulette.</p>
         <div className="casino-stats">
           <div><span>Net Worth:</span> <strong>${netWorth.toFixed(2)}</strong></div>
@@ -141,6 +144,7 @@ export function Casino({ netWorth, onComplete }: CasinoProps) {
         {state.stage === "slots" && (
           <SlotsView
             state={state}
+            paused={paused}
             onSpin={() => setState((prev) => spinSlots(prev))}
             onContinue={handleAdvance}
             formatMoney={formatMoney}
@@ -259,7 +263,7 @@ function BlackjackView({ state, onDeal, onHit, onStand, onContinue }: { state: C
   );
 }
 
-function SlotsView({ state, onSpin, onContinue, formatMoney }: { state: CasinoState; onSpin: () => void; onContinue: () => void; formatMoney: (amount: number) => string; }) {
+function SlotsView({ state, paused, onSpin, onContinue, formatMoney }: { state: CasinoState; paused: boolean; onSpin: () => void; onContinue: () => void; formatMoney: (amount: number) => string; }) {
   const slots = state.slots;
   const [displayGrid, setDisplayGrid] = useState<string[][]>(slots.grid);
 
@@ -268,13 +272,14 @@ function SlotsView({ state, onSpin, onContinue, formatMoney }: { state: CasinoSt
       setDisplayGrid(slots.grid);
       return undefined;
     }
+    if (paused) return undefined;
 
     setDisplayGrid(createRandomSlotsGrid());
     const intervalId = window.setInterval(() => {
       setDisplayGrid(createRandomSlotsGrid());
     }, 100);
     return () => window.clearInterval(intervalId);
-  }, [slots.grid, slots.phase]);
+  }, [paused, slots.grid, slots.phase]);
 
   return (
     <div className="casino-game-card">

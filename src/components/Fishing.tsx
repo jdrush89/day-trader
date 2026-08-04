@@ -6,9 +6,11 @@ interface FishingProps {
   day: number;
   acquiredUpgrades: string[];
   onComplete: (reward: FishingReward | null) => void;
+  paused: boolean;
+  onPause: () => void;
 }
 
-export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
+export function Fishing({ day, acquiredUpgrades, onComplete, paused, onPause }: FishingProps) {
   const [state, setState] = useState<FishingState>(createFishingState);
   const [finished, setFinished] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -17,7 +19,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
 
   // Tick loop — only run after casting
   useEffect(() => {
-    if (finished || !started) return;
+    if (finished || !started || paused) return;
     const interval = setInterval(() => {
       setState((prev) => {
         const next = fishingTick(prev, day, acquiredUpgrades);
@@ -28,7 +30,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
       });
     }, 50); // 20 ticks/s
     return () => clearInterval(interval);
-  }, [day, acquiredUpgrades, finished, started]);
+  }, [day, acquiredUpgrades, finished, started, paused]);
 
   // Global mouse rotation detection — tracks circular motion anywhere on
   // screen for desktop players (using cross-product of movement vectors).
@@ -99,14 +101,14 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
 
   // Desktop: window mousemove for swirl detection anywhere on screen.
   useEffect(() => {
-    if (state.phase !== "reeling") {
+    if (state.phase !== "reeling" || paused) {
       resetMousePointer();
       return;
     }
     const handleMouseMove = (e: MouseEvent) => processMousePointer(e.clientX, e.clientY);
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [state.phase, processMousePointer, resetMousePointer]);
+  }, [state.phase, paused, processMousePointer, resetMousePointer]);
 
   // Touch swirl pad: attach both pointer and touch listeners with
   // preventDefault + pointer capture so the finger can leave the pad without
@@ -200,6 +202,7 @@ export function Fishing({ day, acquiredUpgrades, onComplete }: FishingProps) {
     <div className={`fishing-container ${state.phase === "reeling" ? "no-touch-scroll" : ""}`} ref={containerRef}>
       <div className="fishing-header">
         <h2>🎣 Fishing</h2>
+        <button className="leisure-pause-btn" onClick={onPause}>⏸ Pause</button>
         {state.phase === "idle" && <p className="fishing-status">Ready to fish! Cast your line when you&apos;re ready.</p>}
         {state.phase === "casting" && <p className="fishing-status">Casting line...</p>}
         {state.phase === "waiting" && <p className="fishing-status">Waiting for a bite...</p>}

@@ -129,45 +129,45 @@ const TRACKS: Record<string, TrackDef> = {
     style: { pad: true, arp: true, counter: true, thump: true, sparkle: true, bass: "walk", lead: "square", bassOct: 2 },
   },
 
-  // Trading: driving, focused, minor with tension. Em/G/D/C-ish rock feel.
-  // E=64, G=67, D=62, C=60, Am=57, B=59
+  // Trading: fast neon-floor chiptune. No pad: clipped bass and rapid arpeggios
+  // keep it far away from the suspended feel of the pause theme.
   trading: {
-    id: "trading", bpm: 128,
+    id: "trading", bpm: 152,
     progression: [
-      [64, "min"], [67, "maj"], [62, "maj"], [60, "maj"],
-      [64, "min"], [57, "min"], [59, "maj"], [64, "min"],
+      [61, "min"], [64, "maj"], [59, "maj"], [66, "maj"],
+      [61, "min"], [57, "maj"], [59, "maj"], [61, "min"],
     ],
     melody: [
-      [ 0,  3,  7, 10,  7,  3,  0,  3],
-      [ 0,  7, 12,  7,  0,  7, 12, 10],
-      [ 7,  9, 12,  7,  9, 12,  7,  9],
-      [ 0,  4,  7, 12, 11,  7,  4,  0],
-      [ 0,  3,  7,  3, 10,  7,  3,  0],
-      [ 0,  3,  7, 10,  7,  3,  7, 10],
-      [ 0,  4,  7, 11,  7,  4,  0,  4],
-      [ 3,  0,  7,  3, 10,  7,  3,  0],
+      [ 0,  3,  7, 12, 15, 12,  7,  3],
+      [12,  7,  4,  0,  4,  7, 11,  7],
+      [ 0,  4,  7, 11, 14, 11,  7,  4],
+      [ 7, 11, 14, 19, 14, 11,  7,  4],
+      [12, 10,  7,  3,  0,  3,  7, 10],
+      [ 0,  4,  7, 12,  9,  7,  4,  0],
+      [ 0,  4,  7, 11,  7, 11, 14, 11],
+      [12,  7,  3,  0,  7, 10, 15, 19],
     ],
-    style: { bass: "eighths", lead: "square", pad: true, thump: true, bassOct: 2, leadGain: 0.12 },
+    style: { bass: "eighths", lead: "square", arp: true, thump: true, sparkle: true, bassOct: 2, leadGain: 0.12 },
   },
 
-  // Trading day start: quick, hopeful sunrise fanfare in C major
+  // Trading start: brash opening-bell fanfare with a rising whole-tone flavor.
   "trading-start": {
-    id: "trading-start", bpm: 116,
+    id: "trading-start", bpm: 144,
     progression: [
-      [60, "maj"], [67, "maj"], [65, "maj"], [60, "maj"],
-      [57, "min"], [65, "maj"], [67, "maj"], [60, "maj"],
+      [66, "maj"], [61, "maj"], [63, "maj"], [68, "maj"],
+      [66, "maj"], [70, "maj"], [61, "maj"], [66, "maj"],
     ],
     melody: [
-      [ 7, 12, 16, 12,  7, 12, 16, 12],
-      [ 7, 11, 14, 11,  7,  4,  7, 11],
-      [ 5,  9, 12,  9,  5,  9, 12, 14],
-      [ 4,  7, 12,  7,  4,  0,  4,  7],
-      [ 0,  3,  7, 12,  7,  3,  0,  3],
-      [ 5,  9, 12,  9,  5,  2,  5,  9],
-      [ 7, 11, 14, 16, 14, 11,  7,  4],
-      [12,  7,  4,  0,  4,  7, 12, 19],
+      [ 0,  4,  7, 12, 16, 19, 16, 12],
+      [ 7, 12, 16, 19, 16, 12,  7,  4],
+      [ 0,  4,  7, 11, 14, 19, 14, 11],
+      [ 7, 12, 16, 19, 24, 19, 16, 12],
+      [12, 16, 19, 24, 19, 16, 12,  7],
+      [ 7, 11, 14, 19, 23, 19, 14, 11],
+      [ 0,  4,  7, 12, 16, 12,  7,  4],
+      [12, 16, 19, 24, 19, 24, 28, 31],
     ],
-    style: { bass: "root-fifth", pad: true, sparkle: true, arp: true, lead: "square", bassOct: 2 },
+    style: { bass: "eighths", sparkle: true, arp: true, thump: true, lead: "square", bassOct: 2, leadGain: 0.13 },
   },
 
   // Restaurant: bouncy diner in F major. Playful, syncopated.

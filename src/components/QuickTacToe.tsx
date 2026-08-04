@@ -3,6 +3,8 @@ import { FishingReward } from "../game/fishing";
 
 interface QuickTacToeProps {
   onComplete: (reward: FishingReward | null) => void;
+  paused: boolean;
+  onPause: () => void;
 }
 
 type Cell = "X" | "O" | null;
@@ -69,13 +71,12 @@ function emptyIndices(board: Cell[]): number[] {
   return out;
 }
 
-export function QuickTacToe({ onComplete }: QuickTacToeProps) {
+export function QuickTacToe({ onComplete, paused, onPause }: QuickTacToeProps) {
   const [phase, setPhase] = useState<Phase>("ready");
   const [level, setLevel] = useState(0);
   const [wins, setWins] = useState(0);
   const [board, setBoard] = useState<Cell[]>(() => makeBoard(3));
   const [timeLeftMs, setTimeLeftMs] = useState(TIME_LIMIT_MS);
-  const [paused, setPaused] = useState(false);
   const [endReason, setEndReason] = useState<EndReason>(null);
   const [flash, setFlash] = useState<null | "won" | "cat">(null);
   const rewardIssuedRef = useRef(false);
@@ -84,7 +85,6 @@ export function QuickTacToe({ onComplete }: QuickTacToeProps) {
   const need = winLength(level);
   const startTimeRef = useRef<number>(0);
   const elapsedAtPauseRef = useRef<number>(0);
-  const pausedAtRef = useRef<number>(0);
 
   // Start the round
   const startGame = useCallback(() => {
@@ -93,7 +93,6 @@ export function QuickTacToe({ onComplete }: QuickTacToeProps) {
     setWins(0);
     setBoard(makeBoard(3));
     setTimeLeftMs(TIME_LIMIT_MS);
-    setPaused(false);
     setEndReason(null);
     setFlash(null);
     rewardIssuedRef.current = false;
@@ -172,45 +171,22 @@ export function QuickTacToe({ onComplete }: QuickTacToeProps) {
     }
   }, [board, phase, size, need, level, nextBoard]);
 
-  // Pause key handling
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "Escape" || e.key === "p" || e.key === "P") {
-        if (phase !== "playing") return;
-        e.preventDefault();
-        setPaused((was) => {
-          const now = performance.now();
-          if (!was) {
-            // going to paused: freeze elapsed
-            elapsedAtPauseRef.current += now - startTimeRef.current;
-            pausedAtRef.current = now;
-            return true;
-          } else {
-            // resuming: reset startTime
-            startTimeRef.current = now;
-            return false;
-          }
-        });
-      }
-    };
-    window.addEventListener("keydown", down);
-    return () => window.removeEventListener("keydown", down);
-  }, [phase]);
+  const previousPausedRef = useRef(paused);
 
-  const togglePause = useCallback(() => {
-    if (phase !== "playing") return;
-    setPaused((was) => {
-      const now = performance.now();
-      if (!was) {
-        elapsedAtPauseRef.current += now - startTimeRef.current;
-        pausedAtRef.current = now;
-        return true;
-      } else {
-        startTimeRef.current = now;
-        return false;
-      }
-    });
-  }, [phase]);
+  // Keep the countdown exact while the app-level pause menu is open.
+  useEffect(() => {
+    if (phase !== "playing" || previousPausedRef.current === paused) {
+      previousPausedRef.current = paused;
+      return;
+    }
+    const now = performance.now();
+    if (paused) {
+      elapsedAtPauseRef.current += now - startTimeRef.current;
+    } else {
+      startTimeRef.current = now;
+    }
+    previousPausedRef.current = paused;
+  }, [paused, phase]);
 
   const handleCellClick = useCallback((i: number) => {
     if (phase !== "playing" || paused) return;
@@ -250,10 +226,10 @@ export function QuickTacToe({ onComplete }: QuickTacToeProps) {
         </div>
         <button
           className="qtt-pause-btn"
-          onClick={togglePause}
+          onClick={onPause}
           disabled={phase !== "playing"}
         >
-          {paused ? "▶ Resume" : "⏸ Pause"}
+          ⏸ Pause
         </button>
       </div>
 
@@ -295,15 +271,6 @@ export function QuickTacToe({ onComplete }: QuickTacToeProps) {
           </div>
         )}
 
-        {paused && phase === "playing" && (
-          <div className="qtt-overlay">
-            <div className="qtt-overlay-card">
-              <h3>⏸ Paused</h3>
-              <p>Press <kbd>Esc</kbd> or <kbd>P</kbd> to resume.</p>
-              <button className="qtt-btn" onClick={togglePause}>Resume</button>
-            </div>
-          </div>
-        )}
 
         {phase === "game_over" && (
           <div className="qtt-overlay">

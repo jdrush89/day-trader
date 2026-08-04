@@ -1787,7 +1787,25 @@ body {
 }
 
 .pause-overlay {
-  z-index: 200;
+  z-index: 2000;
+}
+
+.leisure-pause-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 5;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.leisure-pause-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
 }
 
 /* Pause Menu */
