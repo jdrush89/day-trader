@@ -42,6 +42,16 @@
   bottom: 5%;
 }
 
+.title-options-menu {
+  width: min(460px, calc(100vw - 32px));
+  padding: 24px 30px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 14px;
+  background: rgba(5, 8, 16, 0.88);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+}
+
 .title-start-btn {
   font-family: "Courier New", monospace;
   font-size: 1.5rem;

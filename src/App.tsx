@@ -33,7 +33,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.145";
+const GAME_VERSION = "0.0.146";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -790,9 +790,7 @@ function App() {
         const active = document.activeElement;
         const tag = active?.tagName.toLowerCase();
         const isStockSearch = active?.classList.contains("stock-search-input");
-        const isStockNav = active?.closest(".stock-ticker-view") && tag === "button";
         if ((tag === "input" || tag === "select" || tag === "textarea") && !isStockSearch) return;
-        if (isStockNav) return;
         e.preventDefault();
         const newChannel = CHANNEL_KEYS[num - 1];
         setGameState((prev) => {
@@ -2217,7 +2215,7 @@ function App() {
           <button className="music-toggle-floating" onClick={toggleMusic} aria-label={musicMuted ? "Unmute music" : "Mute music"} title={musicMuted ? "Unmute music" : "Mute music"}>
             {musicMuted ? "🔇" : "🔊"}
           </button>
-          <div className="title-screen-overlay title-menu-bottom">
+          <div className="title-screen-overlay title-menu-bottom title-options-menu">
             <h2 className="tutorial-pick-title">⚙️ Options</h2>
             <div className="options-row">
               <label className="options-label">Text Size</label>
