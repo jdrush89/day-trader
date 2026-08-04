@@ -160,6 +160,14 @@ const RESTAURANT_STEPS: TutorialStep[] = [
     action: "setup-completed",
   },
   {
+    icon: "🕴️",
+    title: "Schmoozing Insiders",
+    body: "Customers marked 🕴️ are market insiders. After serving one, choose the genuine compliment in three rounds before time runs out. In this example, \"Your market analysis is brilliant\" is the compliment; the other choices are insults. One wrong answer ends the conversation. Get all three right and the insider gives you a stock tip for tomorrow's trading session.",
+    selector: ".schmooze-inline",
+    position: "top",
+    action: "setup-schmooze",
+  },
+  {
     icon: "🏆",
     title: "Daily Challenges",
     body: "Each shift has a challenge — like completing a number of orders or earning enough tips. Complete it to earn trading tickets (📈) that you can spend in the shop on day trading consumable items!",
@@ -347,4 +355,3 @@ export function Tutorial({ steps, onComplete, onStepChange }: TutorialProps) {
 
 export { TRADING_STEPS, RESTAURANT_STEPS };
 export type { TutorialStep };
-

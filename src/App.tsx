@@ -33,7 +33,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.144";
+const GAME_VERSION = "0.0.145";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -1307,6 +1307,84 @@ function App() {
         const slots = [...prev.orderSlots];
         slots[0] = order;
         return { ...prev, orderSlots: slots, activeOrderId: 9000 };
+      });
+    } else if (step.action === "setup-schmooze") {
+      setRestaurantState((prev) => {
+        if (!prev) return prev;
+        const burger = MENU.find((m) => m.name === "Classic Burger") ?? MENU[0];
+        const rounds = [
+          {
+            compliment: "Your market analysis is brilliant.",
+            insults: ["Your portfolio belongs in the fryer.", "I've seen ketchup make better predictions."],
+          },
+          {
+            compliment: "You always spot trends before anyone else.",
+            insults: ["You couldn't spot a bull in a pasture.", "Your tips are yesterday's leftovers."],
+          },
+          {
+            compliment: "I'd trust your instincts on tomorrow's market.",
+            insults: ["I'd rather invest based on a coin flip.", "Your instincts are a leading contrarian indicator."],
+          },
+        ];
+        const order = {
+          id: 9002,
+          menuItem: burger,
+          currentStepIndex: burger.steps.length,
+          prepProgress: 0,
+          prepStarted: false,
+          flipped: false,
+          burnt: false,
+          chopCount: 0,
+          lastChopKey: null as "left" | "right" | null,
+          mixProgress: 0,
+          lastMousePos: null,
+          assembleIndex: 0,
+          rhythmHitIndex: 0,
+          rhythmHits: 0,
+          rhythmResults: [] as ("pending" | "hit" | "miss")[],
+          holdStartTick: null,
+          holdProgress: 0,
+          holdReleased: false,
+          memorizeSequence: [] as string[],
+          memorizeRevealed: false,
+          memorizeRevealTimer: 0,
+          memorizeInputIndex: 0,
+          memorizeInputDelay: 0,
+          startTime: Date.now(),
+          patienceRemaining: burger.patience,
+          completed: true,
+          served: true,
+          failed: false,
+          failedTimer: 0,
+          customizations: {} as Record<number, boolean[]>,
+          orderCorrect: true,
+          isInsider: true,
+          schmoozing: {
+            rounds,
+            currentRound: 0,
+            options: [
+              "Your market analysis is brilliant.",
+              "Your portfolio belongs in the fryer.",
+              "I've seen ketchup make better predictions.",
+            ],
+            correctIndex: 0,
+            selected: null,
+            failed: false,
+            success: false,
+            timer: 20,
+            timerMax: 20,
+          },
+        };
+        const slots = [...prev.orderSlots];
+        slots[0] = order;
+        return {
+          ...prev,
+          orderSlots: slots,
+          activeOrderId: order.id,
+          activeChore: null,
+          choreSlotIndex: -1,
+          choreFocused: false,
+        };
       });
     } else if (step.action === "setup-chore") {
       setRestaurantState((prev) => {
