@@ -188,7 +188,7 @@ export function Tennis({ acquiredUpgrades, onComplete, paused, onPause }: Tennis
           <div className="tennis-overlay">
             <div className="tennis-overlay-card">
               <h3>🎾 Ready to serve</h3>
-              <p>Press <kbd>Space</kbd> to serve. First to 4 points wins (deuce at 40-40).</p>
+              <p>Press <kbd>Space</kbd> to serve. Win this one rally to claim the prize.</p>
               <button className="tennis-btn" onClick={() => setState((prev) => triggerSwingOrServe(prev))}>Serve</button>
             </div>
           </div>

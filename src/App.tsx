@@ -33,7 +33,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.147";
+const GAME_VERSION = "0.0.148";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -464,6 +464,9 @@ function App() {
   }, [showChallengeIntro]);
 
   const restaurantShiftActive = restaurantState !== null && !restaurantState.shiftOver;
+  const leisureScreenActive =
+    (isMultiplayer ? localEodInfoStep === "leisure" : eodPhase === "leisure") &&
+    leisureActivity !== null;
 
   // Music: run all the time, pick the track that matches the current screen.
   useEffect(() => {
@@ -473,17 +476,17 @@ function App() {
     else if (showChallengeIntro === "trading" || showTransition === "trading") track = "trading-start";
     else if (showChallengeIntro === "restaurant" || showTransition === "restaurant") track = "restaurant-start";
     else if (paused) track = "pause";
-    else if (leisureActivity === "fishing") track = "leisure-fishing";
-    else if (leisureActivity === "casino") track = "leisure-casino";
-    else if (leisureActivity === "tennis") track = "leisure-tennis";
-    else if (leisureActivity === "quicktactoe") track = "leisure-quicktactoe";
-    else if (leisureActivity === "bowling") track = "leisure-bowling";
-    else if (eodPhase === "shop") track = "store";
     else if (restaurantShiftActive && (!bossDay || bossView === "restaurant")) track = "restaurant-start";
     else if (gameState.marketOpen) track = "trading";
+    else if (leisureScreenActive && leisureActivity === "fishing") track = "leisure-fishing";
+    else if (leisureScreenActive && leisureActivity === "casino") track = "leisure-casino";
+    else if (leisureScreenActive && leisureActivity === "tennis") track = "leisure-tennis";
+    else if (leisureScreenActive && leisureActivity === "quicktactoe") track = "leisure-quicktactoe";
+    else if (leisureScreenActive && leisureActivity === "bowling") track = "leisure-bowling";
+    else if (eodPhase === "shop") track = "store";
     else track = "eod";
     setTrack(track);
-  }, [showTitle, paused, showChallengeIntro, showTransition, leisureActivity, eodPhase, restaurantShiftActive, bossDay, bossView, gameState.marketOpen]);
+  }, [showTitle, paused, showChallengeIntro, showTransition, leisureActivity, leisureScreenActive, eodPhase, restaurantShiftActive, bossDay, bossView, gameState.marketOpen]);
 
   // Stop music entirely when the app unmounts.
   useEffect(() => () => stopMusic(), []);
@@ -1666,6 +1669,7 @@ function App() {
   }, []);
 
   const handleLeisureComplete = useCallback((reward: FishingReward | null) => {
+    setLeisureActivity(null);
     // Compute the new state up front so we can pass it directly to
     // beginScheduledDay — the setGameState updater doesn't run synchronously,
     // so we can't rely on capturing a closure inside it.
@@ -1703,6 +1707,7 @@ function App() {
   }, [gameState, isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
 
   const handleCasinoComplete = useCallback((netChange: number) => {
+    setLeisureActivity(null);
     if (netChange !== 0) {
       setGameState((prev) => {
         const updated = { ...prev, cash: Math.round((prev.cash + netChange) * 100) / 100 };

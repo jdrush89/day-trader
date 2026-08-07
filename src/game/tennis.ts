@@ -1,8 +1,7 @@
 /**
  * Tennis Mini-Game Engine
  *
- * A Pong-style game with tennis scoring (0, 15, 30, 40, game, with deuce +
- * advantage at 40-40). Player controls the LEFT paddle with arrow keys or
+ * A single-point Pong-style tennis rally. Player controls the LEFT paddle with arrow keys or
  * WASD. Shift = dash (short burst of extra speed). Space = swing paddle —
  * the right third of the paddle rotates 90° counter-clockwise briefly and
  * if it strikes the ball during that window, the ball is smacked away at
@@ -45,7 +44,7 @@ const BALL_SMACK_SPEED_BOOST = 1.6;
 // ==== Scoring ====
 export type TennisPoint = 0 | 15 | 30 | 40;
 export const TENNIS_POINTS: TennisPoint[] = [0, 15, 30, 40];
-export const POINTS_TO_WIN = 4; // 4 points wins a game (deuce if both reach 3)
+export const POINTS_TO_WIN = 1;
 
 export type TennisPhase =
   | "ready"          // Waiting for player to press Space to serve
@@ -98,19 +97,7 @@ export interface TennisState {
 
 // ==== Scoring helpers ====
 export function tennisScoreLabel(state: TennisState, side: "player" | "opponent"): string {
-  const mine = side === "player" ? state.playerScore : state.opponentScore;
-  const theirs = side === "player" ? state.opponentScore : state.playerScore;
-  const myAdv = side === "player" ? state.playerAdvantage : state.opponentAdvantage;
-  const theirAdv = side === "player" ? state.opponentAdvantage : state.playerAdvantage;
-
-  // Deuce territory: both at 3+
-  if (mine >= 3 && theirs >= 3) {
-    if (myAdv) return "AD";
-    if (theirAdv) return "40";
-    return "40";
-  }
-  const idx = Math.min(mine, 3);
-  return String(TENNIS_POINTS[idx]);
+  return String(side === "player" ? state.playerScore : state.opponentScore);
 }
 
 // ==== Factory ====
@@ -407,91 +394,15 @@ function maybeApplySwingHit(state: TennisState): TennisState {
 }
 
 function awardPoint(state: TennisState, scorer: "player" | "opponent"): TennisState {
-  let playerScore = state.playerScore + (scorer === "player" ? 1 : 0);
-  let opponentScore = state.opponentScore + (scorer === "opponent" ? 1 : 0);
-  let playerAdvantage = state.playerAdvantage;
-  let opponentAdvantage = state.opponentAdvantage;
-
-  // Deuce rules
-  if (playerScore >= 3 && opponentScore >= 3) {
-    if (playerScore > opponentScore) {
-      // Player has AD (or won)
-      if (playerAdvantage) {
-        // Player wins the game
-        return {
-          ...state,
-          playerScore, opponentScore,
-          playerAdvantage: false, opponentAdvantage: false,
-          phase: "game_over",
-          playerWon: true,
-          lastScorer: scorer,
-        };
-      }
-      if (opponentAdvantage) {
-        // Cancel opponent's AD — back to 40-40
-        opponentAdvantage = false;
-        playerScore = 3;
-        opponentScore = 3;
-      } else {
-        playerAdvantage = true;
-      }
-    } else if (opponentScore > playerScore) {
-      if (opponentAdvantage) {
-        return {
-          ...state,
-          playerScore, opponentScore,
-          playerAdvantage: false, opponentAdvantage: false,
-          phase: "game_over",
-          playerWon: false,
-          lastScorer: scorer,
-        };
-      }
-      if (playerAdvantage) {
-        playerAdvantage = false;
-        playerScore = 3;
-        opponentScore = 3;
-      } else {
-        opponentAdvantage = true;
-      }
-    }
-  } else {
-    // Regular game: 4 points wins if opponent has < 3
-    if (playerScore >= POINTS_TO_WIN && opponentScore < 3) {
-      return {
-        ...state,
-        playerScore, opponentScore,
-        playerAdvantage: false, opponentAdvantage: false,
-        phase: "game_over",
-        playerWon: true,
-        lastScorer: scorer,
-      };
-    }
-    if (opponentScore >= POINTS_TO_WIN && playerScore < 3) {
-      return {
-        ...state,
-        playerScore, opponentScore,
-        playerAdvantage: false, opponentAdvantage: false,
-        phase: "game_over",
-        playerWon: false,
-        lastScorer: scorer,
-      };
-    }
-  }
-
-  const serving: "player" | "opponent" = scorer === "player" ? "opponent" : "player";
   return {
     ...state,
-    playerScore,
-    opponentScore,
-    playerAdvantage,
-    opponentAdvantage,
-    phase: "point_scored",
-    pointScoredTimer: 30, // ~1.5s at 20 Hz
+    playerScore: state.playerScore + (scorer === "player" ? 1 : 0),
+    opponentScore: state.opponentScore + (scorer === "opponent" ? 1 : 0),
+    playerAdvantage: false,
+    opponentAdvantage: false,
+    phase: "game_over",
+    playerWon: scorer === "player",
     lastScorer: scorer,
-    serving,
-    ball: resetBall(serving),
-    player: { ...state.player, y: COURT_HEIGHT / 2, vy: 0, swingTimer: 0, dashTimer: 0, swingHit: false },
-    opponent: { ...state.opponent, y: COURT_HEIGHT / 2, vy: 0 },
   };
 }
 
