@@ -33,7 +33,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.146";
+const GAME_VERSION = "0.0.147";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -470,9 +470,9 @@ function App() {
     startMusic();
     let track: TrackId = "trading";
     if (showTitle) track = "title";
-    else if (paused) track = "pause";
     else if (showChallengeIntro === "trading" || showTransition === "trading") track = "trading-start";
     else if (showChallengeIntro === "restaurant" || showTransition === "restaurant") track = "restaurant-start";
+    else if (paused) track = "pause";
     else if (leisureActivity === "fishing") track = "leisure-fishing";
     else if (leisureActivity === "casino") track = "leisure-casino";
     else if (leisureActivity === "tennis") track = "leisure-tennis";
@@ -2618,6 +2618,7 @@ function App() {
                   }
                 } else {
                   setShowChallengeIntro(null);
+                  setPaused(false);
                 }
               }}>{isMultiplayer && challengeReadyPlayers.has(mpState.localPlayer?.id ?? "host") ? "Waiting for players..." : "Start Cooking →"}</button>
             </div>

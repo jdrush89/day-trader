@@ -231,25 +231,26 @@ const TRACKS: Record<string, TrackDef> = {
     style: { pad: true, arpEighths: true, counter: true, bass: "root-fifth", lead: "triangle", bassOct: 2 },
   },
 
-  // Store: warm jazzy shopping tune in Ab major
-  // Ab=56, Db=61, Eb=63, Fm=65 (F=65 min), Bbm=58 min, C=60
+  // Store: bright, quirky "bonus room" chiptune. A fast bouncing bass,
+  // high square lead, and constant arpeggio make it unmistakably different
+  // from the slow sustained pause theme.
   store: {
-    id: "store", bpm: 100,
+    id: "store", bpm: 146,
     progression: [
-      [56, "maj"], [65, "min"], [61, "maj"], [63, "maj"],
-      [56, "maj"], [58, "min"], [61, "maj"], [63, "maj"],
+      [62, "maj"], [66, "min"], [67, "maj"], [69, "maj"],
+      [62, "maj"], [59, "min"], [67, "maj"], [69, "maj"],
     ],
     melody: [
-      [ 7,  4,  0,  4,  7, 12,  7,  4],
-      [ 0,  3,  7, 12,  7,  3,  0,  3],
-      [ 4,  7, 12,  9,  4,  7, 12,  9],
-      [ 4,  7, 11, 14, 11,  7,  4,  0],
-      [ 7,  4,  0,  4,  7, 11,  7,  4],
-      [ 0,  3,  7, 10,  7,  3,  0,  3],
-      [ 4,  9, 12,  7,  4,  9, 12,  7],
-      [16, 12,  7,  4,  0,  4,  7, 11],
+      [12,  7,  4,  7, 12, 16, 12,  7],
+      [ 0,  3,  7, 10, 12, 10,  7,  3],
+      [ 7, 11, 14, 11,  7,  4,  7, 11],
+      [ 4,  7, 12, 16, 12,  7,  4,  7],
+      [12, 16, 19, 16, 12,  7,  4,  7],
+      [ 3,  7, 10, 15, 10,  7,  3,  0],
+      [ 7, 11, 14, 19, 14, 11,  7,  4],
+      [12,  9,  7,  4,  7, 12, 16, 21],
     ],
-    style: { pad: true, arpEighths: true, bass: "walk", lead: "triangle", bassOct: 2, leadGain: 0.08 },
+    style: { arp: true, sparkle: true, bass: "eighths", lead: "square", bassOct: 2, leadGain: 0.11 },
   },
 
   // Pause: slow, suspended-in-time drone in F major
