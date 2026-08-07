@@ -33,7 +33,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.148";
+const GAME_VERSION = "0.0.149";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -688,6 +688,17 @@ function App() {
   const CHANNEL_KEYS: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider", "items"];
 
   useEffect(() => {
+    if (eodPhase !== "upgrades" && eodPhase !== "restaurant-upgrades") return;
+    const frame = window.requestAnimationFrame(() => {
+      const cards = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(".upgrade-draft-options .upgrade-draft-card:not(:disabled)"),
+      ).filter((card) => card.offsetParent !== null);
+      cards[Math.floor(cards.length / 2)]?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [eodPhase, gameState.upgradeDraftOptions, gameState.restaurantUpgradeDraftOptions]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showTitle) {
         if (titleTutorial && titleTutorial !== "pick") return;
@@ -740,6 +751,47 @@ function App() {
           handleTogglePause();
         }
         return;
+      }
+
+      const visibleUpgradeCards = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(".upgrade-draft-options .upgrade-draft-card:not(:disabled)"),
+      ).filter((card) => card.offsetParent !== null);
+      if (visibleUpgradeCards.length > 0) {
+        const currentIndex = visibleUpgradeCards.indexOf(document.activeElement as HTMLButtonElement);
+        if (e.key === "ArrowLeft" || e.key === "ArrowUp" || e.key === "ArrowRight" || e.key === "ArrowDown") {
+          e.preventDefault();
+          const direction = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1;
+          const startIndex = currentIndex >= 0 ? currentIndex : Math.floor(visibleUpgradeCards.length / 2);
+          const nextIndex = (startIndex + direction + visibleUpgradeCards.length) % visibleUpgradeCards.length;
+          visibleUpgradeCards[nextIndex].focus();
+          return;
+        }
+        if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+          e.preventDefault();
+          const selected = currentIndex >= 0
+            ? visibleUpgradeCards[currentIndex]
+            : visibleUpgradeCards[Math.floor(visibleUpgradeCards.length / 2)];
+          selected.click();
+          return;
+        }
+      }
+
+      if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+        const dialogs = Array.from(
+          document.querySelectorAll<HTMLElement>(".end-of-day-overlay, .shop-phase"),
+        ).filter((dialog) => dialog.offsetParent !== null);
+        const dialog = dialogs[dialogs.length - 1];
+        if (dialog) {
+          const continueButton = Array.from(dialog.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"))
+            .find((button) => /^(Continue|Start Trading|Start Cooking)/.test(button.textContent?.trim() ?? ""));
+          const active = document.activeElement as HTMLElement | null;
+          const activeIsControl = active?.matches("button, input, select, textarea");
+          if (continueButton && (!activeIsControl || active === continueButton)) {
+            e.preventDefault();
+            continueButton.click();
+            return;
+          }
+        }
       }
 
       // Debug menu toggle

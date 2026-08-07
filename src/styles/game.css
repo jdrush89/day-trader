@@ -2676,6 +2676,14 @@ body {
   transform: translateY(-2px);
 }
 
+.upgrade-draft-card:focus-visible {
+  border-color: #fff;
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  background: rgba(88, 166, 255, 0.16);
+  transform: translateY(-2px);
+}
+
 .upgrade-card-icon { font-size: 2rem; }
 .upgrade-card-name { font-size: 0.9rem; font-weight: bold; color: var(--accent); }
 .upgrade-card-desc { font-size: 0.75rem; color: var(--text-dim); line-height: 1.4; }

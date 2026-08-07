@@ -9,7 +9,6 @@ import {
   generateTennisReward,
   getSwingAngle,
   setInput,
-  tennisScoreLabel,
   tennisTick,
   togglePause,
   triggerDash,
@@ -135,17 +134,6 @@ export function Tennis({ acquiredUpgrades, onComplete, paused, onPause }: Tennis
   return (
     <div className="tennis-container">
       <div className="tennis-header">
-        <div className="tennis-score">
-          <div className="tennis-score-side">
-            <div className="tennis-score-label">You</div>
-            <div className="tennis-score-value">{tennisScoreLabel(state, "player")}</div>
-          </div>
-          <div className="tennis-score-sep">—</div>
-          <div className="tennis-score-side">
-            <div className="tennis-score-label">Opp.</div>
-            <div className="tennis-score-value">{tennisScoreLabel(state, "opponent")}</div>
-          </div>
-        </div>
         <div className="tennis-controls-hint">
           {isTouch
             ? "Tap the top/bottom of the court to move. Tap SWING to hit."
