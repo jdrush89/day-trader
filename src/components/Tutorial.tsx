@@ -338,6 +338,7 @@ export function Tutorial({ steps, onComplete, onStepChange }: TutorialProps) {
           <h2 className="tutorial-title">{step.title}</h2>
         </div>
         <p className="tutorial-body">{step.body}</p>
+        <div className="tutorial-counter">{stepIndex + 1} / {steps.length}</div>
         <div className="tutorial-buttons">
           <button className="tutorial-skip" onClick={onComplete}>Skip Tutorial</button>
           <div className="tutorial-nav">
@@ -347,7 +348,6 @@ export function Tutorial({ steps, onComplete, onStepChange }: TutorialProps) {
             </button>
           </div>
         </div>
-        <div className="tutorial-counter">{stepIndex + 1} / {steps.length}</div>
       </div>
     </div>
   );

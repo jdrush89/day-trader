@@ -1230,6 +1230,63 @@
   overflow: hidden !important;
   touch-action: none;
 }
+
+/* Tutorial cards use inline positioning on desktop. Override every positional
+   property on mobile so a spotlight near an edge can never push navigation
+   outside the viewport. */
+@media (max-width: 900px), (pointer: coarse) and (max-height: 600px) {
+  .tutorial-card {
+    position: fixed !important;
+    top: auto !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    bottom: max(8px, env(safe-area-inset-bottom)) !important;
+    left: max(8px, env(safe-area-inset-left)) !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: calc(100vh - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 0.9rem !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: none !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tutorial-progress {
+    flex-wrap: wrap;
+    margin-bottom: 0.65rem;
+  }
+
+  .tutorial-body {
+    margin-bottom: 0.75rem;
+  }
+
+  .tutorial-buttons {
+    position: sticky;
+    bottom: -0.9rem;
+    z-index: 1;
+    gap: 0.5rem;
+    margin: 0 -0.9rem -0.9rem;
+    padding: 0.75rem 0.9rem max(0.75rem, env(safe-area-inset-bottom));
+    background: var(--bg-panel);
+    border-top: 1px solid var(--border);
+  }
+
+  .tutorial-counter {
+    margin: 0 0 0.5rem;
+  }
+
+  .tutorial-nav {
+    margin-left: auto;
+  }
+
+  .tutorial-skip,
+  .tutorial-back,
+  .tutorial-next {
+    min-height: 44px;
+  }
+}
 .fishing-container.no-touch-scroll {
   overflow: hidden !important;
   touch-action: none;
