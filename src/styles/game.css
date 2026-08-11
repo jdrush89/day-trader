@@ -467,9 +467,13 @@ body {
 
 .monitor-controls {
   display: flex;
+  flex-shrink: 0;
   gap: 4px;
   padding: 6px 4px;
   justify-content: center;
+  position: relative;
+  z-index: 1;
+  background: #1a1a2e;
 }
 
 .channel-btn {
@@ -2232,6 +2236,8 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: linear-gradient(180deg, #0a0a0a 0%, #1a0a0a 100%);
 }
 
@@ -2335,8 +2341,12 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   padding: 1.5rem;
   gap: 1rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .insider-message-bubble {
