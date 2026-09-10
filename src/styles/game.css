@@ -1800,6 +1800,19 @@ body {
   z-index: 100;
 }
 
+.end-of-day-overlay {
+  box-sizing: border-box;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.end-of-day-overlay > .end-of-day {
+  box-sizing: border-box;
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+}
+
 .pause-overlay {
   z-index: 2000;
 }
