@@ -572,6 +572,11 @@
     padding: 0.8rem;
   }
 
+  .insider-risk-summary {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
   /* Options trading form */
   .order-form-row {
     flex-direction: column;

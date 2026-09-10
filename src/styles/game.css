@@ -2436,6 +2436,22 @@ body {
   line-height: 1.4;
 }
 
+.insider-risk-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid rgba(255, 100, 100, 0.4);
+  border-radius: 8px;
+  background: rgba(255, 50, 50, 0.1);
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.insider-risk-summary strong {
+  color: #ff8a8a;
+}
+
 /* SEC Fine Alert in End of Day */
 .sec-fine-alert {
   background: rgba(255, 0, 0, 0.1);

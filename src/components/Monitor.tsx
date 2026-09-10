@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { Monitor as MonitorType, MonitorChannel, GameState, NewsItem } from "../game/types";
-import { getBuyingPower } from "../game/engine";
+import { getBuyingPower, getInsiderProfitInfo } from "../game/engine";
 import { getConsumable, getPhaseItems } from "../game/consumables";
 import { StockChart } from "./StockChart";
 import { NewsFeed, InsiderFeed } from "./NewsFeed";
@@ -47,6 +47,7 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
   const selectedStock = useMemo(() => gameState.stocks.find((s) => s.symbol === monitor.selectedStock), [gameState.stocks, monitor.selectedStock]);
   const analystRating = selectedStock && showAnalystRating ? getAnalystRating(selectedStock.symbol, selectedStock.tags, gameState.news) : undefined;
   const buyingPower = getBuyingPower(gameState);
+  const insiderProfitInfo = useMemo(() => getInsiderProfitInfo(gameState), [gameState]);
 
   // Focus a stock tab button by symbol
   const focusStockTab = useCallback((symbol: string) => {
@@ -231,7 +232,7 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
             {monitor.channel === "business_news" && <NewsFeed news={gameState.news} category="business" paused={paused} />}
             {monitor.channel === "global_news" && <NewsFeed news={gameState.news} category="global" paused={paused} />}
             {monitor.channel === "social_media" && <NewsFeed news={gameState.news} category="social" paused={paused} />}
-            {monitor.channel === "insider" && <InsiderFeed tip={gameState.insiderTip} tip2={gameState.insiderTip2} viewed={gameState.insiderViewed} onView={onViewInsider} />}
+            {monitor.channel === "insider" && <InsiderFeed tip={gameState.insiderTip} tip2={gameState.insiderTip2} viewed={gameState.insiderViewed} profit={insiderProfitInfo.profit} catchChance={insiderProfitInfo.catchChance} onView={onViewInsider} />}
             {monitor.channel === "items" && (() => {
               const tradingItems = getPhaseItems(gameState.consumableInventory, "trading");
               if (tradingItems.length === 0) return (
