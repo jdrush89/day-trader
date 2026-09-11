@@ -1,6 +1,7 @@
 import { GameState, Stock } from "./types";
 import { createTradingTracker } from "./challenges";
 import { createEmptyInventory } from "./consumables";
+import { getCharacterSelection, isCharacterId, type CharacterSelection } from "./characters";
 
 const SAVE_KEY = "rogue-day-trader-save";
 const MP_SAVES_KEY = "rogue-day-trader-mp-saves";
@@ -90,6 +91,12 @@ function backfillGameState(gs: GameState): GameState {
   if (!gs.consumableInventory) gs.consumableInventory = createEmptyInventory();
   if (gs.playerCount == null) gs.playerCount = 1;
   if (gs.schmoozeInsiderTip === undefined) gs.schmoozeInsiderTip = null;
+  if (!gs.selectedCharacter || !isCharacterId(gs.selectedCharacter.id)) gs.selectedCharacter = getCharacterSelection("jane");
+  if (!gs.playerCharacters) gs.playerCharacters = {};
+  if (!gs.characterMarketBiases) gs.characterMarketBiases = [];
+  if (gs.lastCharacterEvent === undefined) gs.lastCharacterEvent = null;
+  if (gs.ianSight === undefined) gs.ianSight = null;
+  if (!gs.aiStrategies) gs.aiStrategies = [];
   // Rebuild default monitors if stripped
   if (!gs.monitors || gs.monitors.length === 0) {
     const firstStock = gs.stocks?.[0]?.symbol ?? "MEGA";
@@ -126,6 +133,7 @@ export interface PlayerSaveData {
   name: string;
   upgrades: string[];
   restaurantUpgrades: string[];
+  character: CharacterSelection;
 }
 
 export interface MpSaveData {
@@ -179,7 +187,15 @@ export function loadAllMpSaves(): MpSaveData[] {
     const saves: MpSaveData[] = JSON.parse(raw);
     return saves
       .filter((s) => s.version === SAVE_VERSION && s.gameState && typeof s.gameState.day === "number")
-      .map((s) => ({ ...s, saveType: s.saveType ?? "manual" })); // backfill old saves
+      .map((s) => ({
+        ...s,
+        gameState: backfillGameState(s.gameState),
+        saveType: s.saveType ?? "manual",
+        players: s.players.map((player) => ({
+          ...player,
+          character: player.character && isCharacterId(player.character.id) ? player.character : getCharacterSelection("jane"),
+        })),
+      })); // backfill old saves
   } catch {
     return [];
   }

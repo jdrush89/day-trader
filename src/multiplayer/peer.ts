@@ -1,5 +1,6 @@
 import type { Player, ActionFeedItem, PeerAction, GameSync, HostMessage } from "./types";
 import { NetworkManager } from "./network";
+import type { CharacterSelection } from "../game/characters";
 
 export interface PeerCallbacks {
   onStateSync: (state: GameSync) => void;
@@ -43,12 +44,12 @@ export class MultiplayerPeer {
   get player() { return this._player; }
   get connected() { return this._connected; }
 
-  async connect(roomCode: string, playerName: string): Promise<void> {
+  async connect(roomCode: string, playerName: string, character: CharacterSelection): Promise<void> {
     await this.network.joinRoom(roomCode);
     this._connected = true;
 
     // Send join request
-    this.network.sendToHost({ type: "join_request", playerName });
+    this.network.sendToHost({ type: "join_request", playerName, character });
   }
 
   disconnect(): void {

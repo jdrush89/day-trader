@@ -4,6 +4,7 @@ import { getBuyingPower, getInsiderProfitInfo } from "../game/engine";
 import { getConsumable, getPhaseItems } from "../game/consumables";
 import { StockChart } from "./StockChart";
 import { NewsFeed, InsiderFeed } from "./NewsFeed";
+import { characterScale, type CharacterSelection } from "../game/characters";
 
 interface MonitorProps {
   monitor: MonitorType;
@@ -22,14 +23,19 @@ interface MonitorProps {
   onShort: (symbol: string, shares: number) => void;
   onCover: (symbol: string, shares: number) => void;
   onUseItem?: (itemId: string) => void;
+  character: CharacterSelection;
+  playerId: string;
+  onAddAiStrategy: (sourceId: string, symbol: string, direction: "up" | "down") => void;
+  onSetAiRisk: (strategyId: string, risk: number) => void;
+  onClearAiStrategy: (strategyId: string) => void;
 }
 
-const CHANNEL_LABELS: Record<MonitorChannel, string> = { business_news: "📊 Biz News", global_news: "🌍 Global", social_media: "💬 Social", stock_ticker: "📈 Stocks", insider: "🤫 Insider", items: "🎒 Items" };
+const CHANNEL_LABELS: Record<MonitorChannel, string> = { business_news: "📊 Biz News", global_news: "🌍 Global", social_media: "💬 Social", stock_ticker: "📈 Stocks", insider: "🤫 Insider", items: "🎒 Items", ai: "🤖 AI" };
 
 function getAnalystRating(symbol: string, stockTags: string[], news: NewsItem[]): "bullish" | "bearish" | "neutral" { let bullish = 0; let bearish = 0; for (const item of news) { if (!item.impact || item.impact.ticksRemaining <= 0 || item.impact.ticksRemaining > item.impact.duration) continue; for (const effect of item.impact.effects) { const matches = effect.symbol ? effect.symbol === symbol : effect.tag ? stockTags.includes(effect.tag) : false; if (!matches) continue; if (effect.direction === "up") bullish += 1; else bearish += 1; } } if (bullish > bearish) return "bullish"; if (bearish > bullish) return "bearish"; return "neutral"; }
 
-export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameState, paused, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover, onUseItem }: MonitorProps) {
-  const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider", "items"];
+export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameState, paused, showAnalystRating, showDarkPool, onChangeChannel, onSelectStock, onViewInsider, onBuy, onSell, onShort, onCover, onUseItem, character, playerId, onAddAiStrategy, onSetAiRisk, onClearAiStrategy }: MonitorProps) {
+  const channels: MonitorChannel[] = ["stock_ticker", "business_news", "global_news", "social_media", "insider", ...(character.id === "josh" ? ["ai" as const] : []), "items"];
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const stockTabsRef = useRef<HTMLDivElement>(null);
@@ -48,6 +54,20 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
   const analystRating = selectedStock && showAnalystRating ? getAnalystRating(selectedStock.symbol, selectedStock.tags, gameState.news) : undefined;
   const buyingPower = getBuyingPower(gameState);
   const insiderProfitInfo = useMemo(() => getInsiderProfitInfo(gameState), [gameState]);
+  const marketDuration = gameState.playerCharacters && Object.values(gameState.playerCharacters).some((entry) => entry.id === "zack")
+    ? Math.round(100 * characterScale(Math.max(...Object.values(gameState.playerCharacters).filter((entry) => entry.id === "zack").map((entry) => entry.level)), 1.25, 0.1, 2.5))
+    : character.id === "zack" ? Math.round(100 * characterScale(character.level, 1.25, 0.1, 2.5)) : 100;
+  const paulLevels = Object.values(gameState.playerCharacters ?? {}).filter((entry) => entry.id === "paul").map((entry) => entry.level);
+  if (character.id === "paul") paulLevels.push(character.level);
+  const paulBonus = paulLevels.length > 0 ? characterScale(Math.max(...paulLevels), 0.05, 0.02, 0.25) : 0;
+  const zackPenalty = character.id === "zack" ? (gameState.timeOfDay / marketDuration) * 0.35 : 0;
+  const dinkyRange = selectedStock && character.id === "dinky" ? (() => {
+    const history = selectedStock.history;
+    const recentMove = history.length > 4 ? (history[history.length - 1] - history[history.length - 5]) / 4 : 0;
+    const projected = Math.max(0.01, selectedStock.price + recentMove * Math.max(1, marketDuration - gameState.timeOfDay));
+    const spread = Math.max(0.03, 0.18 - (character.level - 1) * 0.015);
+    return { low: projected * (1 - spread), high: projected * (1 + spread) };
+  })() : undefined;
 
   // Focus a stock tab button by symbol
   const focusStockTab = useCallback((symbol: string) => {
@@ -214,7 +234,7 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
                 {selectedStock && filteredStocks.some((s) => s.symbol === selectedStock.symbol) && (
                   <StockChart
                     stock={selectedStock}
-                    totalTicks={100}
+                    totalTicks={marketDuration}
                     buyingPower={buyingPower}
                     analystRating={analystRating}
                     position={gameState.portfolio.find((p) => p.symbol === selectedStock.symbol)}
@@ -225,14 +245,16 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
                     onCover={onCover}
                     tradeButtonsRef={tradeButtonsRef}
                     onTradeKeyDown={handleTradeKeyDown}
+                    forecastRange={dinkyRange}
+                    sight={character.id === "ian" ? gameState.ianSight : null}
                   />
                 )}
               </div>
             )}
-            {monitor.channel === "business_news" && <NewsFeed news={gameState.news} category="business" paused={paused} />}
-            {monitor.channel === "global_news" && <NewsFeed news={gameState.news} category="global" paused={paused} />}
-            {monitor.channel === "social_media" && <NewsFeed news={gameState.news} category="social" paused={paused} />}
-            {monitor.channel === "insider" && <InsiderFeed tip={gameState.insiderTip} tip2={gameState.insiderTip2} viewed={gameState.insiderViewed} profit={insiderProfitInfo.profit} catchChance={insiderProfitInfo.catchChance} onView={onViewInsider} />}
+            {monitor.channel === "business_news" && <NewsFeed news={gameState.news} category="business" paused={paused} probabilityAdjustment={paulBonus - zackPenalty} onAddAiStrategy={character.id === "josh" ? onAddAiStrategy : undefined} aiStrategySourceIds={gameState.aiStrategies.filter((strategy) => strategy.ownerId === playerId).map((strategy) => strategy.sourceId)} />}
+            {monitor.channel === "global_news" && <NewsFeed news={gameState.news} category="global" paused={paused} probabilityAdjustment={paulBonus - zackPenalty} onAddAiStrategy={character.id === "josh" ? onAddAiStrategy : undefined} aiStrategySourceIds={gameState.aiStrategies.filter((strategy) => strategy.ownerId === playerId).map((strategy) => strategy.sourceId)} />}
+            {monitor.channel === "social_media" && <NewsFeed news={gameState.news} category="social" paused={paused} probabilityAdjustment={paulBonus - zackPenalty} onAddAiStrategy={character.id === "josh" ? onAddAiStrategy : undefined} aiStrategySourceIds={gameState.aiStrategies.filter((strategy) => strategy.ownerId === playerId).map((strategy) => strategy.sourceId)} />}
+            {monitor.channel === "insider" && <InsiderFeed tip={gameState.insiderTip} tip2={gameState.insiderTip2} viewed={gameState.insiderViewed} profit={insiderProfitInfo.profit} catchChance={insiderProfitInfo.catchChance} onView={onViewInsider} probabilityAdjustment={paulBonus - zackPenalty} onAddAiStrategy={character.id === "josh" ? onAddAiStrategy : undefined} aiStrategySourceIds={gameState.aiStrategies.filter((strategy) => strategy.ownerId === playerId).map((strategy) => strategy.sourceId)} />}
             {monitor.channel === "items" && (() => {
               const tradingItems = getPhaseItems(gameState.consumableInventory, "trading");
               if (tradingItems.length === 0) return (
@@ -264,6 +286,27 @@ export function Monitor({ monitor, monitorIndex, isActive, totalMonitors, gameSt
                 </div>
               );
             })()}
+            {monitor.channel === "ai" && (
+              <div className="ai-channel">
+                <h3>🤖 Active Strategies</h3>
+                {gameState.aiStrategies.filter((strategy) => strategy.ownerId === playerId).length === 0
+                  ? <p>Add a current signal below. Strategies remain here after their source expires.</p>
+                  : gameState.aiStrategies.filter((strategy) => strategy.ownerId === playerId).map((strategy) => (
+                    <div key={strategy.id} className="ai-strategy-row">
+                      <div><strong>{strategy.direction === "up" ? "BUY" : "SHORT"} {strategy.symbol}</strong><span>{strategy.executed ? "Position opened" : "Waiting for signal"}</span></div>
+                      <label>Risk {Math.round(strategy.risk * 100)}%<input type="range" min="5" max="100" step="5" value={strategy.risk * 100} onChange={(event) => onSetAiRisk(strategy.id, Number(event.target.value) / 100)} /></label>
+                      <button onClick={() => onClearAiStrategy(strategy.id)}>Clear</button>
+                    </div>
+                  ))}
+                <h3>Available Signals</h3>
+                {gameState.news.filter((item) => item.impact?.effects.some((effect) => effect.symbol)).slice(0, 10).map((item) => {
+                  const effect = item.impact!.effects.find((candidate) => candidate.symbol);
+                  if (!effect?.symbol) return null;
+                  const added = gameState.aiStrategies.some((strategy) => strategy.ownerId === playerId && strategy.sourceId === item.id);
+                  return <button key={item.id} className="ai-signal-btn" disabled={added} onClick={() => onAddAiStrategy(item.id, effect.symbol!, effect.direction)}>{added ? "✓ Added" : "Add"} {effect.direction === "up" ? "📈" : "📉"} {effect.symbol}: {item.headline || "Insider signal"}</button>;
+                })}
+              </div>
+            )}
           </div>
         </div>
         <div className="monitor-controls">

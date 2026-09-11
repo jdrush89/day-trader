@@ -19,6 +19,7 @@ import {
 import { RESTAURANT_UPGRADE_POOL } from "./restaurant-upgrades";
 import { getNetWorth } from "./engine";
 import { pickSchmoozeRounds, shuffleOptions } from "./schmooze-data";
+import { characterScale, type CharacterSelection } from "./characters";
 
 const TICKS_PER_SECOND = 20;
 const SHIFT_DURATION_SECONDS = 120;
@@ -450,9 +451,21 @@ function initializeCurrentStep(order: ActiveOrder, upgrades: string[]): ActiveOr
   return order;
 }
 
-function createOrder(menuItem: MenuItem, id: number, upgrades: string[]): ActiveOrder {
+function createOrder(menuItem: MenuItem, id: number, upgrades: string[], characters: Record<string, CharacterSelection>): ActiveOrder {
+  const hasSydney = Object.values(characters).some((character) => character.id === "sydney");
+  const hasAssembleStep = menuItem.steps.some((step) => step.type === "assemble");
+  const characterMenuItem: MenuItem = hasSydney
+    ? {
+        ...menuItem,
+        steps: hasAssembleStep
+          ? menuItem.steps.map((step) => step.type === "assemble"
+              ? { ...step, ingredients: [...step.ingredients, { name: "Chef's garnish", key: "x", essential: true }] }
+              : step)
+          : [...menuItem.steps, { type: "assemble", label: "Add chef's garnish", ingredients: [{ name: "Chef's garnish", key: "x", essential: true }] }],
+      }
+    : menuItem;
   const customizations: Record<number, boolean[]> = {};
-  menuItem.steps.forEach((step, stepIdx) => {
+  characterMenuItem.steps.forEach((step, stepIdx) => {
     if (step.type !== "assemble") return;
     const wanted = step.ingredients.map(() => true);
     const optionalIndices = step.ingredients.map((_, index) => index).filter((index) => !step.ingredients[index].essential);
@@ -469,7 +482,7 @@ function createOrder(menuItem: MenuItem, id: number, upgrades: string[]): Active
   return initializeCurrentStep(
     {
       id,
-      menuItem,
+      menuItem: characterMenuItem,
       currentStepIndex: 0,
       prepProgress: 0,
       prepStarted: false,
@@ -492,7 +505,7 @@ function createOrder(menuItem: MenuItem, id: number, upgrades: string[]): Active
       memorizeInputIndex: 0,
       memorizeInputDelay: 0,
       startTime: Date.now(),
-      patienceRemaining: menuItem.patience,
+      patienceRemaining: characterMenuItem.patience,
       completed: false,
       served: false,
       failed: false,
@@ -500,6 +513,9 @@ function createOrder(menuItem: MenuItem, id: number, upgrades: string[]): Active
       customizations,
       orderCorrect: true,
       isInsider: false,
+      maxPatience: characterMenuItem.patience,
+      patienceDecayMultiplier: 1,
+      characterPatienceApplied: false,
     },
     upgrades,
   );
@@ -566,7 +582,7 @@ function spawnOrder(state: RestaurantState): RestaurantState {
 
   if (emptyIndex === -1) return state;
   const menuItem = state.availableMenu[Math.floor(Math.random() * state.availableMenu.length)];
-  const order = createOrder(menuItem, state.orderIdCounter, state.acquiredUpgrades);
+  const order = createOrder(menuItem, state.orderIdCounter, state.acquiredUpgrades, state.characters);
 
   // ~15% chance to be an insider customer, max 1 per shift
   const hasInsiderAlready = state.orderSlots.some((o) => o?.isInsider) || state.insiderServed;
@@ -677,7 +693,7 @@ function updateOrderTick(order: ActiveOrder, dt: number, upgrades: string[], pat
   if (order.served) return order;
   if (order.failed) return { ...order, failedTimer: order.failedTimer - dt * TICKS_PER_SECOND };
 
-  const patienceRemaining = Math.max(0, order.patienceRemaining - dt * patienceMultiplier);
+  const patienceRemaining = Math.max(0, order.patienceRemaining - dt * patienceMultiplier * (order.patienceDecayMultiplier ?? 1));
   let updatedOrder: ActiveOrder = { ...order, patienceRemaining };
 
   // Completed orders still lose patience but don't fail
@@ -1002,6 +1018,7 @@ export function createRestaurantState(state: GameState, numPlayers = 1): Restaur
     choresScheduled: choreCount,
     servingBlocked: false,
     insiderServed: false,
+    characters: Object.keys(state.playerCharacters ?? {}).length > 0 ? state.playerCharacters : { player: state.selectedCharacter },
   };
 
   return spawnOrder(baseState);
@@ -1124,7 +1141,7 @@ export function restaurantTick(state: RestaurantState, dt: number, activeBuffIds
   return nextState;
 }
 
-export function acceptOrder(state: RestaurantState, slotIndex: number): RestaurantState {
+export function acceptOrder(state: RestaurantState, slotIndex: number, character?: CharacterSelection): RestaurantState {
   // If selecting the chore slot, focus the chore instead
   if (slotIndex === state.choreSlotIndex && state.activeChore && !state.activeChore.completed) {
     return { ...state, choreFocused: true, activeOrderId: null };
@@ -1133,14 +1150,37 @@ export function acceptOrder(state: RestaurantState, slotIndex: number): Restaura
   if (!order || order.failed || order.served) return state;
   if (state.activeOrderId === order.id) return state;
 
+  let totalEarnings = state.totalEarnings;
+  if (character?.id === "cameron" && state.activeOrderId != null) {
+    const previous = state.orderSlots.find((slot) => slot?.id === state.activeOrderId);
+    if (previous && !previous.completed && !previous.failed && !previous.served) {
+      totalEarnings -= Math.round(characterScale(character.level, 5, 1, 20) * 100) / 100;
+    }
+  }
+
   // Trigger memorize reveal when focusing a memorize-step order
   let updatedOrder = { ...order, lastMousePos: null };
+  if (!updatedOrder.characterPatienceApplied && character?.id === "cameron") {
+    const bonus = characterScale(character.level, 0.2, 0.05, 0.75);
+    updatedOrder = {
+      ...updatedOrder,
+      patienceRemaining: updatedOrder.patienceRemaining * (1 + bonus),
+      maxPatience: (updatedOrder.maxPatience ?? updatedOrder.menuItem.patience) * (1 + bonus),
+      characterPatienceApplied: true,
+    };
+  } else if (!updatedOrder.characterPatienceApplied && character?.id === "paul") {
+    updatedOrder = {
+      ...updatedOrder,
+      patienceDecayMultiplier: 1.4,
+      characterPatienceApplied: true,
+    };
+  }
   const step = order.menuItem.steps[order.currentStepIndex];
   if (step?.type === "memorize" && !order.memorizeRevealed && order.memorizeInputIndex === 0 && order.memorizeInputDelay === 0) {
     updatedOrder = { ...updatedOrder, memorizeRevealed: true, memorizeRevealTimer: (step as MemorizeStep).revealDuration };
   }
 
-  return { ...replaceOrder(state, updatedOrder, order.id), choreFocused: false };
+  return { ...replaceOrder(state, updatedOrder, order.id), choreFocused: false, totalEarnings };
 }
 
 export function handleKeyPress(state: RestaurantState, key: string): RestaurantState {
@@ -1344,12 +1384,12 @@ function getOrderBasePay(order: ActiveOrder, upgrades: string[]): number {
 
 export function calculateTip(order: ActiveOrder, upgrades: string[] = []): number {
   if (!order.orderCorrect) return 0;
-  const patienceRatio = Math.max(0, Math.min(1, order.patienceRemaining / order.menuItem.patience));
+  const patienceRatio = Math.max(0, Math.min(1, order.patienceRemaining / (order.maxPatience ?? order.menuItem.patience)));
   const charmMultiplier = 1.3 ** restaurantUpgradeCount(upgrades, "charm");
   return Math.round(order.menuItem.basePay * 0.6 * patienceRatio * charmMultiplier * 100) / 100;
 }
 
-export function serveOrder(state: RestaurantState, slotIndex: number, tipMultiplier = 1, servingPlayerId?: string): RestaurantState {
+export function serveOrder(state: RestaurantState, slotIndex: number, tipMultiplier = 1, servingPlayerId?: string, character?: CharacterSelection): RestaurantState {
   const order = state.orderSlots[slotIndex];
   if (!order || !order.completed || order.failed) return state;
   // Don't re-serve an order already in schmooze mode
@@ -1357,7 +1397,14 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
   // Can't serve while a chore is blocking
   if (state.servingBlocked) return state;
 
-  const tip = calculateTip(order, state.acquiredUpgrades) * tipMultiplier;
+  const inProgressOrders = state.orderSlots.filter((candidate) => candidate && !candidate.completed && !candidate.failed && !candidate.served && candidate.id !== order.id).length;
+  let characterTipMultiplier = 1;
+  if (character?.id === "cameron") {
+    characterTipMultiplier += inProgressOrders * characterScale(character.level, 0.08, 0.02, 0.3);
+  } else if (character?.id === "sydney") {
+    characterTipMultiplier = characterScale(character.level, 2, 0.15, 4);
+  }
+  const tip = calculateTip(order, state.acquiredUpgrades) * tipMultiplier * characterTipMultiplier;
   const basePay = getOrderBasePay(order, state.acquiredUpgrades);
   const nextComboStreak = state.comboStreak + 1;
   const comboBonus = hasRestaurantUpgrade(state.acquiredUpgrades, "combo_bonus") && nextComboStreak % 3 === 0 ? 3 : 0;
@@ -1366,7 +1413,7 @@ export function serveOrder(state: RestaurantState, slotIndex: number, tipMultipl
 
   // Challenge tracking
   let tracker = { ...state.challengeTracker };
-  const elapsed = order.menuItem.patience - order.patienceRemaining;
+  const elapsed = (order.maxPatience ?? order.menuItem.patience) - order.patienceRemaining;
   if (elapsed <= 3) tracker.fastCompletions++;
   if (elapsed < 1) tracker.subSecondCompletion = true;
   if (order.patienceRemaining < 2) tracker.clutchCompletions++;

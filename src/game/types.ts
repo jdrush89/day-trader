@@ -73,7 +73,19 @@ export type MonitorChannel =
   | "social_media"
   | "stock_ticker"
   | "insider"
-  | "items";
+  | "items"
+  | "ai";
+
+export interface AiStrategy {
+  id: string;
+  ownerId: string;
+  sourceId: string;
+  symbol: string;
+  direction: "up" | "down";
+  risk: number;
+  createdTick: number;
+  executed: boolean;
+}
 
 export interface Monitor {
   id: number;
@@ -110,6 +122,8 @@ export interface PendingOrder {
   stopPrice?: number;
   createdAt: number;
   day: number;
+  character?: import("./characters").CharacterSelection;
+  playerName?: string;
 }
 
 export interface InstitutionalOrder {
@@ -182,4 +196,10 @@ export interface GameState {
   playerCount: number;
   schmoozeInsiderTip: InsiderTip | null;
   schmoozeActiveTip: InsiderTip | null;
+  selectedCharacter: import("./characters").CharacterSelection;
+  playerCharacters: Record<string, import("./characters").CharacterSelection>;
+  characterMarketBiases: { symbol: string; direction: "up" | "down"; strength: number; ticksRemaining: number }[];
+  lastCharacterEvent: string | null;
+  ianSight: { mode: "future" | "past"; ticksRemaining: number; horizon: number; targetTick?: number; prices?: Record<string, number> } | null;
+  aiStrategies: AiStrategy[];
 }

@@ -1,10 +1,12 @@
 import { useState } from "react";
 import type { Player } from "../multiplayer/types";
 import type { MpSaveData } from "../game/save";
+import { CharacterSelect } from "./CharacterSelect";
+import type { CharacterId } from "../game/characters";
 
 interface MultiplayerLobbyProps {
-  onHost: (playerName: string) => void;
-  onJoin: (roomCode: string, playerName: string) => void;
+  onHost: (playerName: string, characterId: CharacterId) => void;
+  onJoin: (roomCode: string, playerName: string, characterId: CharacterId) => void;
   onCancel: () => void;
   onReset: () => void;
   connecting: boolean;
@@ -39,6 +41,25 @@ export function MultiplayerLobby({
   const [playerName, setPlayerName] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [copied, setCopied] = useState(false);
+  const [selectedCharacter, setSelectedCharacter] = useState<CharacterId>("jane");
+  const [choosingCharacter, setChoosingCharacter] = useState(false);
+
+  if (choosingCharacter) {
+    return (
+      <CharacterSelect
+        title={mode === "host" ? "Choose Host Character" : "Choose Your Character"}
+        selected={selectedCharacter}
+        onSelect={setSelectedCharacter}
+        onBack={() => setChoosingCharacter(false)}
+        confirmLabel={mode === "host" ? "Create Room" : "Join Room"}
+        onConfirm={() => {
+          setChoosingCharacter(false);
+          if (mode === "host") onHost(playerName.trim(), selectedCharacter);
+          else onJoin(joinCode.trim(), playerName.trim(), selectedCharacter);
+        }}
+      />
+    );
+  }
 
   if (roomCode) {
     // Check if all required players have joined for a resume
@@ -87,6 +108,7 @@ export function MultiplayerLobby({
               <div key={p.id} className="mp-player-row">
                 <span className="mp-player-dot" style={{ backgroundColor: p.color }} />
                 <span className="mp-player-name">{p.name}</span>
+                <span className="mp-player-character">{p.character.id} · Lv {p.character.level}</span>
               </div>
             ))}
           </div>
@@ -139,6 +161,7 @@ export function MultiplayerLobby({
                       // Need a name for the host
                       const savedHost = save.players[0]?.name ?? "Host";
                       setPlayerName(savedHost);
+                      setSelectedCharacter(save.players[0]?.character.id ?? "jane");
                       onResume(save, savedHost);
                     }}>Resume</button>
                     <button className="mp-save-delete-btn" onClick={() => onDeleteSave(save.id)}>🗑️</button>
@@ -217,11 +240,10 @@ export function MultiplayerLobby({
             className="mp-submit-btn"
             disabled={connecting || !playerName.trim() || (mode === "join" && joinCode.length < 5)}
             onClick={() => {
-              if (mode === "host") onHost(playerName.trim());
-              else onJoin(joinCode.trim(), playerName.trim());
+              setChoosingCharacter(true);
             }}
           >
-            {connecting ? "Connecting..." : mode === "host" ? "Create Room" : "Join Room"}
+            {connecting ? "Connecting..." : "Choose Character"}
           </button>
         </div>
         <button className="mp-cancel-btn" onClick={() => { onReset(); setMode("pick"); }}>Back</button>

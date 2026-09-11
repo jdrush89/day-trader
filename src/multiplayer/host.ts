@@ -2,7 +2,8 @@ import type { GameState } from "../game/types";
 import type { RestaurantState } from "../game/restaurant-types";
 import type { PeerAction, Player, ActionFeedItem, GameSync, NetworkMessage } from "./types";
 import { NetworkManager, generateRoomCode, getPlayerColor } from "./network";
-import { buyStock, sellStock, shortStock, coverShort, placeOrder, cancelOrder, buyOption, sellOption, closeOption, togglePinStock } from "../game/engine";
+import { buyStock, sellStock, shortStock, coverShort, placeOrder, cancelOrder, buyOption, sellOption, closeOption, togglePinStock, addAiStrategy, setAiStrategyRisk, clearAiStrategy } from "../game/engine";
+import { characterScale } from "../game/characters";
 import { handleKeyPress, handleKeyUp, handleMouseMove as handleRestaurantMouseMove, serveOrder, acceptOrder, recordOrderContributor, handleChoreKeyPress, handleChoreClick, handleChoreMouseMove } from "../game/restaurant-engine";
 import { handleChopKey } from "../game/restaurant-engine";
 
@@ -44,7 +45,7 @@ export interface HostCallbacks {
   onAllStocksChosen: (choices: { playerId: string; symbol: string }[]) => void;
   onAllRestaurantUpgradesChosen: (choices: { playerId: string; upgradeId: string }[]) => void;
   onAllMenuItemsChosen: (choices: { playerId: string; itemName: string }[]) => void;
-  getPlayerSaves?: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined;
+  getPlayerSaves?: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[]; character: Player["character"] }> | undefined;
   getMpSaveId?: () => string | undefined;
   getShopOffering?: () => Array<{ id: string; name: string; phase: string; tier: number }>;
   getPnlSeries?: () => Array<{ playerId: string; playerName: string; playerColor: string; data: Array<{ time: number; value: number }> }> | undefined;
@@ -273,7 +274,7 @@ export class MultiplayerHost {
     console.log("[Host] Received message from", peerId, (msg as any).type);
     // Handle join request
     if ("type" in msg && msg.type === "join_request") {
-      const { playerName } = msg as { type: "join_request"; playerName: string };
+      const { playerName, character } = msg;
       // Validate name for resume games
       if (this._requiredNames) {
         const alreadyJoined = this.playerList.map((p) => p.name);
@@ -287,7 +288,7 @@ export class MultiplayerHost {
         }
       }
       const color = getPlayerColor(this.players.size + 1); // +1 for host
-      const player: Player = { id: peerId, name: playerName, color };
+      const player: Player = { id: peerId, name: playerName, color, character };
       this.players.set(peerId, player);
       this.callbacks.onPlayerJoined(player);
 
@@ -311,12 +312,13 @@ export class MultiplayerHost {
   }
 
   private processAction(player: Player, action: PeerAction): void {
+    const character = this.callbacks.getPlayerSaves?.()?.find((saved) => saved.name === player.name)?.character ?? player.character;
     switch (action.type) {
       case "buy_stock":
         this.callbacks.setGameState((s) => {
           const stock = s.stocks.find((st) => st.symbol === action.symbol);
           if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "buy", action.symbol, action.shares, stock.price, s.timeOfDay);
-          return buyStock(s, action.symbol, action.shares, player.name);
+          return buyStock(s, action.symbol, action.shares, player.name, character);
         });
         this.addFeedItem(player.id, player.name, `Bought ${action.shares} ${action.symbol}`);
         break;
@@ -324,7 +326,7 @@ export class MultiplayerHost {
         this.callbacks.setGameState((s) => {
           const stock = s.stocks.find((st) => st.symbol === action.symbol);
           if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "sell", action.symbol, action.shares, stock.price, s.timeOfDay);
-          return sellStock(s, action.symbol, action.shares, player.name);
+          return sellStock(s, action.symbol, action.shares, player.name, character);
         });
         this.addFeedItem(player.id, player.name, `Sold ${action.shares} ${action.symbol}`);
         break;
@@ -332,7 +334,7 @@ export class MultiplayerHost {
         this.callbacks.setGameState((s) => {
           const stock = s.stocks.find((st) => st.symbol === action.symbol);
           if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "short", action.symbol, action.shares, stock.price, s.timeOfDay);
-          return shortStock(s, action.symbol, action.shares);
+          return shortStock(s, action.symbol, action.shares, character);
         });
         this.addFeedItem(player.id, player.name, `Shorted ${action.shares} ${action.symbol}`);
         break;
@@ -340,12 +342,12 @@ export class MultiplayerHost {
         this.callbacks.setGameState((s) => {
           const stock = s.stocks.find((st) => st.symbol === action.symbol);
           if (stock) this.callbacks.onRecordTrade?.(player.id, player.name, "cover", action.symbol, action.shares, stock.price, s.timeOfDay);
-          return coverShort(s, action.symbol, action.shares, player.name);
+          return coverShort(s, action.symbol, action.shares, player.name, character);
         });
         this.addFeedItem(player.id, player.name, `Covered ${action.shares} ${action.symbol}`);
         break;
       case "place_order":
-        this.callbacks.setGameState((s) => placeOrder(s, action.symbol, action.side, action.shares, action.orderType, action.limitPrice, action.stopPrice));
+        this.callbacks.setGameState((s) => placeOrder(s, action.symbol, action.side, action.shares, action.orderType, action.limitPrice, action.stopPrice, character, player.name));
         this.addFeedItem(player.id, player.name, `Placed ${action.orderType} ${action.side} on ${action.symbol}`);
         break;
       case "cancel_order":
@@ -353,7 +355,7 @@ export class MultiplayerHost {
         break;
       case "buy_option":
         this.callbacks.setGameState((s) => {
-          const next = buyOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts);
+          const next = buyOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts, character);
           if (next !== s) {
             const newOpt = next.optionsPositions.find((o) => !s.optionsPositions.some((po) => po.id === o.id));
             this.callbacks.onRecordTrade?.(player.id, player.name, "buy_option", action.symbol, action.contracts, newOpt?.premium ?? 0, s.timeOfDay);
@@ -364,7 +366,7 @@ export class MultiplayerHost {
         break;
       case "sell_option":
         this.callbacks.setGameState((s) => {
-          const next = sellOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts);
+          const next = sellOption(s, action.symbol, action.optionType, action.strikePrice, action.expirationDays, action.contracts, character);
           if (next !== s) {
             const newOpt = next.optionsPositions.find((o) => !s.optionsPositions.some((po) => po.id === o.id));
             this.callbacks.onRecordTrade?.(player.id, player.name, "sell_option", action.symbol, action.contracts, newOpt?.premium ?? 0, s.timeOfDay);
@@ -455,7 +457,7 @@ export class MultiplayerHost {
           if (!order) return prev;
           // Use player's active order context
           const withPlayerActive = { ...prev, activeOrderId: this.getPlayerActiveOrder(player.id) };
-          const result = order.completed ? serveOrder(withPlayerActive, action.slotIndex) : acceptOrder(withPlayerActive, action.slotIndex);
+          const result = order.completed ? serveOrder(withPlayerActive, action.slotIndex, 1, player.id, character) : acceptOrder(withPlayerActive, action.slotIndex, character);
           this.setPlayerActiveOrder(player.id, result.activeOrderId);
           return { ...result, activeOrderId: prev.activeOrderId };
         });
@@ -490,14 +492,14 @@ export class MultiplayerHost {
             // Map local slot number to global index based on player's current counter
             const globalIndex = playerCounterIdx * prev.slotsPerCounter + (slotNumber - 1);
             // acceptOrder handles chore slot focus
-            let result = acceptOrder(withPlayerActive, globalIndex);
+            let result = acceptOrder(withPlayerActive, globalIndex, character);
             if (result.choreFocused) {
               return { ...result, activeOrderId: prev.activeOrderId };
             }
             const order = prev.orderSlots[globalIndex];
             if (!order) return prev;
             if (order.completed) {
-              result = serveOrder(withPlayerActive, globalIndex, 1, player.id);
+              result = serveOrder(withPlayerActive, globalIndex, 1, player.id, character);
             } else if (result.activeOrderId != null) {
               result = recordOrderContributor(result, result.activeOrderId, player.id);
             }
@@ -513,7 +515,7 @@ export class MultiplayerHost {
           if (key === "Enter") {
             const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === playerActiveId);
             const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
-            let result = currentOrder?.completed ? serveOrder(withPlayerActive, activeSlotIndex, 1, player.id) : handleKeyPress(withPlayerActive, key);
+            let result = currentOrder?.completed ? serveOrder(withPlayerActive, activeSlotIndex, 1, player.id, character) : handleKeyPress(withPlayerActive, key);
             if (!currentOrder?.completed && playerActiveId != null) result = recordOrderContributor(result, playerActiveId, player.id);
             this.setPlayerActiveOrder(player.id, result.activeOrderId);
             return { ...result, activeOrderId: prev.activeOrderId };
@@ -566,6 +568,36 @@ export class MultiplayerHost {
         break;
       case "join_request":
         // Handled before processAction is called
+        break;
+      case "add_ai_strategy":
+        this.callbacks.setGameState((state) => addAiStrategy(state, player.id, action.sourceId, action.symbol, action.direction, action.risk));
+        break;
+      case "set_ai_risk":
+        this.callbacks.setGameState((state) => setAiStrategyRisk(state, player.id, action.strategyId, action.risk));
+        break;
+      case "clear_ai_strategy":
+        this.callbacks.setGameState((state) => clearAiStrategy(state, player.id, action.strategyId));
+        break;
+      case "leisure_reward":
+        this.callbacks.setGameState((state) => {
+          const multiplier = character.id === "allan" ? characterScale(character.level, 1.25, 0.1, 3) : 1;
+          if (action.cashChange != null) {
+            const change = action.cashChange > 0 ? action.cashChange * multiplier : action.cashChange;
+            return { ...state, cash: Math.round((state.cash + change) * 100) / 100 };
+          }
+          if (!action.reward) return state;
+          if (action.reward.type === "cash") {
+            return { ...state, cash: Math.round((state.cash + (action.reward.amount ?? 0) * multiplier) * 100) / 100 };
+          }
+          if (action.reward.type === "ticket") {
+            return { ...state, tickets: state.tickets + 1, tradingTickets: state.tradingTickets + 1 };
+          }
+          if (action.reward.type === "upgrade" && action.reward.upgradeId && !state.acquiredUpgrades.includes(action.reward.upgradeId)) {
+            return { ...state, acquiredUpgrades: [...state.acquiredUpgrades, action.reward.upgradeId] };
+          }
+          const fallback = action.reward.type === "upgrade" ? 75 : 50;
+          return { ...state, cash: Math.round((state.cash + fallback * multiplier) * 100) / 100 };
+        });
         break;
     }
   }

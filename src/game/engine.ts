@@ -2,6 +2,94 @@ import { GameState, NewsItem, Stock, EarningsData, NewsImpact, InsiderTip, Pendi
 import { STOCK_POOL, StockCandidate } from "./stock-pool";
 import { UPGRADE_POOL } from "./upgrades";
 import { TradingChallengeTracker, createTradingTracker } from "./challenges";
+import { characterScale, type CharacterSelection } from "./characters";
+
+function allCharacters(state: GameState): CharacterSelection[] {
+  return [state.selectedCharacter, ...Object.values(state.playerCharacters ?? {})].filter(
+    (character, index, list) => character && list.findIndex((candidate) => candidate.id === character.id && candidate.level === character.level) === index,
+  );
+}
+
+function strongestCharacter(state: GameState, id: CharacterSelection["id"]): CharacterSelection | undefined {
+  return allCharacters(state).filter((character) => character.id === id).sort((a, b) => b.level - a.level)[0];
+}
+
+export function getMarketDuration(state: GameState): number {
+  const zack = strongestCharacter(state, "zack");
+  return zack ? Math.round(100 * characterScale(zack.level, 1.25, 0.1, 2.5)) : 100;
+}
+
+function resolveDinkySymbol(state: GameState, requestedSymbol: string, character?: CharacterSelection): string {
+  if (character?.id !== "dinky" || Math.random() >= 0.2 || state.stocks.length < 2) return requestedSymbol;
+  const alternatives = state.stocks.filter((stock) => stock.symbol !== requestedSymbol);
+  return alternatives[Math.floor(Math.random() * alternatives.length)].symbol;
+}
+
+function addJaneBias(state: GameState, symbol: string, direction: "up" | "down", character?: CharacterSelection): GameState {
+  if (character?.id !== "jane") return state;
+  const strength = characterScale(character.level, 0.12, 0.025, 0.4);
+  return {
+    ...state,
+    characterMarketBiases: [...state.characterMarketBiases, { symbol, direction, strength, ticksRemaining: 18 }].slice(-20),
+  };
+}
+
+export function addAiStrategy(state: GameState, ownerId: string, sourceId: string, symbol: string, direction: "up" | "down", risk = 0.25): GameState {
+  if (state.aiStrategies.some((strategy) => strategy.ownerId === ownerId && strategy.sourceId === sourceId)) return state;
+  return {
+    ...state,
+    aiStrategies: [...state.aiStrategies, {
+      id: `ai-${ownerId}-${sourceId}`,
+      ownerId,
+      sourceId,
+      symbol,
+      direction,
+      risk: Math.max(0.05, Math.min(1, risk)),
+      createdTick: state.timeOfDay,
+      executed: false,
+    }],
+  };
+}
+
+export function setAiStrategyRisk(state: GameState, ownerId: string, strategyId: string, risk: number): GameState {
+  return {
+    ...state,
+    aiStrategies: state.aiStrategies.map((strategy) =>
+      strategy.id === strategyId && strategy.ownerId === ownerId
+        ? { ...strategy, risk: Math.max(0.05, Math.min(1, risk)) }
+        : strategy
+    ),
+  };
+}
+
+export function clearAiStrategy(state: GameState, ownerId: string, strategyId: string): GameState {
+  return { ...state, aiStrategies: state.aiStrategies.filter((strategy) => strategy.id !== strategyId || strategy.ownerId !== ownerId) };
+}
+
+function runAiStrategies(state: GameState, news: NewsItem[]): GameState {
+  let next = state;
+  const strategies = [...state.aiStrategies];
+  for (let index = 0; index < strategies.length; index++) {
+    const strategy = strategies[index];
+    if (strategy.executed) continue;
+    const owner = state.playerCharacters[strategy.ownerId] ?? (strategy.ownerId === "player" ? state.selectedCharacter : undefined);
+    if (owner?.id !== "josh") continue;
+    const source = news.find((item) => item.id === strategy.sourceId);
+    const impactActive = source?.impact && source.impact.ticksRemaining > 0 && source.impact.ticksRemaining <= source.impact.duration;
+    if (!impactActive) continue;
+    const stock = next.stocks.find((candidate) => candidate.symbol === strategy.symbol);
+    if (!stock) continue;
+    const intelligence = characterScale(owner.level, 0.65, 0.06, 1);
+    const budget = getBuyingPower(next) * strategy.risk * intelligence;
+    const shares = Math.max(0, Math.floor(budget / stock.price));
+    if (shares < 1) continue;
+    next = strategy.direction === "up"
+      ? buyStock(next, strategy.symbol, shares)
+      : shortStock(next, strategy.symbol, shares);
+    strategies[index] = { ...strategy, executed: true };
+  }
+  return { ...next, aiStrategies: strategies };
+}
 
 // Milestone schedule: day 3, 7, 11, 15... (every 3 trading days, boss days don't count)
 // Boss day schedule: day 4, 8, 12, 16... (day after each milestone)
@@ -182,7 +270,9 @@ export function buyOption(
   strikePrice: number,
   expirationDays: number,
   contracts: number,
+  character?: CharacterSelection,
 ): GameState {
+  if (character?.id === "josh") return { ...state, lastCharacterEvent: "Josh cannot place manual trades. Add a tip to the AI channel instead." };
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock || contracts <= 0 || expirationDays < 1 || expirationDays > 7) return state;
   const vol = estimateVolatility(stock);
@@ -202,12 +292,12 @@ export function buyOption(
     dayOpened: state.day,
   };
 
-  return {
+  return addJaneBias({
     ...state,
     cash: state.cash - totalCost,
     optionsPositions: [...state.optionsPositions, option],
     recentTrades: pushRecent(state.recentTrades, symbol),
-  };
+  }, symbol, type === "call" ? "up" : "down", character);
 }
 
 export function sellOption(
@@ -217,7 +307,9 @@ export function sellOption(
   strikePrice: number,
   expirationDays: number,
   contracts: number,
+  character?: CharacterSelection,
 ): GameState {
+  if (character?.id === "josh") return { ...state, lastCharacterEvent: "Josh cannot place manual trades. Add a tip to the AI channel instead." };
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock || contracts <= 0 || expirationDays < 1 || expirationDays > 7) return state;
   const vol = estimateVolatility(stock);
@@ -239,12 +331,12 @@ export function sellOption(
     dayOpened: state.day,
   };
 
-  return {
+  return addJaneBias({
     ...state,
     cash: state.cash + totalPremium,
     optionsPositions: [...state.optionsPositions, option],
     recentTrades: pushRecent(state.recentTrades, symbol),
-  };
+  }, symbol, type === "call" ? "down" : "up", character);
 }
 
 export function closeOption(state: GameState, optionId: string): GameState {
@@ -644,8 +736,12 @@ function generateNews(stocks: Stock[], category: NewsItem["category"], rumorMill
   return { id: `news-${++newsIdCounter}`, headline: template.headline.replace(/\{stock\}/g, stock.symbol), body: template.body.replace(/\{stock\}/g, stock.symbol).replace(/\{name\}/g, stock.name), category, timestamp: Date.now(), affectedStocks: [stock.symbol], sentiment: template.sentiment, author: template.author, upvotes: Math.floor(Math.random() * 20 + 1), commentCount: Math.floor(Math.random() * 5), momentum: initialMomentum, impact };
 }
 
-function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
+function updateStockPrice(stock: Stock, news: NewsItem[], state: GameState, marketDuration: number): Stock {
   let momentum = (Math.random() - 0.5) * 1.5; // Base random walk (slightly reduced)
+  const paul = strongestCharacter(state, "paul");
+  const paulBonus = paul ? characterScale(paul.level, 0.05, 0.02, 0.25) : 0;
+  const zack = strongestCharacter(state, "zack");
+  const zackDecay = zack ? (state.timeOfDay / marketDuration) * 0.35 : 0;
 
   // Apply impacts from active news
   for (const item of news) {
@@ -663,7 +759,8 @@ function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
       if (!matches) continue;
 
       // Only fire with the given probability
-      if (Math.random() > item.impact.probability) continue;
+      const probability = Math.max(0.1, Math.min(0.99, item.impact.probability + paulBonus - zackDecay));
+      if (Math.random() > probability) continue;
 
       let magnitude = effect.strength === "strong" ? 2.0 : effect.strength === "moderate" ? 1.2 : 0.5;
 
@@ -677,6 +774,12 @@ function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
     }
   }
 
+  for (const bias of state.characterMarketBiases) {
+    if (bias.symbol === stock.symbol && bias.ticksRemaining > 0) {
+      momentum += bias.direction === "up" ? bias.strength : -bias.strength;
+    }
+  }
+
   const changePercent = momentum * 0.015;
   const newPrice = Math.max(0.01, stock.price * (1 + changePercent));
   const history = [...stock.history, newPrice].slice(-50);
@@ -687,6 +790,7 @@ function updateStockPrice(stock: Stock, news: NewsItem[]): Stock {
 export function tick(state: GameState): GameState {
   if (state.gameOver || !state.marketOpen) return state;
   let workingState = state;
+  const marketDuration = getMarketDuration(workingState);
   const newTimeOfDay = workingState.timeOfDay + 1;
 
   if (hasUpgrade(workingState, "stop_loss_ins") && workingState.stopLossEnabled) {
@@ -778,10 +882,20 @@ export function tick(state: GameState): GameState {
     workingState = { ...workingState, challengeTracker };
   }
 
-  const newStocks = workingState.stocks.map((s) => updateStockPrice(s, newNews));
-  const postOrderState = processOrders({ ...workingState, stocks: newStocks, news: newNews, institutionalOrders });
+  let newStocks = workingState.stocks.map((s) => updateStockPrice(s, newNews, workingState, marketDuration));
+  if (workingState.ianSight?.mode === "future" && workingState.ianSight.targetTick === newTimeOfDay && workingState.ianSight.prices) {
+    newStocks = newStocks.map((stock) => {
+      const revealedPrice = workingState.ianSight?.prices?.[stock.symbol];
+      if (revealedPrice == null) return stock;
+      return { ...stock, price: revealedPrice, history: [...stock.history.slice(0, -1), revealedPrice] };
+    });
+  }
+  const postOrderState = runAiStrategies(
+    processOrders({ ...workingState, stocks: newStocks, news: newNews, institutionalOrders }),
+    newNews,
+  );
 
-  if (newTimeOfDay >= 100) {
+  if (newTimeOfDay >= marketDuration) {
     // Process options expiration first
     const postOptionsState = processOptionsExpiration(postOrderState);
     const portfolioValue = postOptionsState.portfolio.reduce((sum, pos) => { const stock = newStocks.find((s) => s.symbol === pos.symbol); return sum + (stock ? stock.price * pos.shares : 0); }, 0);
@@ -803,7 +917,8 @@ export function tick(state: GameState): GameState {
       const insiderInfo = getInsiderProfitInfo({ ...postOptionsState, stocks: newStocks });
       const totalInsiderProfit = insiderInfo.profit;
       if (totalInsiderProfit > 0) {
-        const catchChance = insiderInfo.catchChance;
+        const jane = strongestCharacter(postOptionsState, "jane");
+        const catchChance = Math.min(0.99, insiderInfo.catchChance * (jane ? 1.35 : 1));
         let fineAmount = Math.round(totalInsiderProfit * (2 + Math.random()) * 100) / 100;
         if (hasUpgrade(postOptionsState, "bail_out")) fineAmount *= 0.8;
         fineAmount = Math.round(fineAmount * 100) / 100;
@@ -819,7 +934,41 @@ export function tick(state: GameState): GameState {
     return generateDraftOptions(generateUpgradeDraft(endOfDayState));
   }
 
-  return { ...postOrderState, stocks: newStocks, news: newNews, timeOfDay: newTimeOfDay, insiderTip, insiderTip2, institutionalOrders };
+  const ian = strongestCharacter(postOrderState, "ian");
+  let ianSight = postOrderState.ianSight && postOrderState.ianSight.ticksRemaining > 1
+    ? { ...postOrderState.ianSight, ticksRemaining: postOrderState.ianSight.ticksRemaining - 1 }
+    : null;
+  if (ian && !ianSight && Math.random() < characterScale(ian.level, 0.025, 0.006, 0.1)) {
+    const mode = Math.random() < 0.5 ? "future" : "past";
+    const horizon = mode === "future" ? Math.round(characterScale(ian.level, 5, 1, 15)) : 5;
+    const prices = mode === "future"
+      ? Object.fromEntries(newStocks.map((stock) => {
+          const recent = stock.history.slice(-5);
+          const trend = recent.length > 1 ? (recent[recent.length - 1] - recent[0]) / (recent.length - 1) : 0;
+          return [stock.symbol, Math.round(Math.max(0.01, stock.price + trend * horizon) * 100) / 100];
+        }))
+      : undefined;
+    ianSight = {
+      mode,
+      ticksRemaining: horizon,
+      horizon,
+      targetTick: mode === "future" ? newTimeOfDay + horizon : undefined,
+      prices,
+    };
+  }
+  return {
+    ...postOrderState,
+    stocks: newStocks,
+    news: newNews,
+    timeOfDay: newTimeOfDay,
+    insiderTip,
+    insiderTip2,
+    institutionalOrders,
+    characterMarketBiases: postOrderState.characterMarketBiases
+      .filter((bias) => bias.ticksRemaining > 1)
+      .map((bias) => ({ ...bias, ticksRemaining: bias.ticksRemaining - 1 })),
+    ianSight,
+  };
 }
 
 function pushRecent(recent: string[], symbol: string): string[] {
@@ -838,11 +987,18 @@ function addTradedStock(tracker: TradingChallengeTracker, symbol: string): Tradi
   return { ...tracker, tradedStocks: [...tracker.tradedStocks, symbol] };
 }
 
-export function buyStock(state: GameState, symbol: string, shares: number, playerName?: string): GameState {
+export function buyStock(state: GameState, symbol: string, shares: number, playerName?: string, character?: CharacterSelection): GameState {
+  if (character?.id === "josh") return { ...state, lastCharacterEvent: "Josh cannot place manual trades. Add a tip to the AI channel instead." };
+  const requestedSymbol = symbol;
+  symbol = resolveDinkySymbol(state, symbol, character);
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock || shares <= 0) return state;
   const cost = stock.price * shares;
-  if (cost > getBuyingPower(state)) return state;
+  if (cost > getBuyingPower(state)) {
+    return symbol !== requestedSymbol
+      ? { ...state, lastCharacterEvent: `Dinky tried to buy ${requestedSymbol}, but selected ${symbol} without enough buying power.` }
+      : state;
+  }
   const bonusShares = hasUpgrade(state, "bogo") && Math.random() < 0.04 ? 1 : 0;
   const totalNewShares = shares + bonusShares;
   const existingPosition = state.portfolio.find((p) => p.symbol === symbol);
@@ -865,18 +1021,35 @@ export function buyStock(state: GameState, symbol: string, shares: number, playe
     tracker = { ...tracker, contrarianBuys: [...tracker.contrarianBuys, { symbol, buyPrice: stock.price, playerName }] };
   }
 
-  return { ...state, cash: state.cash - cost, portfolio: newPortfolio, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
+  return addJaneBias({
+    ...state,
+    cash: state.cash - cost,
+    portfolio: newPortfolio,
+    recentTrades: pushRecent(state.recentTrades, symbol),
+    challengeTracker: tracker,
+    lastCharacterEvent: symbol !== requestedSymbol ? `Dinky accidentally bought ${symbol} instead of ${requestedSymbol}.` : null,
+  }, symbol, "up", character);
 }
 
-export function sellStock(state: GameState, symbol: string, shares: number, playerName?: string): GameState {
+export function sellStock(state: GameState, symbol: string, shares: number, playerName?: string, character?: CharacterSelection): GameState {
+  if (character?.id === "josh") return { ...state, lastCharacterEvent: "Josh cannot place manual trades. Add a tip to the AI channel instead." };
+  const requestedSymbol = symbol;
+  symbol = resolveDinkySymbol(state, symbol, character);
   const stock = state.stocks.find((s) => s.symbol === symbol);
   const position = state.portfolio.find((p) => p.symbol === symbol);
-  if (!stock || !position || position.shares < shares || shares <= 0) return state;
+  if (!stock || !position || position.shares < shares || shares <= 0) {
+    return symbol !== requestedSymbol
+      ? { ...state, lastCharacterEvent: `Dinky tried to sell ${requestedSymbol}, but selected ${symbol} without enough shares.` }
+      : state;
+  }
   const revenue = stock.price * shares;
   const costBasis = position.avgCost * shares;
   const profit = revenue - costBasis;
   const adjustedProfit = applyProfitModifiers(state, stock, position, profit);
-  const cashDelta = revenue + (adjustedProfit - profit);
+  const memeMultiplier = character?.id === "colin" && stock.tags.includes("social-media")
+    ? (adjustedProfit >= 0 ? characterScale(character.level, 2, 0.25, 5) : 2)
+    : 1;
+  const cashDelta = revenue + (adjustedProfit * memeMultiplier - profit);
   const remainingShares = position.shares - shares;
   const newPortfolio = remainingShares === 0 ? state.portfolio.filter((p) => p.symbol !== symbol) : state.portfolio.map((p) => p.symbol === symbol ? { ...p, shares: remainingShares } : p);
   let insiderRealizedProfit = state.insiderRealizedProfit;
@@ -903,14 +1076,21 @@ export function sellStock(state: GameState, symbol: string, shares: number, play
     tracker = { ...tracker, techProfit: tracker.techProfit + adjustedProfit };
   }
 
-  return { ...state, cash: state.cash + cashDelta, portfolio: newPortfolio, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
+  return { ...state, cash: state.cash + cashDelta, portfolio: newPortfolio, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker, lastCharacterEvent: symbol !== requestedSymbol ? `Dinky tried to sell ${requestedSymbol}, but selected ${symbol}.` : null };
 }
 
-export function shortStock(state: GameState, symbol: string, shares: number): GameState {
+export function shortStock(state: GameState, symbol: string, shares: number, character?: CharacterSelection): GameState {
+  if (character?.id === "josh") return { ...state, lastCharacterEvent: "Josh cannot place manual trades. Add a tip to the AI channel instead." };
+  const requestedSymbol = symbol;
+  symbol = resolveDinkySymbol(state, symbol, character);
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock || shares <= 0) return state;
   const collateral = stock.price * shares;
-  if (collateral > getBuyingPower(state)) return state;
+  if (collateral > getBuyingPower(state)) {
+    return symbol !== requestedSymbol
+      ? { ...state, lastCharacterEvent: `Dinky tried to short ${requestedSymbol}, but selected ${symbol} without enough buying power.` }
+      : state;
+  }
   const existing = state.shorts.find((p) => p.symbol === symbol);
   let newShorts;
   if (existing) {
@@ -919,17 +1099,34 @@ export function shortStock(state: GameState, symbol: string, shares: number): Ga
     newShorts = state.shorts.map((p) => p.symbol === symbol ? { ...p, shares: totalShares, entryPrice: totalEntry / totalShares } : p);
   } else newShorts = [...state.shorts, { symbol, shares, entryPrice: stock.price }];
   const tracker = addTradedStock(state.challengeTracker, symbol);
-  return { ...state, cash: state.cash - collateral, shorts: newShorts, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
+  return addJaneBias({
+    ...state,
+    cash: state.cash - collateral,
+    shorts: newShorts,
+    recentTrades: pushRecent(state.recentTrades, symbol),
+    challengeTracker: tracker,
+    lastCharacterEvent: symbol !== requestedSymbol ? `Dinky accidentally shorted ${symbol} instead of ${requestedSymbol}.` : null,
+  }, symbol, "down", character);
 }
 
-export function coverShort(state: GameState, symbol: string, shares: number, playerName?: string): GameState {
+export function coverShort(state: GameState, symbol: string, shares: number, playerName?: string, character?: CharacterSelection): GameState {
+  if (character?.id === "josh") return { ...state, lastCharacterEvent: "Josh cannot place manual trades. Add a tip to the AI channel instead." };
+  const requestedSymbol = symbol;
+  symbol = resolveDinkySymbol(state, symbol, character);
   const stock = state.stocks.find((s) => s.symbol === symbol);
   const position = state.shorts.find((p) => p.symbol === symbol);
-  if (!stock || !position || position.shares < shares || shares <= 0) return state;
+  if (!stock || !position || position.shares < shares || shares <= 0) {
+    return symbol !== requestedSymbol
+      ? { ...state, lastCharacterEvent: `Dinky tried to cover ${requestedSymbol}, but selected ${symbol} without enough short shares.` }
+      : state;
+  }
   let profit = (position.entryPrice - stock.price) * shares;
   if (profit > 0 && hasUpgrade(state, "loan_shark") && stock.tags.includes("finance")) profit *= 1.15;
   if (profit < 0 && hasUpgrade(state, "hedge_fund")) profit *= 0.75;
-  const netCash = state.cash + position.entryPrice * shares + profit;
+  const memeMultiplier = character?.id === "colin" && stock.tags.includes("social-media")
+    ? (profit >= 0 ? characterScale(character.level, 2, 0.25, 5) : 2)
+    : 1;
+  const netCash = state.cash + position.entryPrice * shares + profit * memeMultiplier;
   const remainingShares = position.shares - shares;
   const newShorts = remainingShares === 0 ? state.shorts.filter((p) => p.symbol !== symbol) : state.shorts.map((p) => p.symbol === symbol ? { ...p, shares: remainingShares } : p);
   let insiderRealizedProfit = state.insiderRealizedProfit;
@@ -951,7 +1148,7 @@ export function coverShort(state: GameState, symbol: string, shares: number, pla
     tracker = { ...tracker, techProfit: tracker.techProfit + profit };
   }
 
-  return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker };
+  return { ...state, cash: netCash, shorts: newShorts, insiderRealizedProfit, recentTrades: pushRecent(state.recentTrades, symbol), challengeTracker: tracker, lastCharacterEvent: symbol !== requestedSymbol ? `Dinky tried to cover ${requestedSymbol}, but selected ${symbol}.` : null };
 }
 
 export function openMarket(state: GameState): GameState {
@@ -962,7 +1159,7 @@ export function openMarket(state: GameState): GameState {
   const hasSchmooze = schmoozeHint != null;
   const snapshotHoldings = hasSchmooze ? state.portfolio.map((p) => ({ symbol: p.symbol, shares: p.shares, avgCost: p.avgCost })) : [];
   const snapshotShorts = hasSchmooze ? state.shorts.map((s) => ({ symbol: s.symbol, shares: s.shares, entryPrice: s.entryPrice })) : [];
-  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: snapshotHoldings, insiderSnapshotShorts: snapshotShorts, insiderRealizedProfit: 0, institutionalOrders: [], challengeTracker: createTradingTracker(), schmoozeInsiderTip: null, schmoozeActiveTip: schmoozeHint };
+  return { ...state, marketOpen: true, restaurantEarnings: 0, milestonePayment: null, stocks: state.stocks.map((s) => ({ ...s, openPrice: s.price, dailyHistory: [...s.dailyHistory, { day: state.day, close: s.price }], history: [s.price] })), dayStartNetWorth: netWorth, insiderTip: null, insiderTip2: null, insiderViewed: false, insiderViewedTick: 0, insiderSnapshotHoldings: snapshotHoldings, insiderSnapshotShorts: snapshotShorts, insiderRealizedProfit: 0, institutionalOrders: [], challengeTracker: createTradingTracker(), schmoozeInsiderTip: null, schmoozeActiveTip: schmoozeHint, characterMarketBiases: [], lastCharacterEvent: null, ianSight: null };
 }
 
 export function acquireUpgrade(state: GameState, upgradeId: string): GameState {
@@ -984,7 +1181,10 @@ export function placeOrder(
   orderType: OrderType,
   limitPrice?: number,
   stopPrice?: number,
+  character?: CharacterSelection,
+  playerName?: string,
 ): GameState {
+  if (character?.id === "josh") return { ...state, lastCharacterEvent: "Josh cannot place manual trades. Add a tip to the AI channel instead." };
   const stock = state.stocks.find((s) => s.symbol === symbol);
   if (!stock || shares <= 0) return state;
 
@@ -1008,6 +1208,8 @@ export function placeOrder(
     stopPrice,
     createdAt: state.timeOfDay,
     day: state.day,
+    character,
+    playerName,
   };
 
   return { ...state, pendingOrders: [...state.pendingOrders, order] };
@@ -1052,10 +1254,10 @@ export function processOrders(state: GameState): GameState {
       const cashBefore = newState.cash;
       const portfolioValueBefore = getPortfolioValue(newState) + getShortCollateral(newState);
       switch (order.side) {
-        case "buy": newState = buyStock(newState, order.symbol, order.shares); break;
-        case "sell": newState = sellStock(newState, order.symbol, order.shares); break;
-        case "short": newState = shortStock(newState, order.symbol, order.shares); break;
-        case "cover": newState = coverShort(newState, order.symbol, order.shares); break;
+        case "buy": newState = buyStock(newState, order.symbol, order.shares, order.playerName, order.character); break;
+        case "sell": newState = sellStock(newState, order.symbol, order.shares, order.playerName, order.character); break;
+        case "short": newState = shortStock(newState, order.symbol, order.shares, order.character); break;
+        case "cover": newState = coverShort(newState, order.symbol, order.shares, order.playerName, order.character); break;
       }
       // For sell/cover limit orders, track the profit earned
       if (order.orderType === "limit" && (order.side === "sell" || order.side === "cover")) {

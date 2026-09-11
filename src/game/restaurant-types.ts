@@ -1,4 +1,5 @@
 import type { RestaurantChallengeTracker } from "./challenges";
+import type { CharacterSelection } from "./characters";
 
 export type StepType = "grill" | "fry" | "chop" | "mix" | "assemble" | "rhythm" | "hold" | "memorize";
 
@@ -107,6 +108,9 @@ export interface ActiveOrder {
   customizations: Record<number, boolean[]>;
   orderCorrect: boolean;
   isInsider: boolean;
+  maxPatience?: number;
+  patienceDecayMultiplier?: number;
+  characterPatienceApplied?: boolean;
   // Schmooze state (populated after serving an insider)
   schmoozing?: {
     rounds: { compliment: string; insults: string[] }[];
@@ -218,4 +222,5 @@ export interface RestaurantState {
   servingBlocked: boolean; // true when a chore timer has expired
   // Insider schmooze system
   insiderServed: boolean; // whether an insider was served this shift (max 1)
+  characters: Record<string, CharacterSelection>;
 }

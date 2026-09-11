@@ -1,6 +1,7 @@
 import { GameState, Stock, DailyPrice } from "./types";
 import { createTradingTracker, selectDailyChallenges } from "./challenges";
 import { createEmptyInventory } from "./consumables";
+import { getCharacterSelection, type CharacterSelection } from "./characters";
 
 function seededRandom(seed: number): () => number {
   let s = seed;
@@ -43,7 +44,11 @@ const INITIAL_STOCKS: Stock[] = [
   { symbol: "MEME", name: "MemeTech Solutions", price: 12, openPrice: 12, history: [12], dailyHistory: [], tags: ["small-cap", "tech", "speculative", "social-media"], ipoDay: 63 },
 ];
 
-export function createInitialState(playerCount: number = 1): GameState {
+export function createInitialState(
+  playerCount: number = 1,
+  selectedCharacter: CharacterSelection = getCharacterSelection("jane"),
+  playerCharacters: Record<string, CharacterSelection> = {},
+): GameState {
   const stocksWithHistory = INITIAL_STOCKS.map((stock, idx) => {
     const volatility = stock.tags.includes("speculative") ? 0.04 : stock.tags.includes("small-cap") ? 0.03 : 0.018;
     const dailyHistory = generateFakeHistory(stock.price, stock.ipoDay, (idx + 1) * 7919, volatility);
@@ -101,5 +106,11 @@ export function createInitialState(playerCount: number = 1): GameState {
     playerCount,
     schmoozeInsiderTip: null,
     schmoozeActiveTip: null,
+    selectedCharacter,
+    playerCharacters,
+    characterMarketBiases: [],
+    lastCharacterEvent: null,
+    ianSight: null,
+    aiStrategies: [],
   };
 }

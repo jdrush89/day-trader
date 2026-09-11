@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { GameState, MonitorChannel, OrderType, OrderSide, InsiderTip } from "./game/types";
 import { createInitialState } from "./game/state";
-import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft, applyMilestoneCheck, isMilestoneDay, generateInsiderTip } from "./game/engine";
+import { tick, buyStock, sellStock, shortStock, coverShort, openMarket, placeOrder, cancelOrder, getMilestone, draftStock, togglePinStock, acquireUpgrade, hasUpgrade, buyOption, sellOption, closeOption, getOptionsValue, isBossDayCheck, generateDraftOptions, generateUpgradeDraft, applyMilestoneCheck, isMilestoneDay, generateInsiderTip, getMarketDuration, addAiStrategy, setAiStrategyRisk, clearAiStrategy } from "./game/engine";
 import { acquireRestaurantUpgrade, createRestaurantState, draftMenuItem, finishRestaurantDay, restaurantTick, MENU, generateRestaurantUpgradeDraft, generateMenuDraft } from "./game/restaurant-engine";
 import { RestaurantState } from "./game/restaurant-types";
 import { RESTAURANT_UPGRADE_POOL } from "./game/restaurant-upgrades";
@@ -27,13 +27,15 @@ import { Casino } from "./components/Casino";
 import { Tennis } from "./components/Tennis";
 import { QuickTacToe } from "./components/QuickTacToe";
 import { Bowling } from "./components/Bowling";
+import { CharacterSelect } from "./components/CharacterSelect";
+import { awardCharacterXp, characterScale, getCharacterSelection, type CharacterId } from "./game/characters";
 import { FishingReward } from "./game/fishing";
 import { startMusic, stopMusic, isMusicMuted, toggleMusicMute, getMusicVolume, setMusicVolume, setTrack, type TrackId } from "./game/music";
 import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.153";
+const GAME_VERSION = "0.0.154";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -106,6 +108,10 @@ function App() {
   const [showDebug, setShowDebug] = useState(false);
   const [debugFF, setDebugFF] = useState(false);
   const [showMultiplayerLobby, setShowMultiplayerLobby] = useState(false);
+  const [showCharacterSelect, setShowCharacterSelect] = useState(false);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<CharacterId>("jane");
+  const [characterXpResult, setCharacterXpResult] = useState<{ amount: number; levelsGained: number; level: number } | null>(null);
+  const awardedMilestoneRef = useRef<string | null>(null);
   const [disconnectedPlayer, setDisconnectedPlayer] = useState<string | null>(null);
   const [eodChoiceMade, setEodChoiceMade] = useState(false); // local player submitted their EOD choice
   const [mpUpgradeChoice, setMpUpgradeChoice] = useState<string | null>(null); // track upgrade pick locally in MP
@@ -426,6 +432,19 @@ function App() {
   );
   const isMultiplayer = mpState.role !== "none";
   const isPeer = mpState.role === "peer";
+  const localCharacter = isMultiplayer
+    ? mpState.localPlayer?.character ?? gameState.selectedCharacter
+    : gameState.selectedCharacter;
+
+  useEffect(() => {
+    if (!gameState.milestonePayment || gameState.gameOver || !localCharacter) return;
+    const milestoneKey = `${gameState.runSeed}:${gameState.day}:${localCharacter.id}`;
+    if (awardedMilestoneRef.current === milestoneKey) return;
+    awardedMilestoneRef.current = milestoneKey;
+    const amount = Math.max(0, Math.floor(gameState.cash));
+    const result = awardCharacterXp(localCharacter.id, amount);
+    setCharacterXpResult({ amount, levelsGained: result.levelsGained, level: result.profile.level });
+  }, [gameState.milestonePayment, gameState.gameOver, gameState.runSeed, gameState.day, gameState.cash, localCharacter]);
 
   // Peer: generate local draft options when entering EOD upgrades phase (so each player gets different choices)
   const peerDraftGenerated = useRef<number>(0); // track which day's draft was generated
@@ -874,6 +893,7 @@ function App() {
         name: p.name,
         upgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localUpgrades : [],
         restaurantUpgrades: p.id === (mpState.localPlayer?.id ?? "host") ? localRestaurantUpgrades : [],
+        character: p.character,
       }));
       const id = saveMpGame(gs, playerSaves, mpSaveIdRef.current ?? undefined, type);
       if (!mpSaveIdRef.current) {
@@ -960,6 +980,33 @@ function App() {
     }));
   }, []);
 
+  const handleAddAiStrategy = useCallback((sourceId: string, symbol: string, direction: "up" | "down") => {
+    if (isPeer) {
+      mpActions.sendAction({ type: "add_ai_strategy", sourceId, symbol, direction, risk: 0.25 });
+      return;
+    }
+    const playerId = mpState.localPlayer?.id ?? "player";
+    setGameState((state) => addAiStrategy(state, playerId, sourceId, symbol, direction));
+  }, [isPeer, mpActions, mpState.localPlayer]);
+
+  const handleSetAiRisk = useCallback((strategyId: string, risk: number) => {
+    if (isPeer) {
+      mpActions.sendAction({ type: "set_ai_risk", strategyId, risk });
+      return;
+    }
+    const playerId = mpState.localPlayer?.id ?? "player";
+    setGameState((state) => setAiStrategyRisk(state, playerId, strategyId, risk));
+  }, [isPeer, mpActions, mpState.localPlayer]);
+
+  const handleClearAiStrategy = useCallback((strategyId: string) => {
+    if (isPeer) {
+      mpActions.sendAction({ type: "clear_ai_strategy", strategyId });
+      return;
+    }
+    const playerId = mpState.localPlayer?.id ?? "player";
+    setGameState((state) => clearAiStrategy(state, playerId, strategyId));
+  }, [isPeer, mpActions, mpState.localPlayer]);
+
   const handleBuy = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "buy_stock", symbol, shares }); return; }
     const playerId = mpState.localPlayer?.id ?? "player";
@@ -978,13 +1025,13 @@ function App() {
             : [...prev.portfolio, { symbol, shares: 1, avgCost: stock.price, dayAcquired: prev.day }],
         };
       }
-      const next = buyStock(prev, symbol, shares, playerName);
+      const next = buyStock(prev, symbol, shares, playerName, localCharacter);
       if (next !== prev) {
         setTradeTracker((t) => recordBuy(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
       }
       return next;
     });
-  }, [isPeer, mpActions, mpState.localPlayer]);
+  }, [isPeer, mpActions, mpState.localPlayer, localCharacter]);
   const handleSell = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "sell_stock", symbol, shares }); return; }
     const playerId = mpState.localPlayer?.id ?? "player";
@@ -992,7 +1039,7 @@ function App() {
     setGameState((prev) => {
       const stock = prev.stocks.find((s) => s.symbol === symbol);
       if (!stock) return prev;
-      const next = sellStock(prev, symbol, shares, playerName);
+      const next = sellStock(prev, symbol, shares, playerName, localCharacter);
       if (next !== prev) {
         setTradeTracker((t) => recordSell(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
       }
@@ -1003,7 +1050,7 @@ function App() {
       }
       return next;
     });
-  }, [isPeer, mpActions, mpState.localPlayer]);
+  }, [isPeer, mpActions, mpState.localPlayer, localCharacter]);
   const handleShort = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "short_stock", symbol, shares }); return; }
     const playerId = mpState.localPlayer?.id ?? "player";
@@ -1011,13 +1058,13 @@ function App() {
     setGameState((prev) => {
       const stock = prev.stocks.find((s) => s.symbol === symbol);
       if (!stock) return prev;
-      const next = shortStock(prev, symbol, shares);
+      const next = shortStock(prev, symbol, shares, localCharacter);
       if (next !== prev) {
         setTradeTracker((t) => recordShort(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
       }
       return next;
     });
-  }, [isPeer, mpActions, mpState.localPlayer]);
+  }, [isPeer, mpActions, mpState.localPlayer, localCharacter]);
   const handleCover = useCallback((symbol: string, shares: number) => {
     if (isPeer) { mpActions.sendAction({ type: "cover_short", symbol, shares }); return; }
     const playerId = mpState.localPlayer?.id ?? "player";
@@ -1025,7 +1072,7 @@ function App() {
     setGameState((prev) => {
       const stock = prev.stocks.find((s) => s.symbol === symbol);
       if (!stock) return prev;
-      const next = coverShort(prev, symbol, shares, playerName);
+      const next = coverShort(prev, symbol, shares, playerName, localCharacter);
       if (next !== prev) {
         setTradeTracker((t) => recordCover(t, playerId, playerName, symbol, shares, stock.price, prev.timeOfDay));
       }
@@ -1036,7 +1083,7 @@ function App() {
       }
       return next;
     });
-  }, [isPeer, mpActions, mpState.localPlayer]);
+  }, [isPeer, mpActions, mpState.localPlayer, localCharacter]);
   const handleTogglePin = useCallback((symbol: string) => setGameState((prev) => togglePinStock(prev, symbol)), []);
   const handleToggleStopLoss = useCallback(() => setGameState((prev) => ({ ...prev, stopLossEnabled: !prev.stopLossEnabled })), []);
 
@@ -1187,8 +1234,8 @@ function App() {
 
   const handlePlaceOrder = useCallback((symbol: string, side: OrderSide, shares: number, orderType: OrderType, limitPrice?: number, stopPrice?: number) => {
     if (isPeer) { mpActions.sendAction({ type: "place_order", symbol, side, shares, orderType, limitPrice, stopPrice }); return; }
-    setGameState((prev) => placeOrder(prev, symbol, side, shares, orderType, limitPrice, stopPrice));
-  }, [isPeer, mpActions]);
+    setGameState((prev) => placeOrder(prev, symbol, side, shares, orderType, limitPrice, stopPrice, localCharacter, mpState.localPlayer?.name));
+  }, [isPeer, mpActions, localCharacter, mpState.localPlayer]);
   const handleCancelOrder = useCallback((orderId: string) => {
     if (isPeer) { mpActions.sendAction({ type: "cancel_order", orderId }); return; }
     setGameState((prev) => cancelOrder(prev, orderId));
@@ -1198,7 +1245,7 @@ function App() {
     const pid = mpState.localPlayer?.id ?? "player";
     const pname = mpState.localPlayer?.name ?? "You";
     setGameState((prev) => {
-      const next = buyOption(prev, symbol, type, strike, days, contracts);
+      const next = buyOption(prev, symbol, type, strike, days, contracts, localCharacter);
       if (next !== prev) {
         const newOpt = next.optionsPositions.find((o) => !prev.optionsPositions.some((po) => po.id === o.id));
         const premium = newOpt ? newOpt.premium : 0;
@@ -1206,13 +1253,13 @@ function App() {
       }
       return next;
     });
-  }, [isPeer, mpActions, mpState.localPlayer]);
+  }, [isPeer, mpActions, mpState.localPlayer, localCharacter]);
   const handleSellOption = useCallback((symbol: string, type: "call" | "put", strike: number, days: number, contracts: number) => {
     if (isPeer) { mpActions.sendAction({ type: "sell_option", symbol, optionType: type, strikePrice: strike, expirationDays: days, contracts }); return; }
     const pid = mpState.localPlayer?.id ?? "player";
     const pname = mpState.localPlayer?.name ?? "You";
     setGameState((prev) => {
-      const next = sellOption(prev, symbol, type, strike, days, contracts);
+      const next = sellOption(prev, symbol, type, strike, days, contracts, localCharacter);
       if (next !== prev) {
         const newOpt = next.optionsPositions.find((o) => !prev.optionsPositions.some((po) => po.id === o.id));
         const premium = newOpt ? newOpt.premium : 0;
@@ -1220,7 +1267,7 @@ function App() {
       }
       return next;
     });
-  }, [isPeer, mpActions, mpState.localPlayer]);
+  }, [isPeer, mpActions, mpState.localPlayer, localCharacter]);
   const handleCloseOption = useCallback((optionId: string) => {
     if (isPeer) { mpActions.sendAction({ type: "close_option", optionId }); return; }
     const pid = mpState.localPlayer?.id ?? "player";
@@ -1727,18 +1774,21 @@ function App() {
     // so we can't rely on capturing a closure inside it.
     const applyReward = (prev: GameState): GameState => {
       if (!reward) return prev;
+      const leisureMultiplier = localCharacter.id === "allan"
+        ? characterScale(localCharacter.level, 1.25, 0.1, 3)
+        : 1;
       switch (reward.type) {
         case "cash":
-          return { ...prev, cash: Math.round((prev.cash + (reward.amount ?? 0)) * 100) / 100 };
+          return { ...prev, cash: Math.round((prev.cash + (reward.amount ?? 0) * leisureMultiplier) * 100) / 100 };
         case "ticket":
           return { ...prev, tickets: prev.tickets + 1, tradingTickets: prev.tradingTickets + 1 };
         case "upgrade":
           if (reward.upgradeId && !prev.acquiredUpgrades.includes(reward.upgradeId)) {
             return { ...prev, acquiredUpgrades: [...prev.acquiredUpgrades, reward.upgradeId] };
           }
-          return { ...prev, cash: prev.cash + 75 }; // fallback if already owned
+          return { ...prev, cash: Math.round((prev.cash + 75 * leisureMultiplier) * 100) / 100 }; // fallback if already owned
         case "recipe":
-          return { ...prev, cash: prev.cash + 50 };
+          return { ...prev, cash: Math.round((prev.cash + 50 * leisureMultiplier) * 100) / 100 };
         default:
           return prev;
       }
@@ -1750,19 +1800,25 @@ function App() {
       setLocalEodInfoStep("waiting");
       const myId = mpState.localPlayer?.id ?? "host";
       setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
-      if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+      if (isPeer) {
+        mpActions.sendAction({ type: "leisure_reward", reward });
+        mpActions.sendAction({ type: "eod_info_done" });
+      }
     } else {
       // Leisure always happens at end of full day — go to next trading day.
       setRestaurantState(null);
       beginScheduledDayRef.current(updatedState, { skipRestaurantTransition: true });
     }
-  }, [gameState, isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
+  }, [gameState, isMultiplayer, isPeer, mpActions, mpState.localPlayer, localCharacter]);
 
   const handleCasinoComplete = useCallback((netChange: number) => {
     setLeisureActivity(null);
     if (netChange !== 0) {
       setGameState((prev) => {
-        const updated = { ...prev, cash: Math.round((prev.cash + netChange) * 100) / 100 };
+        const adjustedChange = netChange > 0 && localCharacter.id === "allan"
+          ? netChange * characterScale(localCharacter.level, 1.25, 0.1, 3)
+          : netChange;
+        const updated = { ...prev, cash: Math.round((prev.cash + adjustedChange) * 100) / 100 };
         // Must pass the updated state directly to avoid stale closure
         if (!isMultiplayer) {
           setTimeout(() => {
@@ -1776,12 +1832,15 @@ function App() {
         setLocalEodInfoStep("waiting");
         const myId = mpState.localPlayer?.id ?? "host";
         setEodInfoReadyPlayers((prev) => { const n = new Set(prev); n.add(myId); return n; });
-        if (isPeer) mpActions.sendAction({ type: "eod_info_done" });
+        if (isPeer) {
+          mpActions.sendAction({ type: "leisure_reward", reward: null, cashChange: netChange });
+          mpActions.sendAction({ type: "eod_info_done" });
+        }
       }
     } else {
       handleLeisureComplete(null);
     }
-  }, [handleLeisureComplete, isMultiplayer, isPeer, mpActions, mpState.localPlayer]);
+  }, [handleLeisureComplete, isMultiplayer, isPeer, mpActions, mpState.localPlayer, localCharacter]);
 
   const handleChallengesContinue = useCallback(() => {
     // After challenges — use state machine to determine next phase
@@ -2108,6 +2167,8 @@ function App() {
     setShowChallengeIntro(null);
     setPaused(false);
     setShowMultiplayerLobby(false);
+    setShowCharacterSelect(false);
+    setCharacterXpResult(null);
     setDisconnectedPlayer(null);
     setLocalUpgrades([]);
     setLocalRestaurantUpgrades([]);
@@ -2144,13 +2205,14 @@ function App() {
 
   const showAnalystRating = isMultiplayer ? effectiveHasUpgrade("analyst_ratings") : hasUpgrade(gameState, "analyst_ratings");
   const showDarkPool = isMultiplayer ? effectiveHasUpgrade("dark_pool") : hasUpgrade(gameState, "dark_pool");
+  const marketDuration = getMarketDuration(gameState);
 
   // Multiplayer lobby overlay — but close it when game starts for peers
   if (showMultiplayerLobby && !(isPeer && mpState.gameStarted)) {
     return (
       <MultiplayerLobby
-        onHost={(name) => mpActions.hostGame(name)}
-        onJoin={(code, name) => mpActions.joinGame(code, name)}
+        onHost={(name, characterId) => mpActions.hostGame(name, getCharacterSelection(characterId))}
+        onJoin={(code, name, characterId) => mpActions.joinGame(code, name, getCharacterSelection(characterId))}
         onCancel={() => {
           mpActions.disconnect();
           setShowMultiplayerLobby(false);
@@ -2168,7 +2230,7 @@ function App() {
           setMpResumeData(save);
           setMpSaveId(save.id);
           mpSaveIdRef.current = save.id;
-          await mpActions.hostGame(playerName);
+          await mpActions.hostGame(playerName, save.players[0]?.character ?? getCharacterSelection("jane"));
           mpActions.setRequiredNames(save.players.map((p) => p.name));
         }}
         onDeleteSave={(id) => {
@@ -2180,7 +2242,12 @@ function App() {
           setShowTitle(false);
           if (mpResumeData) {
             // Resume from saved game
-            const gs = mpResumeData.gameState;
+            const playerCharacters = Object.fromEntries(mpState.players.map((player) => {
+              const savedPlayer = mpResumeData.players.find((saved) => saved.name === player.name);
+              return [player.id, savedPlayer?.character ?? player.character];
+            }));
+            const selectedCharacter = playerCharacters[mpState.localPlayer?.id ?? "host"] ?? mpResumeData.gameState.selectedCharacter;
+            const gs = { ...mpResumeData.gameState, selectedCharacter, playerCharacters };
             setGameState(gs);
             // Find this player's upgrades by name
             const myName = mpState.players.find((p) => p.id === (mpState.localPlayer?.id ?? "host"))?.name;
@@ -2206,7 +2273,9 @@ function App() {
               setPaused(true);
             }
           } else {
-            setGameState(createInitialState(mpState.players.length));
+            const playerCharacters = Object.fromEntries(mpState.players.map((player) => [player.id, player.character]));
+            const localCharacter = mpState.localPlayer?.character ?? getCharacterSelection("jane");
+            setGameState(createInitialState(mpState.players.length, localCharacter, playerCharacters));
             setShowChallengeIntro("trading");
             setPaused(true);
           }
@@ -2226,6 +2295,7 @@ function App() {
     const handleResume = () => {
       if (savedGame) {
         setGameState(savedGame.gameState);
+        setSelectedCharacterId(savedGame.gameState.selectedCharacter.id);
         if (savedGame.phase === "restaurant") {
           const rs = createRestaurantState(savedGame.gameState, savedGame.gameState.playerCount);
           setRestaurantState(rs);
@@ -2233,6 +2303,25 @@ function App() {
         setShowTitle(false);
       }
     };
+
+    if (showCharacterSelect) {
+      return (
+        <CharacterSelect
+          selected={selectedCharacterId}
+          onSelect={setSelectedCharacterId}
+          onBack={() => setShowCharacterSelect(false)}
+          onConfirm={() => {
+            if (savedGame) deleteSave();
+            const character = getCharacterSelection(selectedCharacterId);
+            setGameState(createInitialState(1, character));
+            setShowCharacterSelect(false);
+            setShowTitle(false);
+            setShowChallengeIntro("trading");
+            setPaused(true);
+          }}
+        />
+      );
+    }
 
     if (titleTutorial === "trading") {
       // Force market open so EOD overlay doesn't show during tutorial
@@ -2306,7 +2395,7 @@ function App() {
               RESUME (Day {savedGame.gameState.day})
             </button>
           )}
-          <button className="title-start-btn" onClick={() => { if (savedGame) deleteSave(); const s = createInitialState(); setGameState(s); setShowTitle(false); setShowChallengeIntro("trading"); setPaused(true); }}>
+          <button className="title-start-btn" onClick={() => setShowCharacterSelect(true)}>
             {savedGame ? "NEW GAME" : "START TRADING"}
           </button>
           <button className="title-start-btn title-tutorial-btn" onClick={() => { setTitleTutorial("pick"); setMenuFocusIndex(-1); (document.activeElement as HTMLElement)?.blur(); }}>VIEW TUTORIAL</button>
@@ -2430,10 +2519,18 @@ function App() {
             </div>
           )}
           <div className="header-controls">
-            <div className="time-bar">
-              <div className="time-fill" style={{ width: `${gameState.timeOfDay}%` }} />
-              <span className="time-label">{paused ? "⏸ PAUSED" : gameState.marketOpen ? `Day ${gameState.day} — ${formatMarketTime(gameState.timeOfDay)}` : "Market Closed"}</span>
-            </div>
+            {localCharacter.id === "allan" ? (
+              <div className="allan-clock" aria-label={paused ? "Paused" : "Market time hidden"}>
+                <span className="allan-clock-hand hour" style={{ transform: `rotate(${gameState.timeOfDay * 47}deg)` }} />
+                <span className="allan-clock-hand minute" style={{ transform: `rotate(${-gameState.timeOfDay * 83}deg)` }} />
+                <span className="allan-clock-center" />
+              </div>
+            ) : (
+              <div className="time-bar">
+                <div className="time-fill" style={{ width: `${Math.min(100, gameState.timeOfDay / marketDuration * 100)}%` }} />
+                <span className="time-label">{paused ? "⏸ PAUSED" : gameState.marketOpen ? `Day ${gameState.day} — ${formatMarketTime(gameState.timeOfDay / marketDuration * 100)}` : "Market Closed"}</span>
+              </div>
+            )}
             <div className="speed-controls">
               <button className={speed === 1 ? "active" : ""} onClick={() => handleSetSpeed(1)}>1x</button>
               <button className={speed === 2 ? "active" : ""} onClick={() => handleSetSpeed(2)}>2x</button>
@@ -2470,6 +2567,9 @@ function App() {
             })()}
           </div>
         </header>
+      )}
+      {gameState.lastCharacterEvent && !isRestaurantShift && (
+        <div className="character-event" role="status">{gameState.lastCharacterEvent}</div>
       )}
 
       {paused && !showChallengeIntro && !disconnectedPlayer && !showLoanOffer && (
@@ -2644,6 +2744,7 @@ function App() {
           players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
           hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop" || eodPhase === "leisure")}
           onSchmoozeSuccess={handleSchmoozeSuccess}
+          character={localCharacter}
         />
         {/* Post-shift overlays render on top of restaurant UI */}
         {showChallengeIntro === "restaurant" && (
@@ -2734,6 +2835,12 @@ function App() {
                   </div>
                 );
               })()}
+              {gameState.milestonePayment && characterXpResult && (
+                <div className="character-xp-award">
+                  <strong>{localCharacter.id.toUpperCase()} earned {characterXpResult.amount} XP</strong>
+                  <span>{characterXpResult.levelsGained > 0 ? `Level up! Now level ${characterXpResult.level}.` : `Progress saved toward level ${characterXpResult.level + 1}.`}</span>
+                </div>
+              )}
               <button onClick={isMultiplayer ? handleLocalEodContinue : handleChallengesContinue}>Continue →</button>
             </div>
           </div>
@@ -3248,6 +3355,7 @@ function App() {
               localPlayerName={mpState.localPlayer?.name ?? "You"}
               players={isMultiplayer ? mpState.players.map((p) => ({ id: p.id, name: p.name, color: p.color })) : undefined}
               hideShiftSummary={isMultiplayer && (localEodInfoStep !== null || eodPhase === "upgrades" || eodPhase === "stocks" || eodPhase === "restaurant-upgrades" || eodPhase === "menu-draft" || eodPhase === "shop" || eodPhase === "leisure")}
+              character={localCharacter}
             />
             </div>
           ) : (
@@ -3272,6 +3380,11 @@ function App() {
                   onShort={handleShort}
                   onCover={handleCover}
                   onUseItem={handleUseTradingItem}
+                  character={localCharacter}
+                  playerId={mpState.localPlayer?.id ?? "player"}
+                  onAddAiStrategy={handleAddAiStrategy}
+                  onSetAiRisk={handleSetAiRisk}
+                  onClearAiStrategy={handleClearAiStrategy}
                 />
               ))}
             </div>

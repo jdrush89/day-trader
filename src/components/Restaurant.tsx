@@ -20,6 +20,7 @@ import { ALL_CHALLENGES, type ActiveChallenge } from "../game/challenges";
 import { getConsumable, getPhaseItems, type ConsumableInventory } from "../game/consumables";
 import { PnLGraph } from "./PnLGraph";
 import type { PlayerPnLSeries, PnLDataPoint } from "../game/trade-log";
+import type { CharacterSelection } from "../game/characters";
 
 const TICK_MS = 50;
 
@@ -58,6 +59,7 @@ interface RestaurantProps {
   players?: Array<{ id: string; name: string; color: string }>;
   hideShiftSummary?: boolean;
   onSchmoozeSuccess?: () => InsiderTip;
+  character: CharacterSelection;
 }
 
 function getCurrentStep(order: ActiveOrder): OrderStep | undefined {
@@ -536,7 +538,7 @@ function renderChoreInstruction(chore: ActiveChore, isTouch: boolean, triggerKey
   }
 }
 
-export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, onPeerChoreClick, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players, hideShiftSummary, onSchmoozeSuccess }: RestaurantProps) {
+export function Restaurant({ day, paused, state: rawState, setRestaurantState, onFinish, milestoneTarget, milestoneDaysLeft, netWorth, speed, onSpeedChange, acquiredRestaurantUpgrades, debugFF, onDebugFF, isBossDay, activeChallenges, tradingTickets, restaurantTickets, isPeer, onPeerKey, onPeerKeyUp, onPeerMouse, onPeerChoreClick, currentCounter = 0, onSwitchCounter, localActiveOrderId, consumableInventory, onUseRestaurantItem, localPlayerId = "player", localPlayerName = "You", players, hideShiftSummary, onSchmoozeSuccess, character }: RestaurantProps) {
   // Backward compat: default counter fields
   const state = useMemo(() => ({
     ...rawState,
@@ -567,7 +569,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
       for (let s = 0; s < state.slotsPerCounter; s++) {
         const order = state.orderSlots[start + s];
         if (order && !order.failed && !order.served) {
-          others.push({ counterIndex: c, slotIndex: s, order, patienceRatio: order.patienceRemaining / order.menuItem.patience });
+          others.push({ counterIndex: c, slotIndex: s, order, patienceRatio: order.patienceRemaining / (order.maxPatience ?? order.menuItem.patience) });
         }
       }
     }
@@ -675,13 +677,13 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
         setRestaurantState((prev) => {
           if (!prev) return prev;
           // acceptOrder handles chore slot focus too
-          const next = acceptOrder(prev, globalIndex);
+          const next = acceptOrder(prev, globalIndex, character);
           if (next.choreFocused) return next;
           const order = prev.orderSlots[globalIndex];
           if (!order) return prev;
           // Schmoozing orders just get selected
           if (order.schmoozing) return { ...prev, activeOrderId: order.id, choreFocused: false };
-          if (order.completed) return serveOrder(prev, globalIndex, tipMultiplierRef.current, localPlayerIdRef.current);
+          if (order.completed) return serveOrder(prev, globalIndex, tipMultiplierRef.current, localPlayerIdRef.current, character);
           return next.activeOrderId != null ? recordOrderContributor(next, next.activeOrderId, localPlayerIdRef.current) : next;
         });
         return;
@@ -703,7 +705,7 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
           if (!prev) return prev;
           const activeSlotIndex = prev.orderSlots.findIndex((slot) => slot?.id === prev.activeOrderId);
           const currentOrder = activeSlotIndex >= 0 ? prev.orderSlots[activeSlotIndex] : null;
-          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex, tipMultiplierRef.current, localPlayerIdRef.current);
+          if (currentOrder?.completed) return serveOrder(prev, activeSlotIndex, tipMultiplierRef.current, localPlayerIdRef.current, character);
           const next = handleKeyPress(prev, event.key);
           return prev.activeOrderId != null ? recordOrderContributor(next, prev.activeOrderId, localPlayerIdRef.current) : next;
         });
@@ -1002,8 +1004,8 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
                       if (!currentOrder) return prev;
                       // Schmoozing orders just get selected (focused)
                       if (currentOrder.schmoozing) return { ...prev, activeOrderId: currentOrder.id, choreFocused: false };
-                      if (currentOrder.completed) return serveOrder(prev, globalIndex, tipMultiplier, localPlayerId);
-                      const next = acceptOrder(prev, globalIndex);
+                      if (currentOrder.completed) return serveOrder(prev, globalIndex, tipMultiplier, localPlayerId, character);
+                      const next = acceptOrder(prev, globalIndex, character);
                       return next.activeOrderId != null ? recordOrderContributor(next, next.activeOrderId, localPlayerId) : next;
                     })
               }

@@ -5,6 +5,7 @@ import type { Player, ActionFeedItem, PeerAction, GameSync } from "./types";
 import { MultiplayerHost } from "./host";
 import { MultiplayerPeer } from "./peer";
 import { getPlayerColor } from "./network";
+import type { CharacterSelection } from "../game/characters";
 
 export type MultiplayerRole = "none" | "host" | "peer";
 
@@ -30,8 +31,8 @@ export interface MultiplayerState {
 }
 
 export interface MultiplayerActions {
-  hostGame: (playerName: string) => Promise<void>;
-  joinGame: (roomCode: string, playerName: string) => Promise<void>;
+  hostGame: (playerName: string, character: CharacterSelection) => Promise<void>;
+  joinGame: (roomCode: string, playerName: string, character: CharacterSelection) => Promise<void>;
   startGame: () => void;
   disconnect: () => void;
   sendAction: (action: PeerAction) => void;
@@ -54,7 +55,7 @@ export function useMultiplayer(
   getShowTransition: () => string | null,
   getShowChallengeIntro: () => string | null,
   getShowLoanOffer: () => { amount: number; interestRate: number; dueDay: number; isEmergency: boolean } | null,
-  getPlayerSaves: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }> | undefined,
+  getPlayerSaves: () => Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[]; character: CharacterSelection }> | undefined,
   getMpSaveId: () => string | undefined,
   getShopOffering: () => Array<{ id: string; name: string; phase: string; tier: number }>,
   getPnlSeries: () => Array<{ playerId: string; playerName: string; playerColor: string; data: Array<{ time: number; value: number }> }> | undefined,
@@ -150,10 +151,10 @@ export function useMultiplayer(
     };
   }, []);
 
-  const hostGame = useCallback(async (playerName: string) => {
+  const hostGame = useCallback(async (playerName: string, character: CharacterSelection) => {
     setState((s) => ({ ...s, connecting: true, error: null }));
 
-    const localPlayer: Player = { id: "host", name: playerName, color: getPlayerColor(0) };
+    const localPlayer: Player = { id: "host", name: playerName, color: getPlayerColor(0), character };
 
     const host = new MultiplayerHost({
       getGameState: () => getGameStateRef.current(),
@@ -237,7 +238,7 @@ export function useMultiplayer(
     }
   }, [setGameState, setRestaurantState]);
 
-  const joinGame = useCallback(async (roomCode: string, playerName: string) => {
+  const joinGame = useCallback(async (roomCode: string, playerName: string, character: CharacterSelection) => {
     setState((s) => ({ ...s, connecting: true, error: null }));
 
     const peer = new MultiplayerPeer({
@@ -311,7 +312,7 @@ export function useMultiplayer(
 
     try {
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Connection timed out")), 25000));
-      await Promise.race([peer.connect(roomCode, playerName), timeout]);
+      await Promise.race([peer.connect(roomCode, playerName, character), timeout]);
       peerRef.current = peer;
       setState((s) => ({ ...s, role: "peer", roomCode, connecting: false }));
     } catch (err: any) {

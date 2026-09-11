@@ -2,6 +2,49 @@
 
 /* Medium screens (tablets, small laptops) */
 @media (max-width: 900px) {
+  .character-select-screen {
+    align-items: flex-start;
+    padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .character-select-panel {
+    max-height: none;
+    padding: 14px;
+  }
+
+  .character-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .character-card {
+    min-height: 112px;
+  }
+
+  .character-details {
+    grid-template-columns: 70px 1fr;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .character-details-portrait {
+    width: 66px;
+    height: 82px;
+    font-size: 2.2rem;
+  }
+
+  .character-select-actions {
+    position: sticky;
+    bottom: 0;
+    padding-top: 10px;
+    background: #0f121e;
+  }
+
+  .character-back-btn,
+  .character-confirm-btn {
+    min-width: 0;
+    flex: 1;
+  }
+
   .mobile-global-pause-btn {
     position: fixed;
     top: max(10px, env(safe-area-inset-top));

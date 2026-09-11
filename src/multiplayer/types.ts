@@ -1,5 +1,6 @@
 import type { GameState, OrderSide, OrderType } from "../game/types";
 import type { RestaurantState } from "../game/restaurant-types";
+import type { CharacterSelection } from "../game/characters";
 
 // --- Player identity ---
 
@@ -7,12 +8,13 @@ export interface Player {
   id: string; // PeerJS peer ID
   name: string;
   color: string; // for trade attribution UI
+  character: CharacterSelection;
 }
 
 // --- Actions sent from peer → host ---
 
 export type PeerAction =
-  | { type: "join_request"; playerName: string }
+  | { type: "join_request"; playerName: string; character: CharacterSelection }
   | { type: "buy_stock"; symbol: string; shares: number }
   | { type: "sell_stock"; symbol: string; shares: number }
   | { type: "short_stock"; symbol: string; shares: number }
@@ -45,7 +47,11 @@ export type PeerAction =
   | { type: "use_consumable"; consumableId: string }
   | { type: "buy_consumable"; consumableId: string }
   | { type: "restaurant_chore_click"; nx: number; ny: number }
-  | { type: "eod_info_done" };
+  | { type: "eod_info_done" }
+  | { type: "add_ai_strategy"; sourceId: string; symbol: string; direction: "up" | "down"; risk: number }
+  | { type: "set_ai_risk"; strategyId: string; risk: number }
+  | { type: "clear_ai_strategy"; strategyId: string }
+  | { type: "leisure_reward"; reward: { type: "cash" | "ticket" | "upgrade" | "recipe"; amount?: number; upgradeId?: string } | null; cashChange?: number };
 
 // --- Messages sent from host → peer ---
 
@@ -64,7 +70,7 @@ export interface GameSync {
   players: Player[];
   recentActions: ActionFeedItem[];
   playerActiveOrders?: Record<string, number | null>; // playerId → their active order ID
-  playerSaves?: Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[] }>; // for resume sync
+  playerSaves?: Array<{ name: string; upgrades: string[]; restaurantUpgrades: string[]; character: CharacterSelection }>; // for resume sync
   mpSaveId?: string; // save ID for this game run
   shopOffering?: Array<{ id: string; name: string; phase: string; tier: number }>; // synced shop items
   pnlSeries?: Array<{ playerId: string; playerName: string; playerColor: string; data: Array<{ time: number; value: number }> }>; // trading P&L graph data
