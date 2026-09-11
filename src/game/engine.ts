@@ -1050,7 +1050,7 @@ export function sellStock(state: GameState, symbol: string, shares: number, play
   const costBasis = position.avgCost * shares;
   const profit = revenue - costBasis;
   const adjustedProfit = applyProfitModifiers(state, stock, position, profit);
-  const memeMultiplier = character?.id === "colin" && stock.tags.includes("social-media")
+  const memeMultiplier = character?.id === "colin" && stock.tags.includes("meme")
     ? (adjustedProfit >= 0 ? characterScale(character.level, 2, 0.25, 5) : 2)
     : 1;
   const cashDelta = revenue + (adjustedProfit * memeMultiplier - profit);
@@ -1127,7 +1127,7 @@ export function coverShort(state: GameState, symbol: string, shares: number, pla
   let profit = (position.entryPrice - stock.price) * shares;
   if (profit > 0 && hasUpgrade(state, "loan_shark") && stock.tags.includes("finance")) profit *= 1.15;
   if (profit < 0 && hasUpgrade(state, "hedge_fund")) profit *= 0.75;
-  const memeMultiplier = character?.id === "colin" && stock.tags.includes("social-media")
+  const memeMultiplier = character?.id === "colin" && stock.tags.includes("meme")
     ? (profit >= 0 ? characterScale(character.level, 2, 0.25, 5) : 2)
     : 1;
   const netCash = state.cash + position.entryPrice * shares + profit * memeMultiplier;

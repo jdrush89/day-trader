@@ -41,7 +41,7 @@ const INITIAL_STOCKS: Stock[] = [
   { symbol: "NOVA", name: "Nova Energy", price: 88, openPrice: 88, history: [88], dailyHistory: [], tags: ["mid-cap", "energy", "renewable", "green"], ipoDay: 504 },
   { symbol: "PILL", name: "PillStack Pharma", price: 210, openPrice: 210, history: [210], dailyHistory: [], tags: ["large-cap", "healthcare", "pharma", "biotech"], ipoDay: 1260 },
   { symbol: "BANK", name: "First National Holdings", price: 65, openPrice: 65, history: [65], dailyHistory: [], tags: ["large-cap", "finance", "banking"], ipoDay: 1260 },
-  { symbol: "MEME", name: "MemeTech Solutions", price: 12, openPrice: 12, history: [12], dailyHistory: [], tags: ["small-cap", "tech", "speculative", "social-media"], ipoDay: 63 },
+  { symbol: "MEME", name: "MemeTech Solutions", price: 12, openPrice: 12, history: [12], dailyHistory: [], tags: ["small-cap", "tech", "speculative", "social-media", "meme"], ipoDay: 63 },
 ];
 
 export function createInitialState(

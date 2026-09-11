@@ -25,7 +25,7 @@ describe("trading characters", () => {
 
   it("amplifies Colin's realized meme-stock gains", () => {
     const state = createInitialState();
-    const meme = state.stocks.find((stock) => stock.tags.includes("social-media"))!;
+    const meme = state.stocks.find((stock) => stock.tags.includes("meme"))!;
     const withPosition = {
       ...state,
       stocks: state.stocks.map((stock) => stock.symbol === meme.symbol ? { ...stock, price: 20 } : stock),

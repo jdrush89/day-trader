@@ -10,6 +10,8 @@ export interface StockCandidate {
   historyDays: number; // how many trading days of fake history to generate
 }
 
+export const MEME_STOCK_SYMBOLS = new Set(["MEME", "YOLO", "MOON", "DOGE", "APE", "HODL", "FOMO"]);
+
 export const STOCK_POOL: StockCandidate[] = [
   // Tech
   { symbol: "BYTE", name: "ByteForge Systems", tags: ["mid-cap", "tech", "cloud"], priceRange: [40, 120], volatility: 0.025, historyDays: 504 },
@@ -145,12 +147,12 @@ export const STOCK_POOL: StockCandidate[] = [
   { symbol: "SAFE", name: "SafeGuard Insurance", tags: ["mid-cap", "finance"], priceRange: [30, 75], volatility: 0.018, historyDays: 756 },
 
   // Misc / Weird
-  { symbol: "YOLO", name: "YOLO Ventures", tags: ["small-cap", "speculative"], priceRange: [2, 10], volatility: 0.06, historyDays: 63 },
-  { symbol: "MOON", name: "MoonShot Holdings", tags: ["small-cap", "speculative"], priceRange: [1, 8], volatility: 0.065, historyDays: 63 },
-  { symbol: "DOGE", name: "DogeDAO Inc", tags: ["small-cap", "fintech", "speculative", "social-media"], priceRange: [0.5, 5], volatility: 0.07, historyDays: 63 },
-  { symbol: "APE", name: "ApeStrong Capital", tags: ["small-cap", "finance", "speculative", "social-media"], priceRange: [2, 12], volatility: 0.06, historyDays: 63 },
-  { symbol: "HODL", name: "HODL Asset Management", tags: ["small-cap", "finance", "speculative"], priceRange: [3, 15], volatility: 0.055, historyDays: 126 },
-  { symbol: "FOMO", name: "FOMO Technologies", tags: ["small-cap", "tech", "speculative"], priceRange: [2, 10], volatility: 0.055, historyDays: 63 },
+  { symbol: "YOLO", name: "YOLO Ventures", tags: ["small-cap", "speculative", "meme"], priceRange: [2, 10], volatility: 0.06, historyDays: 63 },
+  { symbol: "MOON", name: "MoonShot Holdings", tags: ["small-cap", "speculative", "meme"], priceRange: [1, 8], volatility: 0.065, historyDays: 63 },
+  { symbol: "DOGE", name: "DogeDAO Inc", tags: ["small-cap", "fintech", "speculative", "social-media", "meme"], priceRange: [0.5, 5], volatility: 0.07, historyDays: 63 },
+  { symbol: "APE", name: "ApeStrong Capital", tags: ["small-cap", "finance", "speculative", "social-media", "meme"], priceRange: [2, 12], volatility: 0.06, historyDays: 63 },
+  { symbol: "HODL", name: "HODL Asset Management", tags: ["small-cap", "finance", "speculative", "meme"], priceRange: [3, 15], volatility: 0.055, historyDays: 126 },
+  { symbol: "FOMO", name: "FOMO Technologies", tags: ["small-cap", "tech", "speculative", "meme"], priceRange: [2, 10], volatility: 0.055, historyDays: 63 },
 
   // More tech to keep variety going
   { symbol: "DEEP", name: "DeepMind Analytics", tags: ["mid-cap", "tech", "ai", "enterprise"], priceRange: [35, 95], volatility: 0.028, historyDays: 504 },

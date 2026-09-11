@@ -2,6 +2,7 @@ import { GameState, Stock } from "./types";
 import { createTradingTracker } from "./challenges";
 import { createEmptyInventory } from "./consumables";
 import { getCharacterSelection, isCharacterId, type CharacterSelection } from "./characters";
+import { MEME_STOCK_SYMBOLS } from "./stock-pool";
 
 const SAVE_KEY = "rogue-day-trader-save";
 const MP_SAVES_KEY = "rogue-day-trader-mp-saves";
@@ -74,6 +75,11 @@ export function saveGame(gameState: GameState, phase: "trading" | "restaurant"):
 }
 
 function backfillGameState(gs: GameState): GameState {
+  gs.stocks = gs.stocks.map((stock) =>
+    MEME_STOCK_SYMBOLS.has(stock.symbol) && !stock.tags.includes("meme")
+      ? { ...stock, tags: [...stock.tags, "meme"] }
+      : stock
+  );
   if (!gs.challengeTracker) gs.challengeTracker = createTradingTracker();
   else {
     // Backfill new tracker fields for old saves
