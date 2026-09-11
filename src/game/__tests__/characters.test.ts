@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { characterScale, xpRequiredForLevel, type CharacterSelection } from "../characters";
-import { buyOption, buyStock, getMarketDuration, placeOrder, sellStock } from "../engine";
+import { buyOption, buyStock, getIanSightDuration, getMarketDuration, placeOrder, sellStock } from "../engine";
 import { acceptOrder, calculateTip, createRestaurantState, serveOrder } from "../restaurant-engine";
 import { createInitialState } from "../state";
 
@@ -53,6 +53,12 @@ describe("trading characters", () => {
       second: character("zack", 4),
     });
     expect(getMarketDuration(state)).toBe(155);
+  });
+
+  it("keeps Ian's sight active for 10 to 20 ticks as he levels", () => {
+    expect(getIanSightDuration(1)).toBe(10);
+    expect(getIanSightDuration(6)).toBe(15);
+    expect(getIanSightDuration(20)).toBe(20);
   });
 
   it("misroutes Dinky trades at the configured chance", () => {

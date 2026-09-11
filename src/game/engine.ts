@@ -19,6 +19,10 @@ export function getMarketDuration(state: GameState): number {
   return zack ? Math.round(100 * characterScale(zack.level, 1.25, 0.1, 2.5)) : 100;
 }
 
+export function getIanSightDuration(level: number): number {
+  return Math.round(characterScale(level, 10, 1, 20));
+}
+
 function resolveDinkySymbol(state: GameState, requestedSymbol: string, character?: CharacterSelection): string {
   if (character?.id !== "dinky" || Math.random() >= 0.2 || state.stocks.length < 2) return requestedSymbol;
   const alternatives = state.stocks.filter((stock) => stock.symbol !== requestedSymbol);
@@ -950,7 +954,7 @@ export function tick(state: GameState): GameState {
       : undefined;
     ianSight = {
       mode,
-      ticksRemaining: horizon,
+      ticksRemaining: getIanSightDuration(ian.level),
       horizon,
       targetTick: mode === "future" ? newTimeOfDay + horizon : undefined,
       prices,
