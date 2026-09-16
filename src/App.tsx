@@ -28,6 +28,7 @@ import { Tennis } from "./components/Tennis";
 import { QuickTacToe } from "./components/QuickTacToe";
 import { Bowling } from "./components/Bowling";
 import { CharacterSelect } from "./components/CharacterSelect";
+import { CurrentCharacterBadge } from "./components/CurrentCharacterBadge";
 import { awardCharacterXp, characterScale, getCharacterSelection, type CharacterId } from "./game/characters";
 import { FishingReward } from "./game/fishing";
 import { startMusic, stopMusic, isMusicMuted, toggleMusicMute, getMusicVolume, setMusicVolume, setTrack, type TrackId } from "./game/music";
@@ -35,7 +36,7 @@ import titleScreen from "./assets/title-screen.png";
 import shwendysExterior from "./assets/shwendys-exterior.png";
 import tradingMorning from "./assets/trading-morning.jpg";
 
-const GAME_VERSION = "0.0.156";
+const GAME_VERSION = "0.0.157";
 
 const LEISURE_ACTIVITY_DEFS: { id: string; icon: string; label: string }[] = [
   { id: "fishing",     icon: "🎣", label: "Go Fishing" },
@@ -2489,7 +2490,10 @@ function App() {
 
      {!isRestaurantShift && (
         <header className="game-header">
-          <h1>{bossDay ? "⚠️ BOSS DAY: Day Shift!" : "📈 Day Trader"}</h1>
+          <div className="trading-brand">
+            <CurrentCharacterBadge character={localCharacter} />
+            <h1>{bossDay ? "⚠️ BOSS DAY: Day Shift!" : "📈 Day Trader"}</h1>
+          </div>
           {effectiveUpgrades.length > 0 && (
             <div className="upgrade-icons">
               {[...new Set(effectiveUpgrades)].map((id) => {

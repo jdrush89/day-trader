@@ -26,6 +26,16 @@
   letter-spacing: 0.08em;
 }
 
+.restaurant-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.restaurant-brand .current-character-badge {
+  border-color: rgba(255, 163, 92, 0.45);
+}
+
 .restaurant-header p {
   color: #ffdcb8;
   margin-top: 4px;

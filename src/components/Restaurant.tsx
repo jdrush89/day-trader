@@ -21,6 +21,7 @@ import { getConsumable, getPhaseItems, type ConsumableInventory } from "../game/
 import { PnLGraph } from "./PnLGraph";
 import type { PlayerPnLSeries, PnLDataPoint } from "../game/trade-log";
 import type { CharacterSelection } from "../game/characters";
+import { CurrentCharacterBadge } from "./CurrentCharacterBadge";
 
 const TICK_MS = 50;
 
@@ -832,7 +833,10 @@ export function Restaurant({ day, paused, state: rawState, setRestaurantState, o
     <div className="restaurant-screen">
       <header className="restaurant-header">
         <div>
-          <h1>🍔 SHWENDY'S</h1>
+          <div className="restaurant-brand">
+            <CurrentCharacterBadge character={character} />
+            <h1>🍔 SHWENDY'S</h1>
+          </div>
           <p>Day {day} — Shwendy's Shift</p>
           {acquiredRestaurantUpgrades.length > 0 && (
             <div className="upgrade-icons">

@@ -211,6 +211,38 @@ body {
   color: var(--gold);
 }
 
+.trading-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.current-character-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  padding: 4px 9px 4px 5px;
+  border: 1px solid rgba(255, 204, 102, 0.4);
+  border-radius: 999px;
+  background: rgba(8, 12, 20, 0.85);
+  color: #ffe2a8;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.current-character-portrait {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, rgba(255, 204, 102, 0.24), rgba(88, 166, 255, 0.16));
+  font-size: 1.05rem;
+}
+
 .header-controls {
   display: flex;
   align-items: center;
